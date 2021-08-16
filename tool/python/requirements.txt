@@ -1,0 +1,6 @@
+pandas==0.24.1
+Seaborn==0.9.0
+gdal==2.3.3
+click==7.1.1
+cython==0.29.14
+mpi4py==3.0.3

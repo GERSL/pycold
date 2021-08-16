@@ -1,0 +1,4 @@
+make -C ./src clean
+make -C ./src
+make -C ./src install
+make -C ./tool/python

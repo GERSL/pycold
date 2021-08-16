@@ -1,0 +1,36 @@
+mode=2
+in_path=/scratch/suy20004/h015v008_stack
+out_path=/scratch/suy20004/h015v008_sccd
+n_cores=1
+user_mask_path=
+row=1
+col=1
+method=4
+probability=0.99
+min_days_cones=80
+output_mode=0
+training_type=0
+distdays_lowerlim=0
+distdays_upperlim=0
+bandselection_bit=62
+classification_config=
+
+#################################################################################
+Explanation:
+Line 1: mode {1 - pixel-based; 2 - scanline-based; 3 - wholescene; 4-csv-input}  
+Line 2: in_path  {directory for LandsatARD ENVI images after being processed by CCDC-assistant or AutoPrepareDataARD.py} 
+Line 3: out_path {output directory for binary dat file}
+Line 4: n_cores {the number of assigned cores}
+Line 5: user_mask_path {mode 3 only; user mask path to speed up processing: note user mask currently only supports byte ENVI format with '1' representing processed regions, and '0' representing skipping regions}
+Line 6: row {mode 1/2 only, row number to query}
+Line 7: col  {mode 1 only, column number to be qury}
+Line 8: method {1 - COLD; 2 - S-CCD}
+Line 9: probability {the default is 0.99}
+Line 10: min_days_conse (only S-CCD)
+Line 11: output_mode # 11: both output; 01: output states; 10: output observation file; 00: no extra outputoutput (mode 1 only)
+Line 12: training_type {0 - normal mode; 1 - used for tuning parameters (currently unavailable); 2 - used for initial stage coefficients output in dynamic stratified monitoring strategy (currently unavailable)}
+Line 14: distdays_lowerlim {used for tuning parameters (currently unavailable)}
+Line 15: distdays_upperlim {used for tuning parameters (currently unavailable)}
+Line 16: bandselection_bit=62 {bit input used for different spectral inputs, and currently support the default inputs, i.e.,green, red, NIR, SWIR1, SWIR2}
+Line 17: classification_config= {used for defining classification config file in dynamic stratified monitoring strategy (currently unavailable)}
+

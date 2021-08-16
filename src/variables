@@ -1,0 +1,15 @@
+in_path=/scratch/suy20004/h010v010_stack
+out_path=/scratch/suy20004/h010v010_results
+task=1
+user_mask_path=
+probability=0.99
+min_days_conse=80
+
+#################################################################################
+Explanation:
+Line 1: in_path  {directory for LandsatARD ENVI images after being processed by CCDC-assistant or AutoPrepareDataARD.py} 
+Line 2: out_path {outputed directory for binary dat file}
+Line 3: task {1 - COLD; 2 - s-ccd}
+Line 4: user_mask_path {user mask path to speed up processing: note user mask currently only supports byte ENVI format with '1' representing processed regions, and '0' representing skipping regions}
+Line 5: probability (the default is 0.99)
+Line 6: min_days_conse (only sccd)
