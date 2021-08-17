@@ -38,10 +38,10 @@ typedef struct
     short int change_prob;     /* the probability of a pixel that have undergone
                                   change (between 0 and 100) */
     double coefs[TOTAL_IMAGE_BANDS][NUM_COEFFS];
-                           /*  coefficients for each time series model for each 
-                               spectral band*/    
+                           /*  coefficients for each time series model for each
+                               spectral band*/
     double rmse[TOTAL_IMAGE_BANDS];
-                           /*  RMSE for each time series model for each 
+                           /*  RMSE for each time series model for each
                                spectral band*/
     double magnitude[TOTAL_IMAGE_BANDS];/* the magnitude of change (difference between model
                                   prediction and observation for each spectral band)*/

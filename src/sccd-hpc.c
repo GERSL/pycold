@@ -917,7 +917,8 @@ int main(int argc, char *argv[])
     //                printf("temporal success2 with processid %d\n", process_id);
     //                printf("valid_scene_count_scanline[i_col] is %d;i_col is %d; current_row is %d; probability threshold is %f\n",
     //                       valid_scene_count_scanline[i_col], i_col, current_row, probability_threshold);
-                    result = cold(tmp_buf_2d, fmask_buf_scanline[i_col], valid_date_array_scanline[i_col],
+                    result = cold(tmp_buf_2d[0], tmp_buf_2d[1], tmp_buf_2d[2], tmp_buf_2d[3], tmp_buf_2d[4],
+                                  tmp_buf_2d[5], tmp_buf_2d[6], fmask_buf_scanline[i_col], valid_date_array_scanline[i_col],
                                   valid_scene_count_scanline[i_col], n_cols, i_col + 1, current_row + 1,
                                   tcg, conse, b_outputCM, starting_date, rec_cg, &num_fc, CM_outputs, CM_outputs_date);
 

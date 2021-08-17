@@ -45,7 +45,13 @@ int sccd_stand_procedure
 (
     int valid_num_scenes,             /* I:  number of scenes  */
     int *valid_date_array,           /* I: valid date time series  */
-    short int **buf,                 /* I:  pixel-based time series  */
+    short int *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     short int *fmask_buf,           /* I:  mask-based time series  */
     int *id_range,
     Output_t_sccd *rec_cg,

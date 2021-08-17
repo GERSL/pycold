@@ -87,7 +87,7 @@ int sccd
 
     id_range = (int*)calloc(valid_num_scenes, sizeof(int));
 
-    status = preprocessing(buf, fmask_buf, &valid_num_scenes, id_range, &clear_sum,
+    status = preprocessing(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, &valid_num_scenes, id_range, &clear_sum,
                            &water_sum, &shadow_sum, &sn_sum, &cloud_sum);
 
 
@@ -123,8 +123,7 @@ int sccd
     }
 
     if (clear_sum < N_TIMES * MAX_NUM_C){
-        result = sccd_inefficientobs_procedure(valid_num_scenes,valid_date_array, buf,
-                                 fmask_buf, id_range,sn_pct,rec_cg, num_fc);
+        result = sccd_inefficientobs_procedure(valid_num_scenes,valid_date_array, buf, fmask_buf, id_range,sn_pct,rec_cg, num_fc);
     }
     else{
 
@@ -142,7 +141,7 @@ int sccd
 //                                     n_total_variable, focus_blist, NDVI_INCLUDED,
 //                                     NBR_INCLUDED, RGI_INCLUDED,TCTWETNESS_INCLUDED,TCTGREENNESS_INCLUDED,
 //                                     EVI_INCLUDED, DI_INCLUDED, NDMI_INCLUDED, booster, b_landspecific, auxval);
-       result = sccd_stand_procedure(valid_num_scenes, valid_date_array, buf,
+       result = sccd_stand_procedure(valid_num_scenes, valid_date_array, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6],
                                      fmask_buf, id_range, rec_cg, num_fc,
                                      states_output_dir, b_fastmode, probability_threshold,
                                      min_days_conse, training_type, monitorwindow_lowerlin,
@@ -4520,7 +4519,13 @@ int sccd_stand_procedure
 (
     int valid_num_scenes,             /* I:  number of scenes  */
     int *valid_date_array,           /* I: valid date time series  */
-    short int **buf,                 /* I:  pixel-based time series  */
+    short int *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     short int *fmask_buf,           /* I:  mask-based time series  */
     int *id_range,
     Output_t_sccd *rec_cg,
@@ -4789,8 +4794,20 @@ int sccd_stand_procedure
                 for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
                 {
 
-                    clry[k][n_clr] = (float)buf[k][i];
-
+                    if (k == 0)
+                        clry[k][n_clr] = (float)buf_b[i];
+                    else if(k == 1)
+                        clry[k][n_clr] = (float)buf_g[i];
+                    else if(k == 2)
+                        clry[k][n_clr] = (float)buf_r[i];
+                    else if(k == 3)
+                        clry[k][n_clr] = (float)buf_n[i];
+                    else if(k == 4)
+                        clry[k][n_clr] = (float)buf_s1[i];
+                    else if(k == 5)
+                        clry[k][n_clr] = (float)buf_s2[i];
+                    else if(k == 6)
+                        clry[k][n_clr] = (float)buf_t[i];
                     clry_copy[k][n_clr] = clry[k][n_clr];
 
                     //printf("%3.2f\n", clry[k][n_clr]);

@@ -613,7 +613,7 @@ int tsalgorithm_executor(
             }
 
             rec_cg = malloc(NUM_FC * sizeof(Output_t));
-            result = cold(buf, fmask_buf, valid_date_array, valid_scene_count, meta->samples, col, row, tcg, conse, FALSE, starting_date,
+            result = cold(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, valid_date_array, valid_scene_count, meta->samples, col, row, tcg, conse, FALSE, starting_date,
                          rec_cg, &num_fc, CM_outputs, CM_outputs_date);
 
             /**********************************************************/
@@ -648,7 +648,7 @@ int tsalgorithm_executor(
             free(rec_cg);
         }else if(b_outputCM_reconstruction == TRUE)
         {
-            // bool b_outputCM_reconstruction = TRUE; // indicate if it is used to reconstruct rec_cg in sp-cold
+            // bool b_outputCM_reconstruction = TRUE; // indicate if it is used to reconstruct rec_cg in ob-cold
             char breakdatemap_list_filename[] = "breakdatemap_list.txt";
             char **breakdatemap_list;
             char breakdatemap_list_directory[MAX_STR_LEN];
@@ -958,7 +958,7 @@ int tsalgorithm_executor(
                 fhoutput_cm = fopen(CM_fullpath,"w");
                 fhoutput_cm_date = fopen(CM_date_fullpath,"w");
             }
-            result = cold(buf, fmask_buf, valid_date_array, valid_scene_count, meta->samples, col, row, tcg, conse, FALSE, starting_date,
+            result = cold(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, valid_date_array, valid_scene_count, meta->samples, col, row, tcg, conse, FALSE, starting_date,
                          rec_cg, &num_fc, CM_outputs, CM_outputs_date);
             for(i = 0; i < num_fc + 1; i++)
             {
@@ -1050,7 +1050,13 @@ Date        Programmer       Reason
 
 int preprocessing
 (
-    short int** buf,            /* I/O:  pixel-based time series  */
+    short int *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     short int* fmask_buf,        /* I:   mask time series  */
     int *valid_num_scenes, /* I/O: * number of scenes after cfmask counts and  */
     int *id_range,
@@ -1066,16 +1072,16 @@ int preprocessing
 
     for (i = 0; i < *valid_num_scenes; i++)
     {
-        if (buf[6][i] != 0)
-            buf[6][i] = (short int)(buf[6][i] * 10 - 27320);
+        if (buf_t[i] != 0)
+            buf_t[i] = (short int)(buf_t[i] * 10 - 27320);
 
-        if ((buf[0][i] > 0) && (buf[0][i] < 10000) &&
-            (buf[1][i] > 0) && (buf[1][i] < 10000) &&
-            (buf[2][i] > 0) && (buf[2][i] < 10000) &&
-            (buf[3][i] > 0) && (buf[3][i] < 10000) &&
-            (buf[4][i] > 0) && (buf[4][i] < 10000) &&
-            (buf[5][i] > 0) && (buf[5][i] < 10000) &&
-            (buf[6][i] > -9320) && (buf[6][i] < 7070))
+        if ((buf_b[i] > 0) && (buf_b[i] < 10000) &&
+            (buf_g[i] > 0) && (buf_g[i] < 10000) &&
+            (buf_r[i] > 0) && (buf_r[i] < 10000) &&
+            (buf_n[i] > 0) && (buf_n[i] < 10000) &&
+            (buf_s1[i] > 0) && (buf_s1[i] < 10000) &&
+            (buf_s2[i] > 0) && (buf_s2[i] < 10000) &&
+            (buf_t[i] > -9320) && (buf_t[i] < 7070))
          {
             id_range[i] = 1;
          }
@@ -1128,7 +1134,13 @@ Date        Programmer       Reason
 
 int cold
 (
-    short int **buf,            /* I:  Landsat spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     short int *fmask_buf,       /* I:  the time series of cfmask values. 0 - clear; 1 - water; 2 - shadow; 3 - snow; 4 - cloud  */
     int *valid_date_array,      /* I:  valid date as matlab serial date form (counting from Jan 0, 0000). Note ordinal date in python is from (Jan 1th, 0001) */
     int valid_num_scenes,       /* I: number of valid scenes  */
@@ -1159,7 +1171,8 @@ int cold
 
     id_range = (int*)calloc(valid_num_scenes, sizeof(int));
 
-    status = preprocessing(buf, fmask_buf, &valid_num_scenes, id_range, &clear_sum,
+    status = preprocessing(buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
+                           fmask_buf, &valid_num_scenes, id_range, &clear_sum,
                            &water_sum, &shadow_sum, &sn_sum, &cloud_sum);
     // printf("preprocessing finished \n");
       /* checking inputs */
@@ -1213,7 +1226,7 @@ int cold
 
     // if ((clr_pct < T_CLR)||(clear_sum < N_TIMES * MAX_NUM_C)){
     if (clear_sum < N_TIMES * MAX_NUM_C){
-        result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf,
+        result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
                                  fmask_buf, id_range,sn_pct,rec_cg, num_fc);
     }
     else{
@@ -1223,7 +1236,17 @@ int cold
         /* standard_procedure for CCD                                 */
         /*                                                            */
         /**************************************************************/
-        result = stand_procedure(valid_num_scenes, valid_date_array, buf, fmask_buf, id_range,
+//        printf("valid_num_scenes = %d\n", valid_num_scenes);
+//        printf("valid_date_array[0] = %d\n", valid_date_array[0]);
+//        printf("buf_b[0] = %d\n", buf_b[0]);
+//        printf("buf_t[0] = %d\n", buf_t[0]);
+//        printf("fmask_buf[0] = %d\n", fmask_buf[0]);
+//        printf("valid_num_scenes[0] = %d\n", valid_num_scenes);
+//        printf("id_range[0]=%d\n", id_range[0]);
+//        printf("tcg=%f\n", tcg);
+//        printf("conse=%d\n", conse);
+//        printf("num_fc=%d\n", *num_fc);
+        result = stand_procedure(valid_num_scenes, valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t, fmask_buf, id_range,
                                  tcg, conse, b_outputCM, starting_date, rec_cg, num_fc, CM_outputs,
                                  CM_outputs_date);
 
@@ -1266,7 +1289,13 @@ int stand_procedure
 (
     int valid_num_scenes,             /* I:  number of valid scenes  */
     int *valid_date_array,            /* I: valid date time series  */
-    short int **buf,            /* I:  pixel-based time series  */
+    short int *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     short int *fmask_buf,       /* I:  mask-based time series  */
     int *id_range,
     double tcg,                 /* I: threshold of change threshold  */
@@ -1407,7 +1436,20 @@ int stand_procedure
                 //printf("%d is %d\n", n_clr + 1, clrx[n_clr]);
                 for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
                 {
-                    clry[k][n_clr] = (float)buf[k][i];
+                    if (k == 0)
+                        clry[k][n_clr] = (float)buf_b[i];
+                    else if (k == 1)
+                        clry[k][n_clr] = (float)buf_g[i];
+                    else if (k == 2)
+                        clry[k][n_clr] = (float)buf_r[i];
+                    else if (k == 3)
+                        clry[k][n_clr] = (float)buf_n[i];
+                    else if (k == 4)
+                        clry[k][n_clr] = (float)buf_s1[i];
+                    else if (k == 5)
+                        clry[k][n_clr] = (float)buf_s2[i];
+                    else if (k == 6)
+                        clry[k][n_clr] = (float)buf_t[i];
                     //printf("%3.2f\n", clry[k][n_clr]);
                 }
                 n_clr++;
@@ -3439,7 +3481,13 @@ int inefficientobs_procedure
 (
     int valid_num_scenes,             /* I:  number of scenes  */
     int *valid_date_array,    /* I: valid date time series  */
-    short int **buf,            /* I:  pixel-based time series  */
+    short int *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    short int *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     short int *fmask_buf,      /* I:  mask-based time series  */
     int *id_range,
     double sn_pct,
@@ -3512,7 +3560,20 @@ int inefficientobs_procedure
                 clrx[n_sn] = valid_date_array[i];
                 for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
                 {
-                     clry[k][n_sn] = (float)buf[k][i];
+                    if (k == 0)
+                        clry[k][n_sn] = (float)buf_b[i];
+                    else if(k == 1)
+                        clry[k][n_sn] = (float)buf_g[i];
+                    else if(k == 2)
+                        clry[k][n_sn] = (float)buf_r[i];
+                    else if(k == 3)
+                        clry[k][n_sn] = (float)buf_n[i];
+                    else if(k == 4)
+                        clry[k][n_sn] = (float)buf_s1[i];
+                    else if(k == 5)
+                        clry[k][n_sn] = (float)buf_s2[i];
+                    else if(k == 6)
+                        clry[k][n_sn] = (float)buf_t[i];
                 }
                 n_sn++;
             }
@@ -3736,8 +3797,22 @@ int inefficientobs_procedure
             if (id_range[i] == 1)
             {
                 clrx[n_clr] = valid_date_array[i];
-                for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
-                    clry[k][n_clr] = (double)buf[k][i];
+                for (k = 0; k < TOTAL_IMAGE_BANDS; k++){
+                    if (k == 0)
+                        clry[k][n_clr] = (float)buf_b[i];
+                    else if(k == 1)
+                        clry[k][n_clr] = (float)buf_g[i];
+                    else if(k == 2)
+                        clry[k][n_clr] = (float)buf_r[i];
+                    else if(k == 3)
+                        clry[k][n_clr] = (float)buf_n[i];
+                    else if(k == 4)
+                        clry[k][n_clr] = (float)buf_s1[i];
+                    else if(k == 5)
+                        clry[k][n_clr] = (float)buf_s2[i];
+                    else if(k == 6)
+                        clry[k][n_clr] = (float)buf_t[i];
+                }
                 n_clr++;
             }
         }
@@ -4342,7 +4417,8 @@ int ccd_scanline
             }
 
             rec_cg = malloc(NUM_FC * sizeof(Output_t));
-            result = cold(tmp_buf, tmp_fmask_buf, tmp_valid_date_array,
+            result = cold(tmp_buf[0], tmp_buf[1], tmp_buf[2], tmp_buf[3], tmp_buf[4],
+                          tmp_buf[5], tmp_buf[6], tmp_fmask_buf, tmp_valid_date_array,
                           valid_scene_count_scanline[i_col], num_samples, i_col + 1,
                           row, tcg, conse, FALSE, starting_date,rec_cg, &num_fc, CM_outputs, CM_outputs_date);
 
@@ -4638,7 +4714,8 @@ int obcold_reconstruction_procedure
 
 
 
-    status = preprocessing(buf, fmask_buf, &valid_num_scenes, id_range, &clear_sum,
+    status = preprocessing(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6],
+                            fmask_buf, &valid_num_scenes, id_range, &clear_sum,
                            &water_sum, &shadow_sum, &sn_sum, &cloud_sum);
     if (status != SUCCESS)
     {
@@ -4690,7 +4767,7 @@ int obcold_reconstruction_procedure
     break_list = (int* )malloc(num_year * sizeof(int));
 
     if (clear_sum < N_TIMES * MAX_NUM_C){
-        result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf,
+        result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6],
                                  fmask_buf, id_range,sn_pct,rec_cg, num_fc);
     }else
     {
@@ -5008,7 +5085,7 @@ int obcold_reconstruction_procedure
         } // end  for(j = 0; j < break_num; j++)
 
         if(*num_fc == 0){ // apply inefficient procedure to guaranttee to have a model
-            result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf,
+            result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6],
                                      fmask_buf, id_range,sn_pct,rec_cg, num_fc);
         }
     }
