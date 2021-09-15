@@ -96,7 +96,7 @@ for i in range(len(cold_result)):
                                  plot_cold_sub['trimodel']
 
     calendar_dates = [pd.Timestamp.fromordinal(int(row) - 366) for row in plot_cold_sub["dates"]]
-    plot_cold_sub.loc[:, 'dates'] = calendar_dates
+    plot_cold_sub.loc[:, 'datesa p'] = calendar_dates
     g = sns.lineplot(x="dates", y="predicted", data=plot_cold_sub, label="Model fit", ax=ax, color="orange")
     g.legend_.remove()  # remove legend temporally
     plot_cold = pd.concat([plot_cold, plot_cold_sub], sort=True)
