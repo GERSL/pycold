@@ -53,3 +53,22 @@ cold_result = pycold.pycold(dates, blue, green, red, nir, swir1, swir2, thermal,
 
 ```
 A full example of running pycold for an example dataset can be found in /YOUR_PYCOLD_DIRECTORY/tool/python/COLDexample_fromcsv.py
+
+
+# New Cmake Build Instructions:
+
+
+```
+# Install required libraries
+sudo apt-get install build-essential
+sudo apt-get install libgsl-dev
+sudo apt-get install gfortran
+
+# Scikit-build will invoke CMake and build everything
+python setup.py build
+
+# Or you can build with CMake by itself
+mkdir -p build
+cd build
+cmake ..
+```
