@@ -37,13 +37,13 @@ typedef struct
     8: model has 7 coefs + 1 const*/
     short int change_prob;     /* the probability of a pixel that have undergone
                                   change (between 0 and 100) */
-    double coefs[TOTAL_IMAGE_BANDS][NUM_COEFFS];
+    float coefs[TOTAL_IMAGE_BANDS][NUM_COEFFS];
                            /*  coefficients for each time series model for each
                                spectral band*/
-    double rmse[TOTAL_IMAGE_BANDS];
+    float rmse[TOTAL_IMAGE_BANDS];
                            /*  RMSE for each time series model for each
                                spectral band*/
-    double magnitude[TOTAL_IMAGE_BANDS];/* the magnitude of change (difference between model
+    float magnitude[TOTAL_IMAGE_BANDS];/* the magnitude of change (difference between model
                                   prediction and observation for each spectral band)*/
 } Output_t;
 

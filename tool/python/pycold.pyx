@@ -11,7 +11,6 @@ from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 
 
 cdef int NUM_FC = 40  # define the maximum number of outputted curves
-cdef int SPATIAL_OUTPUT_INTERVAL = 30  # for object-based COLD only
 
 DTYPE_date = np.float64
 ctypedef np.float64_t DTYPE_t
@@ -23,9 +22,9 @@ reccg_dt = np.dtype([('t_start', np.int32),  # time when series model gets start
                      ('num_obs', np.int32),  # the number of "good" observations used for model estimation
                      ('category', np.short),  # the quality of the model estimation (what model is used, what process is used)
                      ('change_prob', np.short),  # the probability of a pixel that have undergone change (between 0 and 100)
-                     ('coefs', np.double, (7, 8)),  # coefficients for each time series model for each spectral band
-                     ('rmse', np.double, 7),  # RMSE for each time series model for each spectral band
-                     ('magnitude', np.double, 7)])  # the magnitude of change difference between model prediction
+                     ('coefs', np.float, (7, 8)),  # coefficients for each time series model for each spectral band
+                     ('rmse', np.float, 7),  # RMSE for each time series model for each spectral band
+                     ('magnitude', np.float, 7)])  # the magnitude of change difference between model prediction
                                           # and observation for each spectral band)
 
 
@@ -38,15 +37,15 @@ cdef extern from "../../src/output.h":
         int num_obs
         short int category
         short int change_prob
-        double coefs[7][8]
-        double rmse[7]
-        double magnitude[7]
+        float coefs[7][8]
+        float rmse[7]
+        float magnitude[7]
 
 cdef extern from "../../src/cold.h":
     cdef int cold(short *buf_b, short *buf_g, short *buf_r, short *buf_n, short *buf_s1, short *buf_s2,
                   short *buf_t, short *fmask_buf, int *valid_date_array, int valid_num_scenes, int num_samples,
                   int col_pos, int row_pos, double tcg, int conse, bool b_outputCM, int starting_date, Output_t *rec_cg,
-                  int *num_fc, short int *CM_outputs, char *CM_outputs_date);
+                  int *num_fc, int CM_OUTPUT_INTERVAL, short int *CM_outputs, char *CM_outputs_date);
 
 
 
@@ -54,7 +53,7 @@ def pycold(np.ndarray[np.int32_t, ndim=1] dates, np.ndarray[np.int16_t, ndim=1] 
            np.ndarray[np.int16_t, ndim=1] ts_r, np.ndarray[np.int16_t, ndim=1] ts_n, np.ndarray[np.int16_t, ndim=1] ts_s1,
            np.ndarray[np.int16_t, ndim=1] ts_s2, np.ndarray[np.int16_t, ndim=1] ts_t, np.ndarray[np.int16_t, ndim=1] qas,
            double t_cg = 15.0863, int conse=6, int num_samples=5000, int col_pos=1, int row_pos=1, bint b_outputCM=False,
-           int starting_date=0):
+           int starting_date=0, int CM_OUTPUT_INTERVAL=32):
     """
     dates: 1d array of shape(observation numbers), list of ordinal dates
     ts_b: 1d array of shape(observation numbers), time series of blue band.
@@ -73,6 +72,7 @@ def pycold(np.ndarray[np.int32_t, ndim=1] dates, np.ndarray[np.int16_t, ndim=1] 
     b_outputCM: bool, 'True' means outputting change magnitude and change magnitude dates, only for object-based COLD
     starting_date: the starting date of the whole dataset to enable reconstruct CM_date,
                    all pixels for a tile should have the same date, only for b_outputCM is True
+    CM_OUTPUT_INTERVAL: the temporal interval of outputting change magnitudes
     Note: passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
     """
 
@@ -111,8 +111,8 @@ def pycold(np.ndarray[np.int32_t, ndim=1] dates, np.ndarray[np.int16_t, ndim=1] 
 
     # CM_outputs and CM_outputs_date are not used so far, but left for object-based cold (under development)
     if b_outputCM == True:
-        CM_outputs = np.full(math.ceil((dates[valid_num_scenes-1] - starting_date) / SPATIAL_OUTPUT_INTERVAL) + 1, -9999, dtype=np.short)
-        CM_outputs_date = np.full(math.ceil((dates[valid_num_scenes-1] - starting_date) / SPATIAL_OUTPUT_INTERVAL) + 1, 255, dtype=np.byte)
+        CM_outputs = np.full(math.ceil((dates[valid_num_scenes-1] - starting_date) / CM_OUTPUT_INTERVAL) + 1, -9999, dtype=np.short)
+        CM_outputs_date = np.full(math.ceil((dates[valid_num_scenes-1] - starting_date) / CM_OUTPUT_INTERVAL) + 1, 255, dtype=np.byte)
     else:  # set the length to 1 to save memory, as they won't be assigned values
         CM_outputs = np.full(1, -9999, dtype=np.short)
         CM_outputs_date = np.full(1, 255, dtype=np.byte)
@@ -121,7 +121,7 @@ def pycold(np.ndarray[np.int32_t, ndim=1] dates, np.ndarray[np.int16_t, ndim=1] 
 
     result = cold(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0], &ts_t_view[0],
                  &qas_view[0], &dates_view[0], valid_num_scenes, num_samples, col_pos, row_pos, t_cg, conse, b_outputCM,
-                 starting_date, rec_cg, &num_fc, &CM_outputs_view[0], &CM_outputs_date_view[0])
+                 starting_date, rec_cg, &num_fc, CM_OUTPUT_INTERVAL, &CM_outputs_view[0], &CM_outputs_date_view[0])
     if result != 0:
         raise RuntimeError("cold function fails for col_pos = {} and row_pos = {}".format(col_pos, row_pos))
     else:

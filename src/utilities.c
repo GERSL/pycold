@@ -601,9 +601,6 @@ int get_variables
                            /* O: col number for the pixel                   */
     int *task,
     char *user_mask_path,   /* O: directory location for user_mask           */
-    double *probability_threshold,
-    int *conse,
-    int *min_days_conse,
     bool *b_fastmode,
     bool *b_outputCSV
 )
@@ -674,15 +671,6 @@ int get_variables
 
     fscanf(var_fp, "%s\n", line8);
     *task = atoi(strchr(line8, '=') + 1);
-
-    fscanf(var_fp, "%s\n", line9);
-    *probability_threshold = atof(strchr(line9, '=') + 1);
-
-    fscanf(var_fp, "%s\n", line10);
-    *conse = atof(strchr(line10, '=') + 1);
-
-    fscanf(var_fp, "%s\n", line11);
-    *min_days_conse = atoi(strchr(line11, '=') + 1);
 
     fscanf(var_fp, "%s\n", line12);
     output_mode = atoi(strchr(line12, '=') + 1);
@@ -1117,3 +1105,119 @@ int find_index_clrx
         return minabsdiff_i_record;
 }
 
+
+/******************************************************************************
+MODULE:  get_coldparameters
+PURPOSE:  Gets the parameters from yaml
+RETURN VALUE:
+Type = int
+Value           Description
+-----           -----------
+FAILURE         Error Can't locate yaml file
+SUCCESS         No errors encountered
+SOURCE: https://stackoverflow.com/questions/49785153/c-reading-from-txt-file-into-struct
+HISTORY:
+Date        Programmer       Reason
+--------    ---------------  -------------------------------------
+09/01/2021  Su Ye            orginal develop
+******************************************************************************/
+int get_coldparameters
+(
+    int *n_rows,
+    int *n_cols,
+    int *ROW_STEP,
+    int *PARTITION,
+    int *CM_OUTPUT_INTERVAL,
+    float *probability_threshold,
+    int *conse
+)
+{
+    char cwd[MAX_STR_LEN]; // current directory path
+    char var_path[MAX_STR_LEN];
+    FILE *var_fp;
+    char line[MAX_STR_LEN];
+    char line1[MAX_STR_LEN];
+    char parameter_name[MAX_STR_LEN];
+    char errmsg[MAX_STR_LEN];      /* error message                         */
+    float val;
+    char *token;
+    const char deli[] = ":";
+    int output_mode;
+    char FUNC_NAME[] = "get_coldparameters";
+    int status = 0;
+    char s1[] = "n_rows";
+    char s2[] = "n_cols";
+    char s3[] = "ROW_STEP";
+    char s4[] = "PARTITION";
+    char s5[] = "CM_OUTPUT_INTERVAL";
+    char s6[] = "probability_threshold";
+    char s7[] = "conse";
+
+    getcwd(cwd, sizeof(cwd));
+    //printf("getvariable");
+    sprintf(var_path, "%s/%s", cwd, "parameters.yaml");
+
+    var_fp = fopen(var_path, "r");
+
+    if(var_fp == NULL)
+    {
+        sprintf(errmsg, "no parameter.yaml was found in %s \n", cwd);
+        RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+    }
+
+    while (true)
+    {
+        if (fscanf(var_fp, " %[^\n]", line) != EOF){
+          token = strtok(line, deli);
+          if (strcmp(token, s1) == 0){
+              token = strtok(NULL, deli);
+              *n_rows = atoi(token);
+          }
+          else if (strcmp(token, s2) == 0){
+              token = strtok(NULL, deli);
+              *n_cols = atoi(token);
+          }
+          else if (strcmp(token, s3) == 0){
+              token = strtok(NULL, deli);
+              *ROW_STEP = atoi(token);
+          }
+          else if (strcmp(token, s4) == 0){
+              token = strtok(NULL, deli);
+              *PARTITION = atoi(token);
+          }
+          else if(strcmp(token, s5) == 0){
+              token = strtok(NULL, deli);
+              *CM_OUTPUT_INTERVAL = atoi(token);
+          }
+          else if(strcmp(token, s6) == 0){
+              token = strtok(NULL, deli);
+              *probability_threshold = atof(token);
+          }
+          else if(strcmp(token, s7) == 0){
+              token = strtok(NULL, deli);
+              *conse = atoi(token);
+          }
+        }else{
+            break;//end of file
+        }
+    }
+
+    fclose(var_fp);
+
+    if (*n_rows == 0)
+        RETURN_ERROR("n_rows is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*n_cols == 0)
+        RETURN_ERROR("n_cols is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*ROW_STEP == 0)
+        RETURN_ERROR("ROW_STEP is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*PARTITION == 0)
+        RETURN_ERROR("PARTITION is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*CM_OUTPUT_INTERVAL == 0)
+        RETURN_ERROR("CM_OUTPUT_INTERVAL is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*probability_threshold == 0)
+        RETURN_ERROR("probability_threshold is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*conse == 0)
+        RETURN_ERROR("conse is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    return SUCCESS;
+
+}

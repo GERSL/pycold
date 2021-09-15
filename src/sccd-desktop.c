@@ -69,8 +69,7 @@ int main(int argc, char *argv[])
     /**************************************************************/
     /* need to recover for exe */
     result = get_variables(argc, argv, &mode, in_path, out_path, &n_cores,
-                           &row, &col, &task, mask_path, &probability_threshold, conse,
-                           &min_days_conse, &b_fastmode, &b_outputCSV);
+                           &row, &col, &task, mask_path, &b_fastmode, &b_outputCSV);
 
     tsalgorithm_executor(mode, in_path, out_path, n_cores, row, col, task, mask_path, probability_threshold,
                          conse, min_days_conse,output_mode,verbose);

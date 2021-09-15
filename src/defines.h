@@ -47,6 +47,7 @@
 /* 12-31-1972 is 720258 in julian day since year 0001 */
 /* matlab use 720624 since year 0000 */
 #define JULIAN_DATE_LAST_DAY_1972 720624
+#define JULIAN_LANDSAT4_LAUNCH 724108  /* 7-16-1982*/
 #define LANDSAT_START_YEAR 1973
 #define LEAP_YEAR_DAYS 366
 #define NON_LEAP_YEAR_DAYS 365
@@ -187,14 +188,12 @@
 #define DEFAULT_TOTAL_VARIABLE 8
 
 #define TARGETED_LABEL 2
-
+#define N_FEATURE 7
 #define DEFAULT_PROBABILITY 0.99
 #define DEFAULT_CONSE 6
-#define N_FEATURE 7
 
 #define ORDINALDAY_19710101 719528
 #define JULY1ST_DOY 183
 
-#define SPATIAL_OUTPUT_INTERVAL 30
-
+#define SLOPE_SCALE 10000 // the parameter to guarantee the precision for converting scale double slope to float slope
 

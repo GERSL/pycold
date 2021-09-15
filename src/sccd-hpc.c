@@ -190,8 +190,9 @@ int sccd_hpc
     id_range = (int*)malloc(valid_num_scenes * sizeof(int));
     // printf("valid_num_scenes is %d\n", valid_num_scenes);
 
-    status = preprocessing(buf, fmask_buf, &valid_num_scenes, id_range, &clear_sum,
-                           &water_sum, &shadow_sum, &sn_sum, &cloud_sum);
+    status = preprocessing(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6],
+                            fmask_buf, &valid_num_scenes, id_range, &clear_sum,
+                            &water_sum, &shadow_sum, &sn_sum, &cloud_sum);
 
 
     if (status != SUCCESS)
@@ -238,17 +239,15 @@ int sccd_hpc
         /*                                                            */
         /**************************************************************/
 
-       result = sccd_stand_procedure(valid_num_scenes, valid_date_array, buf,
-                                     fmask_buf, id_range, rec_cg, num_fc,
-                                     states_output_dir, b_fastmode, probability_threshold,
-                                     min_days_conse, training_type, monitorwindow_lowerlin,
-                                     monitorwindow_upperlim, sensor_buf, n_focus_variable,
-                                     n_total_variable, focus_blist, NDVI_INCLUDED,
-                                     NBR_INCLUDED, RGI_INCLUDED,TCTWETNESS_INCLUDED,TCTGREENNESS_INCLUDED,
+       result = sccd_stand_procedure(valid_num_scenes, valid_date_array, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6],
+                                     fmask_buf, id_range, rec_cg, num_fc, states_output_dir, b_fastmode, probability_threshold,
+                                     min_days_conse, training_type, monitorwindow_lowerlin, monitorwindow_upperlim, sensor_buf, n_focus_variable,
+                                     n_total_variable, focus_blist, NDVI_INCLUDED, NBR_INCLUDED, RGI_INCLUDED,TCTWETNESS_INCLUDED,TCTGREENNESS_INCLUDED,
                                      EVI_INCLUDED, DI_INCLUDED, NDMI_INCLUDED, b_landspecific, auxval, conse);
 
 
     }
+
 
     //printf("free stage 7 \n");
     //printf("num_fc is %d\n", *num_fc);
@@ -285,8 +284,6 @@ int main(int argc, char *argv[])
                                         3: whole images; 1: pixel-based;
                                         2: scanline-based*/
     int method;
-    double probability_threshold;
-    int output_mode;
     //bool verbose = TRUE;
 
     char scene_list_filename[] = "scene_list.txt"; /* file name containing list of input sceneIDs */
@@ -301,7 +298,6 @@ int main(int argc, char *argv[])
     char **scene_list;                /* 2-D array for list of scene IDs       */
 
     int num_scenes;                  /* Number of input scenes defined        */
-    Input_meta_t *meta;              /* Structure for ENVI metadata hdr info  */
     char tmpstr[MAX_STR_LEN];        /* char string for text manipulation      */
 
     time_t now;                  /* For logging the start, stop, and some     */
@@ -319,7 +315,6 @@ int main(int argc, char *argv[])
     int n_process;
     int n_block;
     int process_id;
-    int n_remain_line;
 
     int **valid_date_array_scanline;
     short int **fmask_buf_scanline;        /* fmask buf, valid pixels only*/
@@ -343,18 +338,15 @@ int main(int argc, char *argv[])
     short int **tmp_buf_2d;                   /* This is the image bands buffer, valid pixel only*/
     //short int *tmp_fmask_buf;              /* fmask buf, valid pixels only          */
     //int *tmp_valid_date_array;             /* Sdate array after cfmask filtering    */
-    int n_rows;
-    int n_cols;
     Output_t* rec_cg;
     Output_t_sccd* s_rec_cg;
-    int new_n_block; // the row number for each block
     int starting_row; // the starting row for each block
     short int tmp_sensor;
     int interval;
     short int *sensor_buf;
     double tcg;
     int starting_date; // the initial date of the whole dataset
-    int n_CM_maps;
+    int n_cm_maps;
     short int* CM_outputs;
     char* CM_outputs_date;
     // bool b_singleline = FALSE;
@@ -364,11 +356,10 @@ int main(int argc, char *argv[])
     char breakdatemap_list_directory[MAX_STR_LEN];
     int num_breakdatemaps;
     int **breakdates_scanline;
-    int n_probability_maps;
+    int *original_row_lut;
     int sample_row = 0;
     int sample_col = 0;
-    int conse;
-
+    int output_mode;
     int mode = 3; // 1 - pixel-based; 2 - scanline-based; 3 - area-based
 
     char CM_filename[MAX_STR_LEN];
@@ -381,8 +372,20 @@ int main(int argc, char *argv[])
     char out_fullpath_tmp[MAX_STR_LEN];
     bool b_obcold_reconstruction = FALSE; // indicate if it is used to reconstruct rec_cg in obcold
     bool b_outputCM = FALSE;
-
+    bool b_partition = TRUE; //
+    int n_rows = 0;
+    int n_cols = 0;
+    int ROW_STEP = 0;
+    int PARTITION = 0;
+    int CM_OUTPUT_INTERVAL;
     int nvals;
+    int original_row;   // the current processing row
+    int reorder_row = 0;
+    int partition_id = 0;
+    int startingrow_inpartition = 0; // the row number in the current partition
+    float probability_threshold = 0;
+    int conse = 0;
+
     if (argv[1][0] == 'r'){
         b_obcold_reconstruction = TRUE;
         method = COLD;
@@ -399,8 +402,20 @@ int main(int argc, char *argv[])
     else
         RETURN_ERROR("The second input parameter has to be r, s, o or c", FUNC_NAME, FAILURE);
 
+    /* stack is complete image, not partitions */
+    if(argv[1][1] == 'c'){
+        b_partition = FALSE;
+    }
+
+    get_coldparameters(&n_rows, &n_cols, &ROW_STEP, &PARTITION, &CM_OUTPUT_INTERVAL, &probability_threshold, &conse);
+
     process_id =  (int)strtol(argv[2], NULL, 10) - 1;
     n_process = (int)strtol(argv[3], NULL, 10);
+    if (n_process != 1 && n_process != 500 && n_process != 250 && n_process !=1000){
+        RETURN_ERROR("The total requested core number must be 250, 500 or 1000", FUNC_NAME, FAILURE);
+    }
+
+
     //argv[4] and argv[5] are in_path and out_path
     // optional parameters
     if (argc == 7){ // debug use for single line
@@ -408,16 +423,11 @@ int main(int argc, char *argv[])
         mode = 2;
     }
 
-    //probability_threshold = (double)strtol(argv[6], NULL, 10);
-    probability_threshold = DEFAULT_PROBABILITY;
-    conse = DEFAULT_CONSE;
 
-    meta = (Input_meta_t *)malloc(sizeof(Input_meta_t));
-    if (meta == NULL)
-    {
-        RETURN_ERROR ("ERROR allocating meta",
-                      FUNC_NAME, FAILURE);
-    }
+    //probability_threshold = (double)strtol(argv[6], NULL, 10);
+//    probability_threshold = DEFAULT_PROBABILITY;
+//    conse = DEFAULT_CONSE;
+
 
     scene_list = (char **) allocate_2d_array (MAX_SCENE_LIST, ARD_STR_LEN,
                                                              sizeof (char));
@@ -427,9 +437,10 @@ int main(int argc, char *argv[])
     }
 
 
+
     /**************************************************************/
     /*                                                            */
-    /*   record the start time of just the CDCD         */
+    /*   record the start time of just the COLD         */
     /*     algorithm.  Up until here, it has all just been        */
     /*     setting it up......                                    */
     /*                                                            */
@@ -525,25 +536,6 @@ int main(int argc, char *argv[])
     }
 
 
-    status = read_envi_header(argv[4], scene_list[0], meta);
-    if (status != SUCCESS)
-    {
-        RETURN_ERROR ("Calling read_envi_header",
-                      FUNC_NAME, FAILURE);
-    }
-
-    n_cols = meta->samples;
-    n_rows = meta->lines;
-    if(n_process > 1){
-        n_block = (int)(meta->lines  / n_process);
-    }
-    else{
-        n_block = meta->lines;
-    }
-
-    n_remain_line = meta->lines -  n_block * n_process;
-    interval = n_process;
-
     /* save basic info file used for obia info*/
     if(process_id == 0){
         if(b_obcold_reconstruction == FALSE){
@@ -555,13 +547,12 @@ int main(int argc, char *argv[])
                 RETURN_ERROR("Opening cold_config file", FUNC_NAME, ERROR);
             }
             starting_date = sdate[0];
-            n_probability_maps = (sdate[num_scenes - 1] - sdate[0]) / SPATIAL_OUTPUT_INTERVAL + 1;
-            fprintf(fd, "starting_date: %d\n", starting_date);
-            fprintf(fd, "n_cm_maps: %d\n", n_probability_maps);
+            n_cm_maps = (sdate[num_scenes - 1] - sdate[0]) / CM_OUTPUT_INTERVAL + 1;
+            fprintf(fd, "n_cm_maps: %d\n", n_cm_maps);
             fprintf(fd, "stack_path: %s\n", argv[4]);
-            fprintf(fd, "in_cm_path: %s\n", argv[5]);
-            fprintf(fd, "cm_interval: %d\n", SPATIAL_OUTPUT_INTERVAL);
-            fprintf(fd, "change probability: %f\n", probability_threshold);
+            fprintf(fd, "coldresults_path: %s\n", argv[5]);
+            fprintf(fd, "starting_date: %d\n", starting_date);
+            fprintf(fd, "change_probability: %f\n", probability_threshold);
             fprintf(fd, "conse: %d\n", conse);
             fclose(fd);
         }else{
@@ -609,6 +600,12 @@ int main(int argc, char *argv[])
     {
         RETURN_ERROR ("Allocating sensor_buf fails", FUNC_NAME, FAILURE);
     }
+
+    original_row_lut = (int *)malloc(n_rows * sizeof(int));
+    if(original_row_lut == NULL)
+    {
+        RETURN_ERROR ("Allocating original_row_lut fails", FUNC_NAME, FAILURE);
+    }
 //    scene_list = (char **) allocate_2d_array (MAX_SCENE_LIST, ARD_STR_LEN,
 //                                                       sizeof (char));
 //    if(scene_list == NULL)
@@ -655,16 +652,13 @@ int main(int argc, char *argv[])
                       FUNC_NAME, FAILURE);
     }
 
-
-    starting_date = sdate[0];
-    n_CM_maps = (sdate[num_scenes - 1] - sdate[0]) / SPATIAL_OUTPUT_INTERVAL + 1;
-    CM_outputs = malloc(sizeof (short int) * n_CM_maps);
+    CM_outputs = malloc(sizeof (short int) * n_cm_maps);
 
     if(CM_outputs == NULL){
          RETURN_ERROR("ERROR allocating CM_outputs", FUNC_NAME, FAILURE);
     }
 
-    CM_outputs_date =  malloc(sizeof (char) * n_CM_maps);
+    CM_outputs_date =  malloc(sizeof (char) * n_cm_maps);
     if(CM_outputs_date == NULL){
          RETURN_ERROR("ERROR allocating CM_outputs_date", FUNC_NAME, FAILURE);
     }
@@ -683,24 +677,50 @@ int main(int argc, char *argv[])
         RETURN_ERROR ("Allocating breakdates_scanline", FUNC_NAME, FAILURE);
     }
 
-    if (mode == 3){
-        if(process_id < n_remain_line)
+    if (b_partition == TRUE){
+        for (i = 0; i < n_rows; i++)
         {
-            new_n_block = n_block + 1;
-            //starting_row = new_n_block * (process_id);
-            //prev_n_block = process_id * n_block;
+            int te = i / (int)(n_rows / ROW_STEP);
+            int re = i % (int)(n_rows / ROW_STEP);
+            original_row_lut[i] = te + re * ROW_STEP + 1;  // 1, 501, 1001,...,4500,5000
         }
-        else
-        {
-            new_n_block = n_block;
-            //starting_row =  (n_block + 1) * n_remain_line + (process_id - n_remain_line) * n_block;
+
+        if (mode == 2){  // for testing single row only
+            n_block = 1;
+            for (i = 0; i < n_rows; i++)
+            {
+                if (original_row_lut[i] == sample_row){
+                    reorder_row = i + 1;
+                    break;
+                }
+            }
+            partition_id = (int) ((reorder_row - 1) /  PARTITION) + 1;
+            startingrow_inpartition = reorder_row  - (partition_id - 1) * n_rows / PARTITION ;
+
+        }else{
+            n_block = (int)(n_rows  / n_process);
+            partition_id = (int) (process_id  * PARTITION / n_process) + 1;
+            startingrow_inpartition = process_id * n_rows / n_process - (partition_id - 1) * n_rows / PARTITION + 1;
         }
-    }else{
-        new_n_block = 1;
+
+    }
+    else{  // if not partitioned images to be processed, keep the same row number
+        if (mode == 2){
+            n_block = 1;
+            reorder_row = sample_row;
+        }else{
+            n_block = (int)(n_rows  / n_process);
+
+        }
+        partition_id = 0;
+        startingrow_inpartition =  sample_row;
     }
 
+    printf("The process_id = %d; partition_id = %d; "
+           "startingrow_inpartition = %d; reorder_row = %d\n",
+           process_id, partition_id, startingrow_inpartition, reorder_row);
 //    if (b_singleline == TRUE){
-//        new_n_block = 1;
+//        n_block = 1;
 //    }
 
 //    n_block = 0;
@@ -709,7 +729,7 @@ int main(int argc, char *argv[])
 
     /*********************************************/
     // debug modes
-    // printf("process_id = %d; new_n_block = %d; num_scenes = %d \n", process_id, new_n_block, num_scenes);
+    // printf("process_id = %d; n_block = %d; num_scenes = %d \n", process_id, n_block, num_scenes);
     //prev_n_block = 119;
 
     /* for reconstructing rec_cg in sp-cold*/
@@ -735,33 +755,80 @@ int main(int argc, char *argv[])
         fclose(fd);
 
         for(i = 0; i < num_breakdatemaps; i++){
-            sprintf(img_filename, "%s/breakdate_maps/%s", argv[5], breakdatemap_list[i]);
+            sprintf(img_filename, "%s/breakdate_maps/%s_P%d", argv[5], breakdatemap_list[i], partition_id);
             fh_breakdatemap[i] = open_raw_binary(img_filename,"rb");
+            if (fh_breakdatemap[i] == NULL)
+            {
+                sprintf(errmsg, "error for openning breakdatemaps %s \n", img_filename);
+                RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+            }
+            fseek(fh_breakdatemap[i], ((startingrow_inpartition - 1)  * n_cols) * sizeof(int), SEEK_SET);
         }
     }
 
 
     for(i = 0; i < num_scenes; i++)
     {
-        // printf("%s:%d\n", scene_list[i], i);
-        sprintf(img_filename, "%s/%s/%s_MTLstack", argv[4], scene_list[i], scene_list[i]);
-        fh[i] = open_raw_binary(img_filename,"rb");
+        if(b_partition == TRUE){
+            // printf("%s:%d\n", scene_list[i], i);
+            sprintf(img_filename, "%s/%s/%s_MTLstack_P%d", argv[4], scene_list[i], scene_list[i], partition_id);
+            fh[i] = open_raw_binary(img_filename,"rb");
+            if (fh[i] == NULL)
+            {
+                sprintf(errmsg, "error for openning %s \n", img_filename);
+                RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+            }
+            fseek(fh[i], ((startingrow_inpartition - 1)  * n_cols * TOTAL_BANDS) * sizeof(short int), SEEK_SET);
+        }
+        else{
+            sprintf(img_filename, "%s/%s/%s_MTLstack", argv[4], scene_list[i], scene_list[i]);
+            fh[i] = open_raw_binary(img_filename,"rb");
+            if (fh[i] == NULL)
+            {
+                sprintf(errmsg, "error for openning %s \n", img_filename);
+                RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+            }
+        }
     }
 
-    int current_row;
-    // for(current_row = starting_row; current_row < starting_row + new_n_block; current_row++)
+    snprintf (msg_str, sizeof(msg_str), "fopen and fseek finished \n");
+    LOG_MESSAGE (msg_str, FUNC_NAME)
+
+
+    // for(original_row = starting_row; original_row < starting_row + n_block; original_row++)
     tcg = X2(NUM_LASSO_BANDS, probability_threshold);
 
-    for(j = 0; j < new_n_block; j++)
+    for(j = 0; j < n_block; j++)
     {
 
         // for debug
-//        current_row = 58;
-        //j = new_n_block - 1;
-        if (mode == 2)
-            current_row = sample_row - 1;
-        else
-            current_row = process_id + j * interval;
+//        original_row = 58;
+        //j = n_block - 1;
+        if (b_partition == TRUE){
+            if (mode == 2){
+                for (i = 0; i < n_rows; i++)
+                {
+                    if (original_row_lut[i] == sample_row){
+                        reorder_row = i + 1;
+                        break;
+                    }
+                }
+                original_row = sample_row;
+            }
+            else{
+                reorder_row = process_id * n_rows / n_process + j + 1;
+                original_row = original_row_lut[reorder_row - 1];
+            }
+        }else{
+            if (mode == 2){
+                reorder_row = sample_row;
+            }else{
+                reorder_row = process_id + j * n_process + 1;
+            }
+            original_row = reorder_row;
+        }
+
+
 
         for (i = 0 ; i < n_cols; i++)
         {
@@ -769,21 +836,21 @@ int main(int argc, char *argv[])
         }
 
 
-        snprintf (msg_str, sizeof(msg_str), "Row %d processing started\n", current_row + 1);
+        snprintf (msg_str, sizeof(msg_str), "Row %d processing started\n", reorder_row);
         LOG_MESSAGE (msg_str, FUNC_NAME)
 
         if(b_obcold_reconstruction == TRUE)
         {
-            sprintf(out_filename, "record_change_row%d_obcold.dat", current_row + 1);
+            sprintf(out_filename, "record_change_row%d_obcold.dat", original_row);
             sprintf(out_fullpath, "%s/obcold/%s", argv[5], out_filename);
             sprintf(out_fullpath_tmp, "%s/obcold/%s.part", argv[5], out_filename);
         }
         else
         {
             if(method == COLD){
-                sprintf(out_filename, "record_change_row%d_cold.dat", current_row + 1);
-                sprintf(CM_filename, "CM_row%d.dat", current_row + 1);
-                sprintf(CM_date_filename, "CM_date_row%d.dat", current_row + 1);
+                sprintf(out_filename, "record_change_row%d_cold.dat", original_row);
+                sprintf(CM_filename, "CM_row%d.dat", original_row);
+                sprintf(CM_date_filename, "CM_date_row%d.dat", original_row);
                 sprintf(out_fullpath, "%s/%s", argv[5], out_filename);
                 sprintf(out_fullpath_tmp, "%s/%s.part", argv[5], out_filename);
                 sprintf(CM_fullpath, "%s/%s", argv[5], CM_filename);
@@ -794,7 +861,7 @@ int main(int argc, char *argv[])
                 }
             }else if(method == SCCD)
             {
-                sprintf(out_filename, "record_change_row%d_sccd.dat", current_row + 1);
+                sprintf(out_filename, "record_change_row%d_sccd.dat", original_row);
                 sprintf(out_fullpath, "%s/%s", argv[5], out_filename);
                 sprintf(out_fullpath, "%s/%s.part", argv[5], out_filename);
             }
@@ -831,11 +898,14 @@ int main(int argc, char *argv[])
              else if(scene_list[i][2] == '8')
                  tmp_sensor = LANDSAT8_OLI;
 
-             fseek(fh[i], (current_row * n_cols * TOTAL_BANDS) * sizeof(short int), SEEK_SET);
+            // for complete images, we process row with an interval
+             if (b_partition == FALSE)
+                 fseek(fh[i], ((reorder_row - 1) * n_cols* TOTAL_BANDS) * sizeof(short int), SEEK_SET);
+
              fread(tmp_buf, sizeof(short int), TOTAL_BANDS * n_cols, fh[i]);
              if (tmp_buf == NULL)
              {
-                 sprintf(errmsg, "error reading %d scene, %d row\n", i, current_row + 1);
+                 sprintf(errmsg, "error reading %d scene, %d row\n", i, reorder_row);
                  RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
              }
 
@@ -856,16 +926,22 @@ int main(int argc, char *argv[])
              }
         }
 
+         snprintf (msg_str, sizeof(msg_str), "Row %d reading Landsat data finished \n", reorder_row);
+         LOG_MESSAGE (msg_str, FUNC_NAME)
+         /* need to work on here later */
          if(b_obcold_reconstruction == TRUE)
          {
              for (i = 0; i < num_breakdatemaps; i++)
              {
-                 fseek(fh_breakdatemap[i], (current_row * n_cols) * sizeof(int), SEEK_SET);
+                 // fseek(fh_breakdatemap[i], ((original_row - 1) * n_cols) * sizeof(int), SEEK_SET);
                  fread(tmp_buf_breakdatemap, sizeof(int), n_cols, fh_breakdatemap[i]);
                  for(k = 0; k < n_cols; k++){
                      breakdates_scanline[k][i] = tmp_buf_breakdatemap[k];
                  }
              }
+
+             snprintf (msg_str, sizeof(msg_str), "breakdatemap reading finished\n");
+             LOG_MESSAGE (msg_str, FUNC_NAME)
          }
 
         /******************************************************************/
@@ -890,7 +966,9 @@ int main(int argc, char *argv[])
                 }
                 result = obcold_reconstruction_procedure(tmp_buf_2d, fmask_buf_scanline[i_col], valid_date_array_scanline[i_col],
                                                          valid_scene_count_scanline[i_col], rec_cg, &num_fc, num_breakdatemaps,
-                                                         breakdates_scanline[i_col],n_cols, i_col + 1, current_row + 1, conse);
+                                                         breakdates_scanline[i_col],n_cols, i_col + 1, original_row, conse);
+                // snprintf (msg_str, sizeof(msg_str), "col %d reconstruction calculation finished\n", i_col+1);
+                // LOG_MESSAGE (msg_str, FUNC_NAME)
                 for(i = 0; i < num_fc; i++)
                 {
                    result = write_output_binary(fhoutput, rec_cg[i]);
@@ -909,18 +987,21 @@ int main(int argc, char *argv[])
                                       FUNC_NAME, FAILURE);
                     }
 
-                    for(i = 0; i < n_CM_maps; i++){
+                    for(i = 0; i < n_cm_maps; i++){
                         CM_outputs[i] = NA_VALUE;
                         CM_outputs_date[i] = 255;
                     }
 
     //                printf("temporal success2 with processid %d\n", process_id);
-    //                printf("valid_scene_count_scanline[i_col] is %d;i_col is %d; current_row is %d; probability threshold is %f\n",
-    //                       valid_scene_count_scanline[i_col], i_col, current_row, probability_threshold);
+    //                printf("valid_scene_count_scanline[i_col] is %d;i_col is %d; original_row is %d; probability threshold is %f\n",
+    //                       valid_scene_count_scanline[i_col], i_col, original_row, probability_threshold);
                     result = cold(tmp_buf_2d[0], tmp_buf_2d[1], tmp_buf_2d[2], tmp_buf_2d[3], tmp_buf_2d[4],
                                   tmp_buf_2d[5], tmp_buf_2d[6], fmask_buf_scanline[i_col], valid_date_array_scanline[i_col],
-                                  valid_scene_count_scanline[i_col], n_cols, i_col + 1, current_row + 1,
-                                  tcg, conse, b_outputCM, starting_date, rec_cg, &num_fc, CM_outputs, CM_outputs_date);
+                                  valid_scene_count_scanline[i_col], n_cols, i_col + 1, original_row, tcg, conse, b_outputCM,
+                                  starting_date, rec_cg, &num_fc, CM_OUTPUT_INTERVAL, CM_outputs, CM_outputs_date);
+
+                    // snprintf (msg_str, sizeof(msg_str), "col %d COLD calculation finished\n", i_col+1);
+                    // LOG_MESSAGE (msg_str, FUNC_NAME)
 
                     for(i = 0; i < num_fc; i++)
                     {
@@ -928,18 +1009,20 @@ int main(int argc, char *argv[])
                     }
 
                     if(b_outputCM == TRUE){
-                        nvals = fwrite (CM_outputs, sizeof(int16), n_CM_maps, fhoutput_cm);
-                        if (nvals != n_CM_maps)
+                        nvals = fwrite (CM_outputs, sizeof(int16), n_cm_maps, fhoutput_cm);
+                        if (nvals != n_cm_maps)
                         {
                             RETURN_ERROR("Incorrect amount of data written", FUNC_NAME, ERROR);
                         }
-                        nvals = fwrite (CM_outputs_date, sizeof(int8), n_CM_maps, fhoutput_cm_date);
-                        if (nvals != n_CM_maps)
+                        nvals = fwrite (CM_outputs_date, sizeof(int8), n_cm_maps, fhoutput_cm_date);
+                        if (nvals != n_cm_maps)
                         {
                             RETURN_ERROR("Incorrect amount of data written", FUNC_NAME, ERROR);
                         }
                     }
 
+                    snprintf (msg_str, sizeof(msg_str), "col %d rec_cg writing finished\n", i_col+1);
+                    LOG_MESSAGE (msg_str, FUNC_NAME)
 
                     free(rec_cg);
                     // for debug
@@ -955,7 +1038,7 @@ int main(int argc, char *argv[])
                     }
 
                     result = sccd_hpc(tmp_buf_2d, fmask_buf_scanline[i_col], valid_date_array_scanline[i_col], valid_scene_count_scanline[i_col],
-                                      s_rec_cg, &num_fc,n_cols, i_col + 1, current_row + 1, probability_threshold, MIN_DAYS_CONSE, sensor_buf,conse);
+                                      s_rec_cg, &num_fc,n_cols, i_col + 1, original_row, probability_threshold, MIN_DAYS_CONSE, sensor_buf,conse);
                     //printf("free stage 9 \n");
                     for(i = 0; i < num_fc; i++)
                     {
@@ -971,7 +1054,7 @@ int main(int argc, char *argv[])
 
             if (result != SUCCESS)
             {
-                RETURN_ERROR("ccd procedure fails at row %d and col %d \n", current_row + 1, i_col + 1);
+                RETURN_ERROR("ccd procedure fails at row %d and col %d \n", reorder_row, i_col + 1);
 
             }
 //            int count;
@@ -989,12 +1072,12 @@ int main(int argc, char *argv[])
 
        if (rename(out_fullpath_tmp, out_fullpath) == 0)
        {
-           snprintf (msg_str, sizeof(msg_str), "Row %d finished\n", current_row + 1);
+           snprintf (msg_str, sizeof(msg_str), "Row %d finished\n", reorder_row);
            LOG_MESSAGE (msg_str, FUNC_NAME);
        }
        else
        {
-           snprintf (msg_str, sizeof(msg_str), "Row %d renaming failed\n", current_row + 1);
+           snprintf (msg_str, sizeof(msg_str), "Row %d renaming failed\n", reorder_row);
            LOG_MESSAGE (msg_str, FUNC_NAME);
        }
 
@@ -1017,7 +1100,6 @@ int main(int argc, char *argv[])
     /*                   free memory                        */
     /********************************************************/
 
-    free(meta);
 
     status = free_2d_array((void **)scene_list);
     if (status != SUCCESS)
@@ -1061,6 +1143,7 @@ int main(int argc, char *argv[])
     free(sdate);
     free(CM_outputs);
     free(CM_outputs_date);
+    free(original_row_lut);
 
     status = free_2d_array((void **)breakdatemap_list);
     if (status != SUCCESS)

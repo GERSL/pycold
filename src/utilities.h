@@ -70,9 +70,6 @@ int get_variables
                            /* O: col number for the pixel                   */
     int *task,
     char *user_mask_path,   /* O: directory location for user_mask           */
-    double *probability_threshold,
-    int *conse,
-    int *min_days_conse,
     bool *b_fastmode,
     bool *b_outputCSV
 );
@@ -109,6 +106,16 @@ int find_index_clrx(
     int input_ordinal_date
 );
 
+int get_coldparameters
+(
+    int *n_rows,
+    int *n_cols,
+    int *ROW_STEP,
+    int *PARTITION,
+    int *CM_OUTPUT_INTERVAL,
+    float *probability_threshold,
+    int *conse
+);
 int usage_message ();
 
 #endif /* UTILITIES_H */

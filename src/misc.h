@@ -34,12 +34,13 @@ int auto_mask
     float **clry,
     int start,
     int end,
-    double years,
+    float years,
     float t_b1,
     float t_b2,
     float n_t,
     int *bl_ids
 );
+
 
 int auto_ts_fit
 (
@@ -54,6 +55,7 @@ int auto_ts_fit
     double *rmse,
     double **v_dif
 );
+
 
 int state_ts_fit
 (
@@ -85,6 +87,18 @@ int auto_ts_predict
     int start,
     int end,
     double *pred_y
+);
+
+
+int auto_ts_predict_float
+(
+    int *clrx,
+    float **coefs,
+    int df,
+    int lasso_band_index,
+    int start,
+    int end,
+    float *pred_y
 );
 
 
@@ -192,6 +206,14 @@ void matlab_2d_array_norm
     int dim1_index,      /* I: 1st dimension index                 */
     int dim2_len,        /* I: number of input elements in 2nd dim */
     double  *output_norm  /* O: output norm value                   */
+);
+
+void matlab_2d_array_norm_float
+(
+    float **array,       /* I: input array                                   */
+    int dim1_index,      /* I: 1st dimension index                           */
+    int dim2_len,        /* I: number of input elements in 2nd dim           */
+    float  *output_norm  /* O: output norm value                             */
 );
 
 void array_1d_mean
@@ -475,27 +497,6 @@ int singleband_minvariogram
     float *variogram          /* O: outputted median variogran for dates           */
 );
 
-int sccd_rmse
-(
-    int *clrx,
-    float **clry,
-    int band_index,
-    int start,
-    int end,
-    int df,
-    double *coefs,
-    float *rmse
-);
-
-int auto_ts_predict_double
-(
-    int *clrx,
-    double *coefs,
-    int df,
-    int start,
-    int end,
-    float *pred_y
-);
 
 int yearmonth2doy
 (
@@ -507,6 +508,27 @@ int yearmonth2doy
 int qabitval
 (
     int packedint
+);
+
+float MeanAngl_float
+(
+      float ** v_diff, // input: a two-dimensional vector of different (i_count * lasso_num)
+      int lasso_num,   // input: the number of lasso band
+      int i_count      // input: the number of consecutive observations
+);
+
+int auto_ts_fit_float
+(
+    int *clrx,
+    float **clry,
+    int band_index,
+    int lasso_band_index, /* this variable is the legacy of experiments on modeling only lasso bands. Zhe wanted to keep all bands still. So pass i_b to this variable*/
+    int start,
+    int end,
+    int df,
+    float **coefs,
+    float *rmse,
+    float **v_dif
 );
 
 void usage ();

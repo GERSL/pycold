@@ -763,6 +763,43 @@ void matlab_2d_array_norm
 }
 
 
+/******************************************************************************
+MODULE:  matlab_2d_array_norm
+
+PURPOSE:  simulate matlab norm function for 1 dimension in 2d array cases only
+
+RETURN VALUE:
+Type = void
+Value           Description
+-----           -----------
+
+
+HISTORY:
+Date        Programmer       Reason
+--------    ---------------  -------------------------------------
+2/9/2015   Song Guo         Original Development
+
+NOTES:
+******************************************************************************/
+
+void matlab_2d_array_norm_float
+(
+    float **array,       /* I: input array                                   */
+    int dim1_index,      /* I: 1st dimension index                           */
+    int dim2_len,        /* I: number of input elements in 2nd dim           */
+    float  *output_norm  /* O: output norm value                             */
+)
+{
+    int i;
+    float sum = 0.0;
+
+    for (i = 0; i < dim2_len; i++)
+    {
+        sum += array[dim1_index][i] * array[dim1_index][i];
+    }
+    *output_norm = sqrtf(sum);
+}
+
 void matlab_1d_array_norm
 (
     float *array,       /* I: input array                                   */
@@ -1425,7 +1462,7 @@ int auto_mask
     float **clry,
     int start,
     int end,
-    double years,
+    float years,
     float t_b1,
     float t_b2,
     float n_t,
@@ -1450,7 +1487,7 @@ int auto_mask
         RETURN_ERROR("ERROR allocating x memory", FUNC_NAME, ERROR);
     }
 
-    year = ceil(years);
+    year = (int)(ceil(years));
     w = TWO_PI / AVE_DAYS_IN_A_YEAR;
     w2 = w / (double)year;
 
@@ -1602,57 +1639,66 @@ int auto_ts_predict
     return (SUCCESS);
 }
 
-int auto_ts_predict_double
+int auto_ts_predict_float
 (
     int *clrx,
-    double *coefs,
+    float **coefs,
     int df,
+    int lasso_band_index,
     int start,
     int end,
     float *pred_y
 )
 {
-    char FUNC_NAME[] = "auto_ts_predict";
+    char FUNC_NAME[] = "auto_ts_predict_float";
     int i;
     int nums = end - start + 1;
     float w, w2, w3;
     w = TWO_PI / AVE_DAYS_IN_A_YEAR;
-    w2 = 2.0 * w;
-    w3 = 3.0 * w;
+    w2 = 2 * w;
+    w3 = 3 * w;
 
     for (i = 0; i < nums; i++)
     {
       if (df ==2)
       {
-        pred_y[i]  = (float)coefs[0] + (float)coefs[1] *
-              (float)clrx[i+start];
+        pred_y[i]  = coefs[lasso_band_index][0] + coefs[lasso_band_index][1] *
+              (float)clrx[i+start] / SLOPE_SCALE;
       }
       else if (df == 4)
       {
-        pred_y[i]  = (float)coefs[0] + (float)coefs[1] *
-              (float)clrx[i+start] + (float)coefs[2] *
-              cos((float)clrx[i+start] * w ) + (float)coefs[3] *
-              sin((float)clrx[i+start] * w );
+        pred_y[i]  = coefs[lasso_band_index][0] + coefs[lasso_band_index][1] *
+              (float)clrx[i+start] / SLOPE_SCALE + coefs[lasso_band_index][2] *
+              cosf((float)clrx[i+start] * w ) + coefs[lasso_band_index][3] *
+              sinf((float)clrx[i+start] * w );
+      }
+      else if (df == 5)
+      {
+        pred_y[i]  = coefs[lasso_band_index][0] + coefs[lasso_band_index][1] *
+                cosf((float)clrx[i+start] * w ) + coefs[lasso_band_index][2] *
+                sinf((float)clrx[i+start] * w ) + coefs[lasso_band_index][3] *
+                cosf((float)clrx[i+start] * w2 ) + coefs[lasso_band_index][4] *
+                sinf((float)clrx[i+start] * w2 );
       }
       else if (df == 6)
       {
-        pred_y[i]  = (float)coefs[0] + (float)coefs[1] *
-              clrx[i+start] + (float)coefs[2] *
-              cos((float)clrx[i+start] * w ) + (float)coefs[3] *
-              sin((float)clrx[i+start] * w ) + (float)coefs[4] *
-              cos((float)clrx[i+start] * w2 ) + (float)coefs[5] *
-              sin((float)clrx[i+start] * w2 );
+        pred_y[i]  = coefs[lasso_band_index][0] + coefs[lasso_band_index][1] *
+              (float)clrx[i+start] / SLOPE_SCALE + coefs[lasso_band_index][2] *
+              cosf((float)clrx[i+start] * w ) + coefs[lasso_band_index][3] *
+              sinf((float)clrx[i+start] * w ) + coefs[lasso_band_index][4] *
+              cosf((float)clrx[i+start] * w2 ) + coefs[lasso_band_index][5] *
+              sinf((float)clrx[i+start] * w2 );
       }
       else if (df == 8)
       {
-        pred_y[i]  = (float)coefs[0] + (float)coefs[1] *
-              clrx[i+start] + (float)coefs[2] *
-              cos((float)clrx[i+start] * w ) + (float)coefs[3] *
-              sin((float)clrx[i+start] * w ) + (float)coefs[4] *
-              cos((float)clrx[i+start] * w2 ) + (float)coefs[5] *
-              sin((float)clrx[i+start] * w2) + (float)coefs[6] *
-              cos((float)clrx[i+start] * w3 ) + (float)coefs[7] *
-              sin((float)clrx[i+start] * w3 );
+        pred_y[i]  = coefs[lasso_band_index][0] + coefs[lasso_band_index][1] *
+              (float)clrx[i+start] / SLOPE_SCALE + coefs[lasso_band_index][2] *
+              cosf((float)clrx[i+start] * w ) + coefs[lasso_band_index][3] *
+              sinf((float)clrx[i+start] * w ) + coefs[lasso_band_index][4] *
+              cosf((float)clrx[i+start] * w2 ) + coefs[lasso_band_index][5] *
+              sinf((float)clrx[i+start] * w2) + coefs[lasso_band_index][6] *
+              cosf((float)clrx[i+start] * w3 ) +coefs[lasso_band_index][7] *
+              sinf((float)clrx[i+start] * w3 );
       }
       else
       {
@@ -1662,6 +1708,7 @@ int auto_ts_predict_double
 
     return (SUCCESS);
 }
+
 
 /******************************************************************************
 MODULE:  auto_ts_fit
@@ -1923,6 +1970,301 @@ int auto_ts_fit
         }
         matlab_2d_array_norm(v_dif, lasso_band_index, nums, &v_dif_norm);
         *rmse = v_dif_norm / sqrt((double)(nums - df));
+        //*rmse = v_dif_norm / sqrt((double)(nums)); //SY 08182019
+    }
+
+    /* Free allocated memory */
+    free(yhat);
+    if (df == 2 || df == 4 || df == 5 || df == 6 || df == 8)
+    {
+        if (free_2d_array ((void **) x) != SUCCESS)
+        {
+            RETURN_ERROR ("Freeing memory: x\n", FUNC_NAME, ERROR);
+        }
+    free(y);
+    }
+
+    return (SUCCESS);
+}
+
+
+
+
+/******************************************************************************
+MODULE:  auto_ts_fit_float
+
+PURPOSE:  Lasso regression fitting with full outputs
+
+RETURN VALUE:
+Type = int
+ERROR error in allocating memories
+SUCCESS no error encounted
+
+HISTORY:
+Date        Programmer       Reason
+--------    ---------------  -------------------------------------
+11/23/2015  Song Guo         Original Development
+20151203    Brian Davis      Merge of versions.
+20160104    Song Guo         Numerous bug fixes.
+20160517    Brian Davis      Removed temporary hack of initializing lmu to 1.
+                             There now seem to be no data-dependent crashes
+                             with lmu initialized to some strange value(s).
+                             Put df and nums correctly into error message
+                             sprintf when malloc of y fails.
+                             Incorporated fix to initialize coefs to 0.0.
+
+NOTES:
+******************************************************************************/
+int auto_ts_fit_float
+(
+    int *clrx,
+    float **clry,
+    int band_index,
+    int lasso_band_index, /* this variable is the legacy of experiments on modeling only lasso bands. Zhe wanted to keep all bands still. So pass i_b to this variable*/
+    int start,
+    int end,
+    int df,
+    float **coefs,
+    float *rmse,
+    float **v_dif
+)
+{
+    char FUNC_NAME[] = "auto_ts_fit_float";
+    char errmsg[MAX_STR_LEN];
+    float w;
+    int i, j;
+    float **x;
+    float *y;
+    int status;
+    float *yhat;
+    float v_dif_norm = 0.0;
+    int nums = 0;
+    int nlam = 1;		// number of lambda
+
+
+    float alpha = 1.0;
+    int lmu;
+    double cfs[nlam][df];
+    nums = end - start + 1;
+
+
+    w = TWO_PI / 365.25;
+
+    float ulam[1] = {20, };  // SY lambda = 20
+
+    /* Allocate memory */
+    if (df ==2 || df ==4 || df == 5 || df == 6 || df == 8)
+    {
+        x = (float **)allocate_2d_array(df - 1, nums, sizeof(float));
+        if (x == NULL)
+        {
+            sprintf(errmsg, "Allocating x memory for %d - 1 times %d size of float",
+                    df, nums);
+            RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+        }
+
+        y = malloc(nums * sizeof(float));
+        if (y == NULL)
+        {
+                sprintf(errmsg, "Allocating y memory %d %d", df, nums);
+                RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+        }
+    }
+    else
+    {
+        RETURN_ERROR("Unsupported df value", FUNC_NAME, ERROR);
+    }
+
+    yhat = (float *)malloc(nums * sizeof(float));
+    if (yhat == NULL)
+    {
+        RETURN_ERROR("Allocating yhat memory", FUNC_NAME, ERROR);
+    }
+
+    switch (df)
+    {
+
+        case 2:
+            for (i = 0; i < nums; i++)
+            {
+                x[0][i] = (float)clrx[i+start];
+                y[i] = (float)clry[band_index][i+start];
+            }
+
+            status = c_glmnet(nums, df-1, &x[0][0], y, nlam, ulam, alpha, &lmu, cfs);
+            if (status != SUCCESS)
+            {
+                sprintf(errmsg, "Calling c_glmnet when df = %d", df);
+                RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+            }
+
+            for (i = 0; i < LASSO_COEFFS; i++)
+                coefs[lasso_band_index][i] = 0.0;
+
+            for (i = 0; i < lmu; i++)
+            {
+                for (j = 0; j < df; j++)
+                {
+                    if(j == 1){
+                        coefs[lasso_band_index][j]= (float)(cfs[i][j] * SLOPE_SCALE);
+                    }else{
+                        coefs[lasso_band_index][j]= (float)(cfs[i][j]);
+                    }
+                }
+            }
+            break;
+
+       case 4:
+            for (i = 0; i < nums; i++)
+            {
+                x[0][i] = (float)clrx[i+start];
+                x[1][i] = cosf(w * (float)clrx[i+start]);
+
+                x[2][i] = sinf(w * (float)clrx[i+start]);
+                y[i] = (float)clry[band_index][i+start];
+
+                // printf("%f, %f, %f, %f\n", x[0][i], x[1][i], x[2][i], y[i]);
+
+            }
+
+            status = c_glmnet(nums, df-1, &x[0][0], y, nlam, ulam, alpha, &lmu, cfs);
+            if (status != SUCCESS)
+            {
+                sprintf(errmsg, "Calling c_glmnet when df = %d", df);
+                RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+            }
+
+            for (i = 0; i < LASSO_COEFFS; i++)
+                coefs[lasso_band_index][i] = 0.0;
+
+            for (i = 0; i < lmu; i++)
+            {
+                for (j = 0; j < df; j++)
+                {
+                    if(j == 1){
+                        coefs[lasso_band_index][j]= (float)(cfs[i][j] * SLOPE_SCALE);
+                    }else{
+                       coefs[lasso_band_index][j]= (float)(cfs[i][j]);
+                    }
+                }
+            }
+            break;
+
+        case 5:
+             for (i = 0; i < nums; i++)
+             {
+                 x[0][i] = cosf(w * (float)clrx[i+start]);
+
+                 x[1][i] = sinf(w * (float)clrx[i+start]);
+                 x[2][i] = cosf(2 * w * (float)clrx[i+start]);
+                 x[3][i] = sinf(2 * w * (float)clrx[i+start]);
+                 y[i] = (float)clry[band_index][i+start];
+
+                 // printf("%f, %f, %f, %f\n", x[0][i], x[1][i], x[2][i], y[i]);
+
+             }
+
+             status = c_glmnet(nums, df-1, &x[0][0], y, nlam, ulam, alpha, &lmu, cfs);
+             if (status != SUCCESS)
+             {
+                 sprintf(errmsg, "Calling c_glmnet when df = %d", df);
+                 RETURN_ERROR(errmsg, FUNC_NAME, ERROR)
+             }
+
+             for (i = 0; i < LASSO_COEFFS; i++)
+                coefs[lasso_band_index][i] = 0.0;
+
+             for (i = 0; i < lmu; i++)
+             {
+                for (j = 0; j < df; j++)
+                {
+                     coefs[lasso_band_index][j]= cfs[i][j];
+                     //printf("%d band %d cof: %f\n", band_index, j, coefs[lasso_band_index][j]);
+                }
+             }
+             break;
+
+       case 6:
+            for (i = 0; i < nums; i++)
+            {
+                x[0][i] = (float)clrx[i+start];
+                x[1][i] = cosf(w * (float)clrx[i+start]);
+                x[2][i] = sinf(w * (float)clrx[i+start]);
+                x[3][i] = cosf(2 * w * (float)clrx[i+start]);
+                x[4][i] = sinf(2 * w * (float)clrx[i+start]);
+                y[i] = (float)clry[band_index][i+start];
+            }
+
+            status = c_glmnet(nums, df-1, &x[0][0], y, nlam, ulam, alpha, &lmu, cfs);
+            if (status != SUCCESS)
+            {
+                sprintf(errmsg, "Calling c_glmnet when df = %d", df);
+                RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+            }
+
+            for (i = 0; i < LASSO_COEFFS; i++)
+                coefs[lasso_band_index][i] = 0.0;
+
+            for (i = 0; i < lmu; i++)
+            {
+                for (j = 0; j < df; j++)
+                {
+                    if(j == 1){
+                        coefs[lasso_band_index][j]= (float)(cfs[i][j] * SLOPE_SCALE);
+                    }else{
+                       coefs[lasso_band_index][j]= (float)(cfs[i][j]);
+                    }
+                }
+            }
+            break;
+
+       case 8:
+            for (i = 0; i < nums; i++)
+            {
+                x[0][i] = (float)clrx[i+start];
+                x[1][i] = cosf(w * (float)clrx[i+start]);
+                x[2][i] = sinf(w * (float)clrx[i+start]);
+                x[3][i] = cosf(2 * w * (float)clrx[i+start]);
+                x[4][i] = sinf(2 * w * (float)clrx[i+start]);
+                x[5][i] = cosf(3 * w * (float)clrx[i+start]);
+                x[6][i] = sinf(3 * w * (float)clrx[i+start]);
+                y[i] = (float)clry[band_index][i+start];
+            }
+
+            status = c_glmnet(nums, df-1, &x[0][0], y, nlam, ulam, alpha, &lmu, cfs);
+            if (status != SUCCESS)
+            {
+                sprintf(errmsg, "Calling c_glmnet when df = %d", df);
+                RETURN_ERROR(errmsg, FUNC_NAME, ERROR)
+            }
+
+            for (i = 0; i < LASSO_COEFFS; i++)
+                coefs[lasso_band_index][i] = 0.0;
+
+            for (i = 0; i < lmu; i++)
+            {
+                for (j = 0; j < df; j++)
+                {
+                    if(j == 1){
+                        coefs[lasso_band_index][j]= (float)(cfs[i][j] * SLOPE_SCALE);
+                    }else{
+                       coefs[lasso_band_index][j]= (float)(cfs[i][j]);
+                    }
+                }
+            }
+            break;
+    }
+
+    /* predict lasso model results */
+    if (df == 2 || df == 4 || df == 5 || df == 6 || df == 8)
+    {
+        auto_ts_predict_float(clrx, coefs, df, lasso_band_index, start, end, yhat);
+        for (i = 0; i < nums; i++)
+        {
+            v_dif[lasso_band_index][i] = (float)clry[band_index][i+start] - yhat[i];
+        }
+        matlab_2d_array_norm_float(v_dif, lasso_band_index, nums, &v_dif_norm);
+        *rmse = v_dif_norm / sqrtf((float)(nums - df));
         //*rmse = v_dif_norm / sqrt((double)(nums)); //SY 08182019
     }
 
@@ -2632,6 +2974,46 @@ double MeanAngl
 }
 
 
+float MeanAngl_float
+(
+      float ** v_diff, // input: a two-dimensional vector of different (i_count * lasso_num)
+      int lasso_num,   // input: the number of lasso band
+      int i_count      // input: the number of consecutive observations
+)
+{
+    float y;
+    int i, j;
+    float product;
+    float norm1;
+    float norm2;
+    float angl_sum = 0;
+    float tmp;
+    if (i_count > 1)
+    {
+        for(i = 0; i < i_count - 1; i++)
+        {
+            product = 0;
+            norm1 = 0;
+            norm2 = 0;
+            for(j = 0; j < lasso_num; j++)
+            {
+                product+= v_diff[j][i] * v_diff[j][i+1];
+                norm1 += v_diff[j][i] * v_diff[j][i];
+                norm2 += v_diff[j][i+1] * v_diff[j][i+1];
+            }
+            tmp = acosf(product / (sqrtf(norm1) * sqrtf(norm2)));
+            angl_sum += (tmp * 180.0)/PI;
+        }
+        y = angl_sum/(i_count-1);
+    }
+    else
+    {
+        y = 0;
+    }
+    return y;
+}
+
+
 float MediumAngl(
       float ** v_diff, // input: a two-dimensional vector of different (i_count * lasso_num)
       int lasso_num,   // input: the number of lasso band
@@ -2831,59 +3213,6 @@ int singleband_minvariogram
 
 }
 
-
-int sccd_rmse
-(
-    int *clrx,
-    float **clry,
-    int band_index,
-    int start,
-    int end,
-    int df,
-    double *coefs,
-    float *rmse
-)
-{
-    int i ;
-    char FUNC_NAME[] = "sccd_rmse";
-    float *yhat;
-    float *v_dif;
-    int nums = 0;
-    float v_dif_norm = 0.0;
-    nums = end - start + 1;
-    yhat = (float *)malloc(nums * sizeof(float));
-    if (yhat == NULL)
-    {
-        RETURN_ERROR("Allocating yhat memory", FUNC_NAME, ERROR);
-    }
-
-
-    v_dif = (float *)malloc(nums * sizeof(float));
-    if (v_dif == NULL)
-    {
-        RETURN_ERROR("Allocating v_dif memory", FUNC_NAME, ERROR);
-    }
-
-
-
-    auto_ts_predict_double(clrx, coefs, df, start, end, yhat);
-    for (i = 0; i < nums; i++)
-    {
-        v_dif[i] = clry[band_index][i+start] - yhat[i];
-    }
-    matlab_1d_array_norm(v_dif, nums, &v_dif_norm);
-    *rmse = v_dif_norm / sqrt((float)(nums));
-        //*rmse = v_dif_norm / sqrt((float)(nums));
-
-
-    free(yhat);
-    yhat = NULL;
-
-    free(v_dif);
-    v_dif = NULL;
-
-    return SUCCESS;
-}
 
 int yearmonth2doy
 (

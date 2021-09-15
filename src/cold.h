@@ -45,8 +45,9 @@ int cold
     int starting_date,          /* I: (optional) the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
     Output_t *rec_cg,           /* O: outputted structure for CCDC results    */
     int *num_fc,                /* O: number of fitting curves                   */
-    short int* CM_outputs,      /* I/O: (optional) maximum change magnitudes at every SPATIAL_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    char* CM_outputs_date       /* I/O: (optional) dates for maximum change magnitudes at every SPATIAL_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    int CM_OUTPUT_INTERVAL,     /* I: the interval of days of outputting change maganitude                   */
+    short int* CM_outputs,      /* I/O: (optional) maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    char* CM_outputs_date       /* I/O: (optional) dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 );
 
 
@@ -69,14 +70,15 @@ int stand_procedure
     int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
     Output_t *rec_cg,           /* O: outputted structure for CCDC results     */
     int *num_fc,                /* O: number of fitting curves                       */
-    short int* CM_outputs,      /* I/O: maximum change magnitudes at every SPATIAL_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    char* CM_outputs_date      /* I/O: dates for maximum change magnitudes at every SPATIAL_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    int CM_OUTPUT_INTERVAL,
+    short int* CM_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    char* CM_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 );
 
 int inefficientobs_procedure
 (
-    int num_scenes,             /* I:  number of scenes  */
-    int *date_array,            /* I: valid date time series  */
+    int valid_num_scenes,             /* I:  number of scenes  */
+    int *valid_date_array,    /* I: valid date time series  */
     short int *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     short int *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     short int *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
@@ -84,11 +86,11 @@ int inefficientobs_procedure
     short int *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     short int *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     short int *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    short int *fmask_buf,       /* I:  mask-based time series  */
-    int *id_range,              /* I:  ids to check valid values  */
-    double sn_pct,               /* I:  mask-based time series  */
-    Output_t *rec_cg,           /* O: outputed records for CCDC results */
-    int *num_fc                   /* O: Intialize NUM of Functional Curves    */
+    short int *fmask_buf,      /* I:  mask-based time series  */
+    int *id_range,
+    float sn_pct,
+    Output_t *rec_cg,
+    int *num_fc
 );
 
 const char *check_parameter(
@@ -117,7 +119,7 @@ int tsalgorithm_executor(
     int col,
     int task,
     char* mask_path,
-    double probability_threshold,
+    float probability_threshold,
     int conse,
     int min_days_conse,
     int output_mode,
@@ -146,24 +148,6 @@ double angle_decaying(
     double highbound
 );
 
-int stand_procedure_fixeddays
-(
-    int valid_num_scenes,             /* I:  number of scenes  */
-    int *valid_date_array,    /* I: valid date time series  */
-    short int **buf,            /* I:  pixel-based time series  */
-    short int *fmask_buf,      /* I:  mask-based time series  */
-    int *id_range,
-    Output_t *rec_cg,
-    int *num_fc,                 /* O: Initialize NUM of Functional Curves    */
-    double probability_threshold,
-    double tcg,
-    int starting_date,
-    short int* CM_outputs,
-    char* CM_outputs_date,
-    int min_days_conse,
-    int conse,
-    bool b_outputCM
-);
 
 int ccd_scanline
 (
@@ -195,7 +179,8 @@ int ccd_scanline
     char *auxiliary_var_path,
     int conse,
     bool b_outputCM,
-    bool b_outputCM_reconstruction
+    bool b_outputCM_reconstruction,
+    int CM_OUTPUT_INTERVAL
 );
 
 #endif // CCD_H

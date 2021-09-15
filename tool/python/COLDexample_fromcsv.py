@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt  # for plotting
 Landsat_bandname = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Thermal']
 t_c = - 200  # the threshold used for get_breakcategory
 w = np.pi * 2 / 365.25
-
+slope_scale = 10000  # slope_in_rec_cg = original_slope * slope_scale, we used this way to keep precision for
+                     # model coefficients in float datatype
 
 def get_breakcategory(ccd_plot, i_curve):
     """
@@ -82,8 +83,8 @@ plot_cold = pd.DataFrame(columns=['Trend', 'Annual', 'Semiannual', 'Trimodel', '
 for i in range(len(cold_result)):
     j = np.arange(cold_result[i]['t_start'], cold_result[i]['t_end'] + 1, 1)
     plot_cold_sub = pd.DataFrame({'dates': j,
-                                  'trend': j * cold_result[i]['coefs'][band - 1][1] + cold_result[i]['coefs'][band - 1][
-                                      0],
+                                  'trend': j * cold_result[i]['coefs'][band - 1][1] / slope_scale +
+                                           cold_result[i]['coefs'][band - 1][0],
                                   'annual': np.cos(w * j) * cold_result[i]['coefs'][band - 1][2] +
                                             np.sin(w * j) * cold_result[i]['coefs'][band - 1][3],
                                   'semiannual': np.cos(2 * w * j) * cold_result[i]['coefs'][band - 1][4] +

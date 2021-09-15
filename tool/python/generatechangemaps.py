@@ -28,88 +28,90 @@ def singlerow_execution(reccg_path, filename, dt, cols, method, mode, targeted_y
     identical_pos_curve = []
     for count, curve in enumerate(ccd_scanline):
         if curve['pos'] != last_pos:
-            if len(identical_pos_curve) > 0:
-                identical_pos_curve_np = np.array(identical_pos_curve)
+            if len(identical_pos_curve) == 0:
+                continue
 
-                # identical_pos_curve_np.sort(order='t_start')
-                # identical_pos_curve_np = np.array([x for x in ccd_scanline if x['pos'] == pos])
-                # identical_pos_curve_np.sort(order='t_start')
-                if mode == 'r': # recent disturbance year, need sort in descending
-                    identical_pos_curve_np = identical_pos_curve_np[::-1]
-                i_col = int((identical_pos_curve_np[0]["pos"] - 1) % 5000)
-                if i_col < 0:
-                    print('Processing {} failed: i_row={}; i_col={}; pos = {}'.format(filename,
-                                                                                      i_row, i_col,
-                                                                                      np.ceil(identical_pos_curve_np[0]["pos"])))
-                    return
-                for n, element in enumerate(identical_pos_curve_np):
-                    prob = element['change_prob']
-                    if method is 'COLD' or method is 'obcold':
-                        if prob < 100: # last segment
-                            continue
-                        green_direction = False
-                        afforestation = False
-                        if (element['magnitude'][3] > t_c and element['magnitude'][2] < -t_c and
-                                element['magnitude'][4] < -t_c):
-                            green_direction = True
-                            if mode == 'r':
-                                if n - 1 >= 0:
-                                    if (identical_pos_curve_np[n - 1]['coefs'][3][1] > np.abs(
-                                            element['coefs'][3][1])) and \
-                                            (identical_pos_curve_np[n - 1]['coefs'][2][1] < -np.abs(
-                                                element['coefs'][2][1])) and \
-                                            (identical_pos_curve_np[n - 1]['coefs'][4][1] < -np.abs(
-                                                element['coefs'][4][1])):
-                                        afforestation = True
-                                    else:
-                                        afforestation = False
-                            elif mode == 'f':
-                                if n + 1 <= len(identical_pos_curve_np) - 1:
-                                    if (identical_pos_curve_np[n+1]['coefs'][3][1] > np.abs(element['coefs'][3][1])) and \
-                                        (identical_pos_curve_np[n+1]['coefs'][2][1] < -np.abs(element['coefs'][2][1])) and \
-                                            (identical_pos_curve_np[n+1]['coefs'][4][1] < -np.abs(element['coefs'][4][1])):
-                                        afforestation = True
-                                    else:
-                                        afforestation = False
+            identical_pos_curve_np = np.array(identical_pos_curve)
 
-                        if green_direction is not True or afforestation is True:
-                            # print(element['t_break'])
-                            try:
-                                if prob == 100:
-                                    year = pd.Timestamp.fromordinal(element['t_break'] - bias).year
-                                    if targeted_year == 0:  #
-                                        # array[i_row,i_col] = month
-                                        results_row[i_col] = year
-                                        break
-                                    elif year == targeted_year:
-                                        results_row[i_col] = element['t_break'] - \
-                                                              (pd.Timestamp.toordinal(datetime.date(year,
-                                                                                                    1, 1))
-                                                               + bias) + 1  # convert doy
-                                        break
-                            except:
-                                print("Fail at row {} and col {}; t_break = {}".format(i_row + 1, i_col + 1,
-                                                                                       element['t_break']))
-                    elif method is 'SCCD':
-                        if element['category'] % 10 == 1 and element['category'] / 10 is not 2 and \
-                                element['t_break'] > 0:
-                            try:
-                                if prob == 100:
-                                    year = pd.Timestamp.fromordinal(element['t_break'] - bias).year
-                                    if targeted_year == 0:  #
-                                        results_row[i_col] = year
-                                        break
-                                    elif year == targeted_year:
-                                        # array[i_row, i_col] = element['t_break']
-                                        results_row[i_col] = element['t_break'] - \
-                                                              (pd.Timestamp.toordinal(datetime.date(year,
-                                                                                                    1, 1))
-                                                               + bias) + 1 # convert doy
-                                        break
-                            except:
-                                print("Fail at row {} and col {}; t_break = {}".format(i_row + 1, i_col + 1,
-                                                                                       element['t_break']))
-                                # clear list
+            # identical_pos_curve_np.sort(order='t_start')
+            # identical_pos_curve_np = np.array([x for x in ccd_scanline if x['pos'] == pos])
+            # identical_pos_curve_np.sort(order='t_start')
+            if mode == 'r': # recent disturbance year, need sort in descending
+                identical_pos_curve_np = identical_pos_curve_np[::-1]
+            i_col = int((identical_pos_curve_np[0]["pos"] - 1) % 5000)
+            if i_col < 0:
+                print('Processing {} failed: i_row={}; i_col={}; pos = {}'.format(filename,
+                                                                                  i_row, i_col,
+                                                                                  np.ceil(identical_pos_curve_np[0]["pos"])))
+                return
+            for n, element in enumerate(identical_pos_curve_np):
+                prob = element['change_prob']
+                if method is 'COLD' or method is 'obcold':
+                    if prob < 100: # last segment
+                        continue
+                    green_direction = False
+                    afforestation = False
+                    if (element['magnitude'][3] > t_c and element['magnitude'][2] < -t_c and
+                            element['magnitude'][4] < -t_c):
+                        green_direction = True
+                        if mode == 'r':
+                            if n - 1 >= 0:
+                                if (identical_pos_curve_np[n - 1]['coefs'][3][1] > np.abs(
+                                        element['coefs'][3][1])) and \
+                                        (identical_pos_curve_np[n - 1]['coefs'][2][1] < -np.abs(
+                                            element['coefs'][2][1])) and \
+                                        (identical_pos_curve_np[n - 1]['coefs'][4][1] < -np.abs(
+                                            element['coefs'][4][1])):
+                                    afforestation = True
+                                else:
+                                    afforestation = False
+                        elif mode == 'f':
+                            if n + 1 <= len(identical_pos_curve_np) - 1:
+                                if (identical_pos_curve_np[n+1]['coefs'][3][1] > np.abs(element['coefs'][3][1])) and \
+                                    (identical_pos_curve_np[n+1]['coefs'][2][1] < -np.abs(element['coefs'][2][1])) and \
+                                        (identical_pos_curve_np[n+1]['coefs'][4][1] < -np.abs(element['coefs'][4][1])):
+                                    afforestation = True
+                                else:
+                                    afforestation = False
+
+                    if green_direction is not True or afforestation is True:
+                        # print(element['t_break'])
+                        try:
+                            if prob == 100:
+                                year = pd.Timestamp.fromordinal(element['t_break'] - bias).year
+                                if targeted_year == 0:  #
+                                    # array[i_row,i_col] = month
+                                    results_row[i_col] = year
+                                    break
+                                elif year == targeted_year:
+                                    results_row[i_col] = element['t_break'] - \
+                                                          (pd.Timestamp.toordinal(datetime.date(year,
+                                                                                                1, 1))
+                                                           + bias) + 1  # convert doy
+                                    break
+                        except:
+                            print("Fail at row {} and col {}; t_break = {}".format(i_row + 1, i_col + 1,
+                                                                                   element['t_break']))
+                elif method is 'SCCD':
+                    if element['category'] % 10 == 1 and element['category'] / 10 is not 2 and \
+                            element['t_break'] > 0:
+                        try:
+                            if prob == 100:
+                                year = pd.Timestamp.fromordinal(element['t_break'] - bias).year
+                                if targeted_year == 0:  #
+                                    results_row[i_col] = year
+                                    break
+                                elif year == targeted_year:
+                                    # array[i_row, i_col] = element['t_break']
+                                    results_row[i_col] = element['t_break'] - \
+                                                          (pd.Timestamp.toordinal(datetime.date(year,
+                                                                                                1, 1))
+                                                           + bias) + 1 # convert doy
+                                    break
+                        except:
+                            print("Fail at row {} and col {}; t_break = {}".format(i_row + 1, i_col + 1,
+                                                                                   element['t_break']))
+                            # clear list
             identical_pos_curve = []
             identical_pos_curve.append(curve)
             # go to the next pos
@@ -117,86 +119,88 @@ def singlerow_execution(reccg_path, filename, dt, cols, method, mode, targeted_y
         else:
             identical_pos_curve.append(curve)
 
-        if count == (len(ccd_scanline) - 1):  # that means all curve have been collected for last_pos
-            if len(identical_pos_curve) > 0:
-                identical_pos_curve_np = np.array(identical_pos_curve)
-                # identical_pos_curve_np.sort(order='t_start')
-                # identical_pos_curve_np = np.array([x for x in ccd_scanline if x['pos'] == pos])
-                # identical_pos_curve_np.sort(order='t_start')
-                if mode == 'r': # recent disturbance year, need sort in descending
-                    identical_pos_curve_np = identical_pos_curve_np[::-1]
-                i_col = int((identical_pos_curve_np[0]["pos"] - 1) % 5000)
-                if i_col < 0:
-                    print('Processing {} failed: i_row={}; i_col={}; pos = {}'.format(filename,
-                                                                                      i_row, i_col,
-                                                                                      np.ceil(identical_pos_curve_np[0]["pos"])))
-                    return
-                for n, element in enumerate(identical_pos_curve_np):
-                    if method is 'COLD' or method is 'obcold':
-                        if prob < 100: # last segment
-                            continue
-                        green_direction = False
-                        afforestation = False
-                        if (element['magnitude'][3] > t_c and element['magnitude'][2] < -t_c and
-                                element['magnitude'][4] < -t_c):
-                            green_direction = True
-                            if mode == 'r':
-                                if n - 1 >= 0:
-                                    if (identical_pos_curve_np[n - 1]['coefs'][3][1] > np.abs(
-                                            element['coefs'][3][1])) and \
-                                            (identical_pos_curve_np[n - 1]['coefs'][2][1] < -np.abs(
-                                                element['coefs'][2][1])) and \
-                                            (identical_pos_curve_np[n - 1]['coefs'][4][1] < -np.abs(
-                                                element['coefs'][4][1])):
-                                        afforestation = True
-                                    else:
-                                        afforestation = False
-                            elif mode == 'f':
-                                if n + 1 <= len(identical_pos_curve_np) - 1:
-                                    if (identical_pos_curve_np[n+1]['coefs'][3][1] > np.abs(element['coefs'][3][1])) and \
-                                        (identical_pos_curve_np[n+1]['coefs'][2][1] < -np.abs(element['coefs'][2][1])) and \
-                                            (identical_pos_curve_np[n+1]['coefs'][4][1] < -np.abs(element['coefs'][4][1])):
-                                        afforestation = True
-                                    else:
-                                        afforestation = False
+        if count == (len(ccd_scanline) - 1):  # processing the last element for one more time
+            if len(identical_pos_curve) == 0:
+                continue
 
-                        if green_direction is not True or afforestation is True:
-                            try:
-                                if prob == 100:
-                                    year = pd.Timestamp.fromordinal(element['t_break'] - bias).year
-                                    if targeted_year == 0:  #
-                                        # array[i_row,i_col] = month
-                                        results_row[i_col] = year
-                                        break
-                                    elif year == targeted_year:
-                                        results_row[i_col] = element['t_break'] - \
-                                                              (pd.Timestamp.toordinal(datetime.date(year,
-                                                                                                    1, 1))
-                                                               + bias) + 1  # convert doy
-                                        break
-                            except:
-                                print("Fail at row {} and col {}; t_break = {}".format(i_row + 1, i_col + 1,
-                                                                                       element['t_break']))
-                    elif method is 'SCCD':
-                        if element['category'] % 10 == 1 and element['category'] / 10 is not 2 and \
-                                element['t_break'] > 0:
-                            try:
-                                if prob == 100:
-                                    year = pd.Timestamp.fromordinal(element['t_break'] - bias).year
-                                    if targeted_year == 0:  #
-                                        results_row[i_col] = year
-                                        break
-                                    elif year == targeted_year:
-                                        # array[i_row, i_col] = element['t_break']
-                                        results_row[i_col] = element['t_break'] - \
-                                                              (pd.Timestamp.toordinal(datetime.date(year,
-                                                                                                    1, 1))
-                                                               + bias) + 1 # convert doy
-                                        break
-                            except:
-                                print("Fail at row {} and col {}; t_break = {}".format(i_row + 1, i_col + 1,
-                                                                                       element['t_break']))
-                                # clear list
+            identical_pos_curve_np = np.array(identical_pos_curve)
+            # identical_pos_curve_np.sort(order='t_start')
+            # identical_pos_curve_np = np.array([x for x in ccd_scanline if x['pos'] == pos])
+            # identical_pos_curve_np.sort(order='t_start')
+            if mode == 'r': # recent disturbance year, need sort in descending
+                identical_pos_curve_np = identical_pos_curve_np[::-1]
+            i_col = int((identical_pos_curve_np[0]["pos"] - 1) % 5000)
+            if i_col < 0:
+                print('Processing {} failed: i_row={}; i_col={}; pos = {}'.format(filename,
+                                                                                  i_row, i_col,
+                                                                                  np.ceil(identical_pos_curve_np[0]["pos"])))
+                return
+            for n, element in enumerate(identical_pos_curve_np):
+                if method is 'COLD' or method is 'obcold':
+                    if prob < 100: # last segment
+                        continue
+                    green_direction = False
+                    afforestation = False
+                    if (element['magnitude'][3] > t_c and element['magnitude'][2] < -t_c and
+                            element['magnitude'][4] < -t_c):
+                        green_direction = True
+                        if mode == 'r':
+                            if n - 1 >= 0:
+                                if (identical_pos_curve_np[n - 1]['coefs'][3][1] > np.abs(
+                                        element['coefs'][3][1])) and \
+                                        (identical_pos_curve_np[n - 1]['coefs'][2][1] < -np.abs(
+                                            element['coefs'][2][1])) and \
+                                        (identical_pos_curve_np[n - 1]['coefs'][4][1] < -np.abs(
+                                            element['coefs'][4][1])):
+                                    afforestation = True
+                                else:
+                                    afforestation = False
+                        elif mode == 'f':
+                            if n + 1 <= len(identical_pos_curve_np) - 1:
+                                if (identical_pos_curve_np[n+1]['coefs'][3][1] > np.abs(element['coefs'][3][1])) and \
+                                    (identical_pos_curve_np[n+1]['coefs'][2][1] < -np.abs(element['coefs'][2][1])) and \
+                                        (identical_pos_curve_np[n+1]['coefs'][4][1] < -np.abs(element['coefs'][4][1])):
+                                    afforestation = True
+                                else:
+                                    afforestation = False
+
+                    if green_direction is not True or afforestation is True:
+                        try:
+                            if prob == 100:
+                                year = pd.Timestamp.fromordinal(element['t_break'] - bias).year
+                                if targeted_year == 0:  #
+                                    # array[i_row,i_col] = month
+                                    results_row[i_col] = year
+                                    break
+                                elif year == targeted_year:
+                                    results_row[i_col] = element['t_break'] - \
+                                                          (pd.Timestamp.toordinal(datetime.date(year,
+                                                                                                1, 1))
+                                                           + bias) + 1  # convert doy
+                                    break
+                        except:
+                            print("Fail at row {} and col {}; t_break = {}".format(i_row + 1, i_col + 1,
+                                                                                   element['t_break']))
+                elif method is 'SCCD':
+                    if element['category'] % 10 == 1 and element['category'] / 10 is not 2 and \
+                            element['t_break'] > 0:
+                        try:
+                            if prob == 100:
+                                year = pd.Timestamp.fromordinal(element['t_break'] - bias).year
+                                if targeted_year == 0:  #
+                                    results_row[i_col] = year
+                                    break
+                                elif year == targeted_year:
+                                    # array[i_row, i_col] = element['t_break']
+                                    results_row[i_col] = element['t_break'] - \
+                                                          (pd.Timestamp.toordinal(datetime.date(year,
+                                                                                                1, 1))
+                                                           + bias) + 1 # convert doy
+                                    break
+                        except:
+                            print("Fail at row {} and col {}; t_break = {}".format(i_row + 1, i_col + 1,
+                                                                                   element['t_break']))
+                            # clear list
             identical_pos_curve = []
 
     outfile = os.path.join(out_path, 'tmp_map_row{}.npy'.format(str(i_row+1).zfill(4)))

@@ -1,11 +1,11 @@
-mode=1
-in_path=/scratch/suy20004/h011v009_stack
-out_path=/home/suy20004/tmp
+mode=2
+in_path=/scratch/suy20004/h015v008_stack
+out_path=/scratch/suy20004/h015v008_sccd
 n_cores=1
 user_mask_path=
-row=1122
-col=3363
-method=1
+row=1
+col=1
+method=4
 probability=0.99
 min_days_cones=80
 output_mode=0
