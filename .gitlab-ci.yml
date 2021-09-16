@@ -18,14 +18,12 @@
 
         More details are here https://docs.gitlab.com/ee/ci/pipelines/settings.html#auto-cancel-redundant-pipelines
 
-
 # Abuse YAML notation to make a heredoc. This will be ignored by the CI.
 stages:
     - lint
     - build
     - test
     - docker
-
 
 ### Conditionals ###
 
