@@ -28,7 +28,7 @@ reccg_dt = np.dtype([('t_start', np.int32),  # time when series model gets start
                                           # and observation for each spectral band)
 
 
-cdef extern from "../../src/output.h":
+cdef extern from "../../../src/output.h":
     ctypedef struct Output_t:
         int t_start
         int t_end
@@ -41,7 +41,7 @@ cdef extern from "../../src/output.h":
         float rmse[7]
         float magnitude[7]
 
-cdef extern from "../../src/cold.h":
+cdef extern from "../../../src/cold.h":
     cdef int cold(short *buf_b, short *buf_g, short *buf_r, short *buf_n, short *buf_s1, short *buf_s2,
                   short *buf_t, short *fmask_buf, int *valid_date_array, int valid_num_scenes, int num_samples,
                   int col_pos, int row_pos, double tcg, int conse, bool b_outputCM, int starting_date, Output_t *rec_cg,

@@ -1,4 +1,4 @@
-option(BUILD_PYCOLD "Enable pycold module" TRUE)
+option(BUILD_PYCOLD "Enable _pycold_cython module" TRUE)
 if (BUILD_PYCOLD)
 
   find_package(PythonInterp REQUIRED)
@@ -7,8 +7,8 @@ if (BUILD_PYCOLD)
   find_package(Cython REQUIRED)
   find_package(NumPy REQUIRED)
 
-  set(cython_source "pycold.pyx")
-  set(PYCOLD_MODULE_NAME "pycold")
+  set(cython_source "_pycold_cython.pyx")
+  set(PYCOLD_MODULE_NAME "_pycold_cython")
 
   # Translate Cython into C/C++
   add_cython_target(${PYCOLD_MODULE_NAME} "${cython_source}" C OUTPUT_VAR sources)

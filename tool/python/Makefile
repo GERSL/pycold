@@ -1,3 +1,5 @@
+# DEPRECATED
+#
 # For cython to generate python library
 default: pycold
 

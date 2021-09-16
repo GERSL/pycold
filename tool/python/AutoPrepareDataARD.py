@@ -1,7 +1,8 @@
-import warnings
-warnings.filterwarnings("ignore")
+# import warnings
+# warnings.filterwarnings("ignore")
 import os
-import pandas # must import pandas ahead of gdal; uconn hpc specific issue
+import sys
+import pandas  # NOQA  # must import pandas ahead of gdal; uconn hpc specific issue
 from osgeo import gdal_array
 import numpy as np
 import gdal
@@ -9,18 +10,18 @@ import tarfile
 from os import listdir
 from os.path import isfile, join, isdir
 import logging
-import const
 import numpy as geek
 from datetime import datetime
 import click
 import shutil
 from pytz import timezone
-from mpi4py import MPI
+# from mpi4py import MPI
 from fixed_thread_pool_executor import FixedThreadPoolExecutor
 import multiprocessing
-from math import floor, ceil
 import time
 import xml.etree.ElementTree as ET
+
+from pycold import const
 
 
 def mask_value(vector, val):
@@ -97,16 +98,16 @@ def load_data(file_name, gdal_driver='GTiff'):
     Converts a GDAL compatable file into a numpy array and associated geodata.
     The rray is provided so you can run with your processing - the geodata consists of the geotransform and gdal dataset object
     if you're using an ENVI binary as input, this willr equire an associated .hdr file otherwise this will fail.
-	This needs modifying if you're dealing with multiple bands.
+    This needs modifying if you're dealing with multiple bands.
 
-	VARIABLES
-	file_name : file name and path of your file
+    VARIABLES
+        file_name : file name and path of your file
 
-	RETURNS
-	image array
-	(geotransform, inDs)
+    RETURNS
+        image array
+        (geotransform, inDs)
     '''
-    driver_t = gdal.GetDriverByName(gdal_driver) ## http://www.gdal.org/formats_list.html
+    driver_t = gdal.GetDriverByName(gdal_driver)  # http://www.gdal.org/formats_list.html
     driver_t.Register()
 
     inDs = gdal.Open(file_name, gdal.GA_ReadOnly)
@@ -137,10 +138,10 @@ def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_thresho
         shutil.rmtree(join(tmp_path, folder.replace("SR", "BT")), ignore_errors=True)
 
     try:
-        with tarfile.open(join(source_dir, folder+'.tar')) as tar_ref:
+        with tarfile.open(join(source_dir, folder + '.tar')) as tar_ref:
             try:
                 tar_ref.extractall(join(tmp_path, folder))
-            except:
+            except Exception:
                 # logger.warning('Unzip fails for {}'.format(folder))
                 logger.warn('Unzip fails for {}'.format(folder))
                 return
@@ -150,10 +151,10 @@ def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_thresho
 
     # unzip BT
     try:
-        with tarfile.open(join(source_dir, folder.replace("SR", "BT")+'.tar')) as tar_ref:
+        with tarfile.open(join(source_dir, folder.replace("SR", "BT") + '.tar')) as tar_ref:
             try:
                 tar_ref.extractall(join(tmp_path, folder.replace("SR", "BT")))
-            except:
+            except Exception:
                 # logger.warning('Unzip fails for {}'.format(folder.replace("SR", "BT")))
                 logger.warn('Unzip fails for {}'.format(folder.replace("SR", "BT")))
                 return
@@ -279,7 +280,7 @@ def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_thresho
                     return
                 pathid = int(elements[0].attrib['path'])
                 # assign the region has different pathid to filled value so won't be processed
-                QA_band_unpacked[singlepath_tile !=pathid] = 255
+                QA_band_unpacked[singlepath_tile != pathid] = 255
 
             outDs.GetRasterBand(8).WriteArray(QA_band_unpacked)
             # print(join(join(tmp_path, folder), "{}B1.tif".format(folder)))
@@ -327,7 +328,7 @@ def checkfinished_step2(out_dir, n_cores):
     :return:
     """
     for i in range(n_cores):
-        if not os.path.exists(join(out_dir, 'rank{}_finished.txt'.format(i+1))):
+        if not os.path.exists(join(out_dir, 'rank{}_finished.txt'.format(i + 1))):
             return False
     return True
 
@@ -389,7 +390,7 @@ def main(source_dir, out_dir, threads_number, parallel_mode, clear_threshold, si
                 with tarfile.open(join(source_dir, folder_list[0] + '.tar')) as tar_ref:
                     try:
                         tar_ref.extractall(join(tmp_path, folder_list[0]))
-                    except:
+                    except Exception:
                         # logger.warning('Unzip fails for {}'.format(folder))
                         print('Unzip fails for {} and gdal-warp single-path fail'.format(folder_list[0]))
             ref_image = gdal.Open(
@@ -469,9 +470,9 @@ def main(source_dir, out_dir, threads_number, parallel_mode, clear_threshold, si
             with tarfile.open(join(source_dir, folder_list[0] + '.tar')) as tar_ref:
                 try:
                     tar_ref.extractall(join(tmp_path, folder_list[0]))
-                except:
+                except Exception:
                     logger.warning('Unzip fails for {}'.format(folder))
-                        # print('Unzip fails for {} and gdal-warp single-path fail'.format(folder_list[0]))
+                    # print('Unzip fails for {} and gdal-warp single-path fail'.format(folder_list[0]))
             ref_image = gdal.Open(join(join(tmp_path, folder_list[0]), "{}B1.tif".format(folder_list[0])))
             trans = ref_image.GetGeoTransform()
             proj = ref_image.GetProjection()
@@ -484,8 +485,8 @@ def main(source_dir, out_dir, threads_number, parallel_mode, clear_threshold, si
             dst = gdal.Warp(join(out_dir, 'singlepath_landsat_tile.tif'), conus_path_image,
                             options=params)
             # must close the dst
-            dst = None
-            out_img = None
+            dst = None  # NOQA
+            out_img = None  # NOQA
             shutil.rmtree(join(tmp_path, folder_list[0]), ignore_errors=True)
             logger.info('gdal-warp for single-path array succeed: {}'.format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
             logger = None
@@ -510,7 +511,7 @@ def main(source_dir, out_dir, threads_number, parallel_mode, clear_threshold, si
                                         band_count, new_rank + 1, len(folder_list), single_path, logger)
 
             # create an empty file for signaling
-            with open(os.path.join(out_dir, 'rank{}_finished.txt'.format(rank)), 'w') as fp:
+            with open(os.path.join(out_dir, 'rank{}_finished.txt'.format(rank)), 'w') as fp:  # NOQA
                 pass
 
         # wait for all cores assigned
@@ -540,7 +541,7 @@ def main(source_dir, out_dir, threads_number, parallel_mode, clear_threshold, si
 
         time.sleep(3)  # sleep 3 seconds to guarantee scene_list writting finished
 
-            # os.remove(join(out_dir, 'singlepath_landsat_tile.tif'))
+        # os.remove(join(out_dir, 'singlepath_landsat_tile.tif'))
 
         # logger.info("Final report: finished preparation task ({})"
         #             .format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))

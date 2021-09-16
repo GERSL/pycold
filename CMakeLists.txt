@@ -39,4 +39,4 @@ endif()
 add_subdirectory("src")
 
 # Python bindings
-add_subdirectory("tool/python")
+add_subdirectory("tool/python/pycold")
