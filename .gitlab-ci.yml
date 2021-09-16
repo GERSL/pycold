@@ -86,6 +86,8 @@ stages:
         - conda create -y --prefix ".cache/conda/envs/loose-pycold-env" python=3.8 --override-channels --channel conda-forge
         - conda activate ".cache/conda/envs/loose-pycold-env"
         # TODO cibuildwheel
+        - python -m pip install -r requirements/build.txt
+        - python -m pip install -r requirements/runtime.txt
         - python setup.py bdist_wheel
         - python -m pip install dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
         # - python -m pip wheel .
