@@ -47,5 +47,6 @@ if (BUILD_SCCD)
   # (this will be an inplace build if you use `pip install -e`)
   file(RELATIVE_PATH _install_dest "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
   install(TARGETS ${SCCD_MODULE_NAME} LIBRARY DESTINATION "${_install_dest}")
+
 endif()
 

@@ -43,4 +43,6 @@ if __name__ == '__main__':
         author="Su Ye",
         author_email="remotesensingsuy@gmail.com",
         packages=find_packages(where='tool/python', include='pycold.*'),
+        cmake_install_dir='tool/python/pycold',
+        # packages=['pycold'],
     )
