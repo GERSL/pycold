@@ -18,6 +18,7 @@ git clone https://gitlab.kitware.com/smart/pycold.git
 sudo apt-get install build-essential
 sudo apt-get install libgsl-dev
 sudo apt-get install gfortran
+sudo apt-get install zlib
 ```
 (MAC)
 ```
@@ -60,7 +61,7 @@ A full example of running pycold for an example dataset can be found in /YOUR_PY
 
 ```
 # Install required libraries
-sudo apt-get install build-essential
+sudo apt-get install build-essential zlib
 sudo apt-get install libgsl-dev
 sudo apt-get install gfortran
 
