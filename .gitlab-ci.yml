@@ -83,7 +83,8 @@ stages:
         - conda init bash
         - source ~/.bashrc
         - ls -al
-        - apt-get install build-essential libgsl-dev gfortran
+        - apt-get update -y
+        - apt-get install build-essential libgsl-dev gfortran -y
         - conda create -y --prefix ".cache/conda/envs/loose-pycold-env" python=3.8 --override-channels --channel conda-forge
         - conda activate ".cache/conda/envs/loose-pycold-env"
         # TODO cibuildwheel
