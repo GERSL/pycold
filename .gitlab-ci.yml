@@ -119,43 +119,43 @@ stages:
             - .cache/xdg_cache
 
 
-#.test_strict_template:
-#    &test_strict_template
-#    <<:
-#        *common_template
-#    stage:
-#        test
+.test_strict_template:
+    &test_strict_template
+    <<:
+        *common_template
+    stage:
+        test
 
-#    before_script:
-#        - conda init bash
-#        - source ~/.bashrc
-#        - ls -al
-#        - ./dev/make_strict_req.sh
-#        - conda env create -f conda_env_strict.yml --prefix ".cache/conda/envs/strict-watch-env"
-#        - conda activate ".cache/conda/envs/strict-watch-env"
-#        - pip install -e .
-#    script:
-#        - ./run_tests.py --network watch tests scripts
+    before_script:
+        - conda init bash
+        - source ~/.bashrc
+        - ls -al
+        - ./dev/make_strict_req.sh
+        - conda env create -f conda_env_strict.yml --prefix ".cache/conda/envs/strict-watch-env"
+        - conda activate ".cache/conda/envs/strict-watch-env"
+        - pip install -e .
+    script:
+        - ./run_tests.py --network watch tests scripts
 
-#    after_script:
-#        - du -sh .cache/*
-#        - du -sh .cache/xdg_cache/*
-#        - du -sh .cache/conda/*
-#        - du -sh .cache/pip/*
+    after_script:
+        - du -sh .cache/*
+        - du -sh .cache/xdg_cache/*
+        - du -sh .cache/conda/*
+        - du -sh .cache/pip/*
 
-#    # Coverage is a regex that will parse the coverage from the test stdout
-#    coverage:
-#        '/TOTAL.+ ([0-9]{1,3}%)/'
+    # Coverage is a regex that will parse the coverage from the test stdout
+    coverage:
+        '/TOTAL.+ ([0-9]{1,3}%)/'
 
-#    cache:
-#        key:
-#            strict-cache-v1
-#        paths:
+    cache:
+        key:
+            strict-cache-v1
+        paths:
             
-#            #- .cache/conda/envs/strict-watch-env  # better with or without this?
-#            - .cache/conda/pkgs
-#            - .cache/pip
-#            - .cache/xdg_cache
+            #- .cache/conda/envs/strict-watch-env  # better with or without this?
+            - .cache/conda/pkgs
+            - .cache/pip
+            - .cache/xdg_cache
 
 
 #### JOBS ###
@@ -169,6 +169,60 @@ test_full_loose/conda-linux:
     image:
         gitlab.kitware.com:4567/computer-vision/ci-docker/miniconda3
     needs: []
+
+
+cibuildwheel:
+    rules:
+        - <<: *if-merge-request
+        - <<: *if-merged-into-default
+    stage: 
+        build
+
+    tags:
+        - aws
+        - docker
+        - linux
+        - linux-3.17
+        - build
+        - smart
+
+    #tags:
+    #    # Tags define which runners will accept which jobs
+    #    - linux
+    #    - docker
+    #    - privileged
+
+    image: gitlab.kitware.com:4567/computer-vision/ci-docker/podman
+
+    script:
+        - podman --version
+        - podman info --debug
+        - python3 -m pip install git+https://github.com/Erotemic/cibuildwheel.git@dev/flow
+        - pwd
+        - ls -al
+        - export CIBW_SKIP="pp* cp27-* cp35-* cp36-* cp37-*"
+        - export CIBW_OCI_EXE="podman"
+        # NOTE: this requires that some mechanism exists in cibuildwheel to
+        # ignore this directory when it copys the repo into the container
+        - mkdir -p ".cache/containers/vfs-storage/"
+        - export CIBW_OCI_ROOT=$(realpath ".cache/containers/vfs-storage/")
+        - echo "CIBW_OCI_ROOT = $CIBW_OCI_ROOT"
+        - cibuildwheel --platform linux --print-build-identifiers
+        # - cibuildwheel --output-dir wheelhouse --platform linux --archs x86_64,i686,aarch64,ppc64le,s390x,universal2,arm64,x86,AMD64
+        - cibuildwheel --output-dir wheelhouse --platform linux
+        - ls $CIBW_OCI_ROOT
+        - ls wheelhouse
+
+    artifacts:
+        paths:
+            - wheelhouse/
+
+    # Contents of .cache/containers/vfs-storage are far too large to cache
+    # Not sure if it is possible to cache the download of the images
+    #cache:
+    #    paths:
+    #        - .cache/containers
+    #    TODO: can we use skopeo to cache the images?
 
 
 #test_full_strict/conda-linux:
