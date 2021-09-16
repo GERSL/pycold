@@ -98,11 +98,11 @@ stages:
         - python -c "import pycold; print(pycold.__version__)"
           #- ./run_tests.py --network watch tests scripts
 
-    after_script:
-        - du -sh .cache/*
-        - du -sh .cache/xdg_cache/*
-        - du -sh .cache/conda/*
-        - du -sh .cache/pip/*
+    #after_script:
+    #    - du -sh .cache/*
+    #    - du -sh .cache/xdg_cache/*
+    #    - du -sh .cache/conda/*
+    #    - du -sh .cache/pip/*
 
     # Coverage is a regex that will parse the coverage from the test stdout
     coverage:
