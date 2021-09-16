@@ -83,7 +83,7 @@ stages:
         - conda init bash
         - source ~/.bashrc
         - ls -al
-        - conda env create python=3.8 --override-channels --channel conda-forge --prefix ".cache/conda/envs/loose-pycold-env"
+        - conda create -y --prefix ".cache/conda/envs/loose-pycold-env" python=3.8 --override-channels --channel conda-forge
         - conda activate ".cache/conda/envs/loose-pycold-env"
         # TODO cibuildwheel
         - python setup.py bdist_wheel
