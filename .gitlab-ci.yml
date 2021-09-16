@@ -9,7 +9,7 @@
         https://gitlab.kitware.com/smart/pycold/-/ci/lint
 
         * Make sure you add Runners to your project 
-        https://gitlab.org.com/smart/pycold/-/settings/ci_cd 
+        https://gitlab.kitware.com/smart/pycold/-/settings/ci_cd 
         in Runners-> Shared Runners
         and Runners-> Available specific runners
 
@@ -89,7 +89,7 @@ stages:
         - conda activate ".cache/conda/envs/loose-pycold-env"
         # TODO cibuildwheel
         - python setup.py bdist_wheel
-        - python -m pip install ../dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
+        - python -m pip install dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
         # - python -m pip wheel .
         # - pip install -e .
 
