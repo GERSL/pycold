@@ -161,9 +161,19 @@ stages:
 
 #### JOBS ###
 
-#test_full_loose/conda-linux:
+test_full_loose/conda-linux:
+    <<:
+        *test_loose_template
+    rules:
+        - <<: *if-merge-request
+        - <<: *if-merged-into-default
+    image:
+        gitlab.kitware.com:4567/computer-vision/ci-docker/miniconda3
+    needs: []
+
+#test_full_strict/conda-linux:
 #    <<:
-#        *test_loose_template
+#        *test_strict_template
 #    rules:
 #        - <<: *if-merge-request
 #        - <<: *if-merged-into-default
@@ -226,12 +236,3 @@ stages:
 #    #    TODO: can we use skopeo to cache the images?
 
 
-#test_full_strict/conda-linux:
-#    <<:
-#        *test_strict_template
-#    rules:
-#        - <<: *if-merge-request
-#        - <<: *if-merged-into-default
-#    image:
-#        gitlab.kitware.com:4567/computer-vision/ci-docker/miniconda3
-#    needs: []
