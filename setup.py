@@ -30,7 +30,7 @@ VERSION = parse_version('tool/python/pycold/__init__.py')  # needs to be a globa
 
 if __name__ == '__main__':
     setup(
-        package_dir={'': 'tool/python/pycold'},
+        package_dir={'': 'tool/python/'},
         name="pycold",
         version=VERSION,
         description="python implementation of COntinuous monitoring of Land disturbances algorithm",
@@ -42,5 +42,5 @@ if __name__ == '__main__':
         # include_dirs=[numpy.get_include()],
         author="Su Ye",
         author_email="remotesensingsuy@gmail.com",
-        packages=find_packages(include='tool/python/pycold.*'),
+        packages=find_packages(where='tool/python', include='pycold.*'),
     )

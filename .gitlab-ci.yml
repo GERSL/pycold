@@ -89,11 +89,14 @@ stages:
         - conda activate ".cache/conda/envs/loose-pycold-env"
         # TODO cibuildwheel
         - python setup.py bdist_wheel
+        - python -m pip install ../dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
         # - python -m pip wheel .
         # - pip install -e .
 
     script:
-        - ./run_tests.py --network watch tests scripts
+        - python -c "import pycold; print(pycold.__file__)"
+        - python -c "import pycold; print(pycold.__version__)"
+          #- ./run_tests.py --network watch tests scripts
 
     after_script:
         - du -sh .cache/*

@@ -25,6 +25,8 @@ if (BUILD_PYCOLD)
         ${PYTHON_INCLUDE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}
   )
+
+  # TODO: linking to the SCCD shared object isn't working 100% yet.
   target_link_libraries(${PYCOLD_MODULE_NAME} ${SCCD_MODULE_NAME})
 
   target_compile_definitions(${PYCOLD_MODULE_NAME} PUBLIC
