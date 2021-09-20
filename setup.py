@@ -4,13 +4,13 @@
 """
 
 # Check contents of whel
-rm -rf _skbuild/ build/ dist/ tool/python/pycold.egg-info/
+rm -rf _skbuild/ dist/ tool/python/pycold.egg-info/
 python setup.py bdist_wheel && unzip -l dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
 
 pip install dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
 python -c "import pycold"
 """
-from setuptools import find_packages
+# from setuptools import find_packages
 from skbuild import setup
 
 
