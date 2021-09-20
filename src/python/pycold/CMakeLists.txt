@@ -22,6 +22,10 @@ if (BUILD_PYCOLD)
         ${CMAKE_CURRENT_SOURCE_DIR}
   )
 
+  # TODO: not sure why this isn't set in the global scope?
+  # Hack around it: just hard code the module name
+  set(SCCD_MODULE_NAME "sccd")
+
   # TODO: linking to the SCCD shared object isn't working 100% yet.
   target_link_libraries(${PYCOLD_MODULE_NAME} ${SCCD_MODULE_NAME})
 
@@ -35,9 +39,15 @@ if (BUILD_PYCOLD)
 
   # Install the C++ module to the correct relative location
   # (this will be an inplace build if you use `pip install -e`)
-  file(RELATIVE_PATH _install_dest "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
-  install(TARGETS ${PYCOLD_MODULE_NAME} LIBRARY DESTINATION "${_install_dest}")
-  # Also install the sccd library here
-  #message(STATUS "SCCD_MODULE_NAME = ${SCCD_MODULE_NAME}")
-  #install(TARGETS ${SCCD_MODULE_NAME} LIBRARY DESTINATION "${_install_dest}")
+  #file(RELATIVE_PATH pycold_install_dest "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
+
+
+  # My "normal" method of setting install targets does not seem to work here. Hacking it.
+  # NOTE: skbuild *seems* to place libraries in a data dir *unless* the install destination
+  # corresponds exactly to the <package_dir>/<package_name> specified implicitly in setup.py
+  set(pycold_install_dest "src/python/pycold")
+
+  #install(TARGETS ${SCCD_MODULE_NAME} LIBRARY DESTINATION "${pycold_install_dest}")
+  install(TARGETS ${PYCOLD_MODULE_NAME} LIBRARY DESTINATION "${pycold_install_dest}")
+
 endif()
