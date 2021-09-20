@@ -1,0 +1,2 @@
+[build-system]
+requires = ["setuptools>=41.0.1", "wheel", "scikit-build>=0.9.0", "numpy", "cmake", "cython", "ninja", "cffi"]

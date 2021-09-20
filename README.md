@@ -18,6 +18,7 @@ git clone https://gitlab.kitware.com/smart/pycold.git
 sudo apt-get install build-essential
 sudo apt-get install libgsl-dev
 sudo apt-get install gfortran
+sudo apt-get install zlib1g-dev
 ```
 (MAC)
 ```
@@ -53,3 +54,32 @@ cold_result = pycold.pycold(dates, blue, green, red, nir, swir1, swir2, thermal,
 
 ```
 A full example of running pycold for an example dataset can be found in /YOUR_PYCOLD_DIRECTORY/tool/python/COLDexample_fromcsv.py
+
+
+# New Cmake Build Instructions:
+
+
+```
+# Install required libraries
+sudo apt-get install build-essential zlib1g-dev
+sudo apt-get install libgsl-dev
+sudo apt-get install gfortran
+
+# Option 1: Build and install a wheel
+Scikit-build will invoke CMake and build everything
+python setup.py bdist_wheel
+
+# Then you can pip install the wheel
+pip install dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
+
+# Option 2: Install in development mode
+pip install -r requirements.txt
+pip install -e .
+
+# Option 3: Or you can build standalone binaries with CMake by itself
+mkdir -p build
+cd build
+cmake ..
+make 
+
+```
