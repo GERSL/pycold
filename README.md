@@ -65,11 +65,21 @@ sudo apt-get install build-essential zlib1g-dev
 sudo apt-get install libgsl-dev
 sudo apt-get install gfortran
 
-# Scikit-build will invoke CMake and build everything
-python setup.py build
+# Option 1: Build and install a wheel
+Scikit-build will invoke CMake and build everything
+python setup.py bdist_wheel
 
-# Or you can build with CMake by itself
+# Then you can pip install the wheel
+pip install dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
+
+# Option 2: Install in development mode
+pip install -r requirements.txt
+pip install -e .
+
+# Option 3: Or you can build standalone binaries with CMake by itself
 mkdir -p build
 cd build
 cmake ..
+make 
+
 ```
