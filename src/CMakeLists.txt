@@ -46,7 +46,8 @@ if (BUILD_SCCD)
   # Install the C++ module to the correct relative location
   # (this will be an inplace build if you use `pip install -e`)
   file(RELATIVE_PATH _install_dest "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
-  install(TARGETS ${SCCD_MODULE_NAME} LIBRARY DESTINATION "${_install_dest}")
+  # Is this right?
+  install(TARGETS ${SCCD_MODULE_NAME} LIBRARY DESTINATION "${_install_dest}../tool/python/pycold")
 
 endif()
 

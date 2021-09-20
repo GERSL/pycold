@@ -1,6 +1,15 @@
 # from os.path import exists
 # from os.path import join
 # from os.path import dirname
+"""
+
+# Check contents of whel
+python setup.py bdist_wheel
+unzip -l dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
+
+pip install dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
+python -c "import pycold"
+"""
 from setuptools import find_packages
 from skbuild import setup
 
@@ -43,6 +52,6 @@ if __name__ == '__main__':
         author="Su Ye",
         author_email="remotesensingsuy@gmail.com",
         packages=find_packages(where='tool/python', include='pycold.*'),
-        cmake_install_dir='tool/python/pycold',
+        # cmake_install_dir='tool/python/pycold',
         # packages=['pycold'],
     )
