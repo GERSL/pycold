@@ -18,6 +18,7 @@
 #include "output.h"
 #include "misc.h"
 #include "s_ccd.h"
+#include <errno.h>
 
 /******************************************************************************
 MODULE:  get_args
@@ -287,10 +288,14 @@ int main(int argc, char *argv[])
     //bool verbose = TRUE;
 
     char scene_list_filename[] = "scene_list.txt"; /* file name containing list of input sceneIDs */
+    char first_last_day_filename[] = "starting_last_dates.txt"; /* file name containing the last and first day of the dataset */
     char breakdatemap_list_filename[] = "breakdatemap_list.txt"; /* file name containing list of breakdatemap file names */
     char msg_str[MAX_STR_LEN];       /* Input data scene name                 */
-    int i, j;                           /* Loop counters                         */
+    int i;                           /* Loop counters                         */
     char scene_list_directory[MAX_STR_LEN]; /* full directory of scene list*/
+    char first_last_day_directory[MAX_STR_LEN]; /* full directory of scene list*/
+    int starting_date;
+    int last_date;
     int status;                      /* Return value from function call       */
     char FUNC_NAME[] = "main";       /* For printing error messages           */
 
@@ -313,26 +318,23 @@ int main(int argc, char *argv[])
     /**************************************************************************/
 
     int n_process;
-    int n_block;
     int process_id;
 
-    int **valid_date_array_scanline;
     short int **fmask_buf_scanline;        /* fmask buf, valid pixels only*/
-    int* valid_scene_count_scanline;
     short int **buf;                       /* This is the image bands buffer, valid pixel only*/
     short int *tmp_buf;                   /* This is the image bands buffer, valid pixel only*/
     bool isUserMaskExist;     /*  if user mask exists or not        */
-    char *user_mask_scanline;
     bool user_mask_hasvalidcount = FALSE;
     // int n_working_process; /* total processes - 1 (master process)*/
     int i_col;
-    int* num_fc_scanline;
-    FILE *fh[MAX_SCENE_LIST];
+    FILE *fh;
     FILE *fusermask_bip;
     FILE *fhoutput;
     FILE *fhoutput_cm;
     FILE *fhoutput_cm_date;
-    FILE* fd;
+    FILE *fhoutput_cm_direction;
+    FILE *fd;
+    FILE *fd2;
     char img_filename[MAX_STR_LEN]; /* file name constructed from sceneID   */
     int k, b;
     short int **tmp_buf_2d;                   /* This is the image bands buffer, valid pixel only*/
@@ -345,26 +347,26 @@ int main(int argc, char *argv[])
     int interval;
     short int *sensor_buf;
     double tcg;
-    int starting_date; // the initial date of the whole dataset
     int n_cm_maps;
     short int* CM_outputs;
-    char* CM_outputs_date;
+    unsigned char* CM_outputs_date;
+    unsigned char* CMdirection_outputs;
     // bool b_singleline = FALSE;
-    FILE *fh_breakdatemap[MAX_YEAR_RANGE];
+    FILE *fh_breakdatemap;
     int *tmp_buf_breakdatemap;
     char **breakdatemap_list;
     char breakdatemap_list_directory[MAX_STR_LEN];
     int num_breakdatemaps;
-    int **breakdates_scanline;
-    int *original_row_lut;
-    int sample_row = 0;
-    int sample_col = 0;
-    int output_mode;
+    int **breakdates_block;
+    // int sample_row = 0;
+    // int sample_col = 0;
     int mode = 3; // 1 - pixel-based; 2 - scanline-based; 3 - area-based
 
     char CM_filename[MAX_STR_LEN];
+    char CM_direction_filename[MAX_STR_LEN];
     char CM_date_filename[MAX_STR_LEN];
     char CM_fullpath[MAX_STR_LEN];
+    char CM_direction_fullpath[MAX_STR_LEN];
     char CM_date_fullpath[MAX_STR_LEN];
     char cold_config_fullname[MAX_STR_LEN];
     char cold_config_fullpath[MAX_STR_LEN];
@@ -375,17 +377,32 @@ int main(int argc, char *argv[])
     bool b_partition = TRUE; //
     int n_rows = 0;
     int n_cols = 0;
-    int ROW_STEP = 0;
-    int PARTITION = 0;
+    // int ROW_STEP = 0;
+    // int PARTITION = 0;
     int CM_OUTPUT_INTERVAL;
     int nvals;
     int original_row;   // the current processing row
-    int reorder_row = 0;
-    int partition_id = 0;
-    int startingrow_inpartition = 0; // the row number in the current partition
+    int original_col;
     float probability_threshold = 0;
     int conse = 0;
+    Input_meta_t *meta;
+    int n_block_v;
+    int n_block_h;
+    int current_block_x;
+    int current_block_y;
 
+    int sample_process;
+    int block_width;
+    int block_height;
+    char cwd[MAX_STR_LEN]; // current directory path
+    char var_path[MAX_STR_LEN];
+
+
+    /**************************************************************/
+    /*                                                            */
+    /*   preprocessing inputted parameters                        */
+    /*                                                            */
+    /**************************************************************/
     if (argv[1][0] == 'r'){
         b_obcold_reconstruction = TRUE;
         method = COLD;
@@ -407,20 +424,29 @@ int main(int argc, char *argv[])
         b_partition = FALSE;
     }
 
-    get_coldparameters(&n_rows, &n_cols, &ROW_STEP, &PARTITION, &CM_OUTPUT_INTERVAL, &probability_threshold, &conse);
-
-    process_id =  (int)strtol(argv[2], NULL, 10) - 1;
-    n_process = (int)strtol(argv[3], NULL, 10);
-    if (n_process != 1 && n_process != 500 && n_process != 250 && n_process !=1000){
-        RETURN_ERROR("The total requested core number must be 250, 500 or 1000", FUNC_NAME, FAILURE);
-    }
-
-
     //argv[4] and argv[5] are in_path and out_path
     // optional parameters
-    if (argc == 7){ // debug use for single line
-        sample_row = (int)strtol(argv[6], NULL, 10);
+
+    if (argc > 6)
+        get_coldparameters(&n_rows, &n_cols, &n_block_h, &n_block_v, &CM_OUTPUT_INTERVAL, &probability_threshold, &conse, argv[6]);
+    else{
+        getcwd(cwd, sizeof(cwd));
+        sprintf(var_path, "%s/%s", cwd, "parameters.yaml");
+        get_coldparameters(&n_rows, &n_cols, &n_block_h, &n_block_v, &CM_OUTPUT_INTERVAL, &probability_threshold, &conse, var_path);
+    }
+
+    if (argc == 8){ // debug use for single line
+        sample_process = (int)strtol(argv[7], NULL, 10);
         mode = 2;
+    }
+    if(mode == 2){
+        process_id =  sample_process;
+    }else{
+        process_id =  (int)strtol(argv[2], NULL, 10) - 1;
+    }
+    n_process = (int)strtol(argv[3], NULL, 10);
+    if ((n_process != n_block_v * n_block_h) && (n_process != 1)){
+        RETURN_ERROR("The total requested core number must be equal to n_block_v * N_PARITION_W", FUNC_NAME, FAILURE);
     }
 
 
@@ -436,38 +462,24 @@ int main(int argc, char *argv[])
         RETURN_ERROR("ERROR allocating scene_list memory", FUNC_NAME, FAILURE);
     }
 
+    meta = (Input_meta_t *)malloc(sizeof(Input_meta_t));
+    if (meta == NULL)
+    {
+        RETURN_ERROR ("ERROR allocating meta",
+                      FUNC_NAME, FAILURE);
+    }
 
 
     /**************************************************************/
     /*                                                            */
-    /*   record the start time of just the COLD         */
+    /*   record the start time of just the COLD                   */
     /*     algorithm.  Up until here, it has all just been        */
     /*     setting it up......                                    */
     /*                                                            */
     /**************************************************************/
     time (&now);                 /*     intermediate times.                   */
-    snprintf (msg_str, sizeof(msg_str), "CCDC start_time\n", ctime (&now));
-
-    //printf("debug: step1\n");
+    snprintf (msg_str, sizeof(msg_str), "COLD starts \n", ctime (&now));
     LOG_MESSAGE (msg_str, FUNC_NAME);
-
-    // printf("The actual assigned process number is %d\n", n_process);
-
-
-
-    //printf("debug: step2\n");
-    /**************************************************************/
-    /*                                                            */
-    /*   read CCD variable                                        */
-    /*                                                            */
-    /**************************************************************/
-//    result = get_variables_hpc(argc, argv, in_path, out_path,
-//                            &method, mask_path, &probability_threshold,
-//                            &min_days_conse);
-//    if(result == ERROR)
-//    {
-//        RETURN_ERROR("CCDC procedure fails. The program stops!", FUNC_NAME, FAILURE);
-//    }
 
     /* if out_path not exist, create it*/
     struct stat st_tmp = {0};
@@ -475,8 +487,24 @@ int main(int argc, char *argv[])
         mkdir(argv[5], 0700);
     }
 
+    // chi-square probability
+    tcg = X2(NUM_LASSO_BANDS, probability_threshold);
 
-    sprintf(scene_list_directory, "%s/%s", argv[4], scene_list_filename);
+    /**************************************************************/
+    /*                                                            */
+    /*   reading scene_list text file                            */
+    /*                                                            */
+    /**************************************************************/
+    if (b_partition == FALSE){  // for conus sample test
+        current_block_x = 1;
+        current_block_y = 1;
+        sprintf(scene_list_directory, "%s/%s", argv[4], scene_list_filename);
+    }else{
+        current_block_y = process_id / n_block_h + 1;
+        current_block_x = process_id % n_block_h + 1;
+        sprintf(scene_list_directory, "%s/Block_h%d_v%d/%s", argv[4],
+                current_block_x, current_block_y, scene_list_filename);
+    }
 
     if (access(scene_list_directory, F_OK) != 0) /* File does not exist */
     {
@@ -513,13 +541,19 @@ int main(int argc, char *argv[])
 
     fclose(fd);
 
+
+    /**************************************************************/
+    /*                                                            */
+    /* Now that we know the actual number of scenes, allocate     */
+    /* memory for date array.                                     */
+    /*                                                            */
+    /**************************************************************/
     sdate = (int *)malloc(num_scenes * sizeof(int));
 
     if (sdate == NULL)
     {
         RETURN_ERROR("ERROR allocating sdate memory", FUNC_NAME, FAILURE);
     }
-
 
     /**************************************************************/
     /*                                                            */
@@ -536,8 +570,45 @@ int main(int argc, char *argv[])
     }
 
 
+    // for conus sample test
+    if (b_partition == FALSE){
+        status = read_envi_header(argv[4], scene_list[0], meta);
+        if (status != SUCCESS)
+        {
+            RETURN_ERROR ("Calling read_envi_header",
+                          FUNC_NAME, FAILURE);
+        }
+        // overriding row and column using ENVI meta
+        n_cols = meta->samples;
+        n_rows = meta->lines;
+        n_block_h = 1;
+        n_block_v = 1;
+        starting_date = sdate[0];
+        last_date = sdate[num_scenes - 1];
+    }else{
+        sprintf(first_last_day_directory, "%s/%s", argv[4], first_last_day_filename);
+        // errno = 0;
+        fd2 = fopen(first_last_day_directory, "r");
+        if (fd2 == NULL)
+        {
+            // printf("Error %d \n", errno);
+            sprintf(errmsg,  "Opening first_last_day_directory file fails: %s\n", first_last_day_directory);
+            RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+        }
+
+        fscanf(fd2, "%d\n", &starting_date);
+        fscanf(fd2, "%d\n", &last_date);
+        fclose(fd2);
+        // starting_date = 724253;
+        // last_date = 738261;
+    }
+    block_width = n_cols / n_block_h;
+    block_height = n_rows / n_block_v;
+    n_cm_maps = (last_date - starting_date) / CM_OUTPUT_INTERVAL + 1;
+
     /* save basic info file used for obia info*/
-    if(process_id == 0){
+    if(process_id == 0 || mode == 2)
+    {
         if(b_obcold_reconstruction == FALSE){
             sprintf(cold_config_fullname, "cold_config.yaml");
             sprintf(cold_config_fullpath, "%s/%s", argv[5], cold_config_fullname);
@@ -546,8 +617,8 @@ int main(int argc, char *argv[])
             {
                 RETURN_ERROR("Opening cold_config file", FUNC_NAME, ERROR);
             }
-            starting_date = sdate[0];
-            n_cm_maps = (sdate[num_scenes - 1] - sdate[0]) / CM_OUTPUT_INTERVAL + 1;
+            // starting_date = ORDINALDAY_19710101;
+
             fprintf(fd, "n_cm_maps: %d\n", n_cm_maps);
             fprintf(fd, "stack_path: %s\n", argv[4]);
             fprintf(fd, "coldresults_path: %s\n", argv[5]);
@@ -564,7 +635,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    buf = (short int **) allocate_2d_array (TOTAL_IMAGE_BANDS, num_scenes * n_cols, sizeof (short int));
+
+    buf = (short int **) allocate_2d_array (TOTAL_IMAGE_BANDS, num_scenes * block_width * block_height, sizeof (short int));
     if(buf == NULL)
     {
         RETURN_ERROR ("Allocating buf", FUNC_NAME, FAILURE);
@@ -577,35 +649,19 @@ int main(int argc, char *argv[])
                       FUNC_NAME, FAILURE);
     }
 
-    fmask_buf_scanline = (short int **)allocate_2d_array (n_cols, num_scenes, sizeof (short int));
+    fmask_buf_scanline = (short int**)allocate_2d_array (block_width * block_height, num_scenes, sizeof(short int));
     if(fmask_buf_scanline == NULL)
     {
         RETURN_ERROR ("Allocating fmask_buf_scanline", FUNC_NAME, FAILURE);
     }
 
-    valid_scene_count_scanline = (int*)malloc(n_cols * sizeof(int));
-    if(valid_scene_count_scanline == NULL)
-    {
-        RETURN_ERROR ("Allocating valid_scene_count_scanline", FUNC_NAME, FAILURE);
-    }
 
-    valid_date_array_scanline = (int**)allocate_2d_array (n_cols, num_scenes, sizeof (int));
-    if(valid_date_array_scanline == NULL)
-    {
-        RETURN_ERROR ("Allocating valid_date_array_scanline", FUNC_NAME, FAILURE);
-    }
+//    sensor_buf = (short int *) malloc(num_scenes * sizeof(short int));
+//    if(sensor_buf == NULL)
+//    {
+//        RETURN_ERROR ("Allocating sensor_buf fails", FUNC_NAME, FAILURE);
+//    }
 
-    sensor_buf = (short int *) malloc(num_scenes * sizeof(short int));
-    if(sensor_buf == NULL)
-    {
-        RETURN_ERROR ("Allocating sensor_buf fails", FUNC_NAME, FAILURE);
-    }
-
-    original_row_lut = (int *)malloc(n_rows * sizeof(int));
-    if(original_row_lut == NULL)
-    {
-        RETURN_ERROR ("Allocating original_row_lut fails", FUNC_NAME, FAILURE);
-    }
 //    scene_list = (char **) allocate_2d_array (MAX_SCENE_LIST, ARD_STR_LEN,
 //                                                       sizeof (char));
 //    if(scene_list == NULL)
@@ -613,112 +669,36 @@ int main(int argc, char *argv[])
 //        RETURN_ERROR ("Allocating scene_list", FUNC_NAME, FAILURE);
 //    }
 
-
-    /**************************************************************/
-    /*                                                            */
-    /* Now that we know the actual number of scenes, allocate     */
-    /* memory for date array.                                     */
-    /*                                                            */
-    /**************************************************************/
-
-    num_fc_scanline = (int *)malloc(n_cols * sizeof(short int));
-    if (num_fc_scanline == NULL)
-    {
-        RETURN_ERROR ("ERROR allocating num_fc_scanline",
-                      FUNC_NAME, FAILURE);
-    }
-
-
-    user_mask_scanline = (char* )malloc(n_cols * sizeof(char));
-    if (user_mask_scanline == NULL)
-    {
-        RETURN_ERROR ("ERROR allocating user_mask_scanline",
-                      FUNC_NAME, FAILURE);
-    }
-
-
-    tmp_buf = malloc(sizeof(short int) * n_cols * TOTAL_BANDS);
+    tmp_buf = malloc(sizeof(short int) * block_width * block_height * TOTAL_BANDS);
     if (tmp_buf == NULL)
     {
         RETURN_ERROR ("ERROR allocating tmp_buf",
                       FUNC_NAME, FAILURE);
     }
 
-
-    tmp_buf_breakdatemap = malloc(sizeof(int) * n_cols);
-    if (tmp_buf_breakdatemap == NULL)
-    {
-        RETURN_ERROR ("ERROR allocating tmp_buf_breakdatemap",
-                      FUNC_NAME, FAILURE);
-    }
-
     CM_outputs = malloc(sizeof (short int) * n_cm_maps);
-
     if(CM_outputs == NULL){
+        printf("%d h%d v%d", n_cm_maps, current_block_x, current_block_y);
          RETURN_ERROR("ERROR allocating CM_outputs", FUNC_NAME, FAILURE);
     }
 
-    CM_outputs_date =  malloc(sizeof (char) * n_cm_maps);
+    CMdirection_outputs =  malloc(sizeof (unsigned char) * n_cm_maps);
+    if(CMdirection_outputs == NULL){
+         RETURN_ERROR("ERROR allocating CM_outputs_date", FUNC_NAME, FAILURE);
+    }
+
+    CM_outputs_date =  malloc(sizeof (unsigned char) * n_cm_maps);
     if(CM_outputs_date == NULL){
          RETURN_ERROR("ERROR allocating CM_outputs_date", FUNC_NAME, FAILURE);
     }
 
 
-
-    breakdatemap_list = (char **) allocate_2d_array (MAX_YEAR_RANGE, ARD_STR_LEN, sizeof (char));
-    if (breakdatemap_list == NULL)
-    {
-        RETURN_ERROR("ERROR allocating breakdatemap_list memory", FUNC_NAME, FAILURE);
-    }
-
-    breakdates_scanline = (int**)allocate_2d_array (n_cols, MAX_YEAR_RANGE, sizeof (int));
-    if(breakdates_scanline == NULL)
-    {
-        RETURN_ERROR ("Allocating breakdates_scanline", FUNC_NAME, FAILURE);
-    }
-
-    if (b_partition == TRUE){
-        for (i = 0; i < n_rows; i++)
-        {
-            int te = i / (int)(n_rows / ROW_STEP);
-            int re = i % (int)(n_rows / ROW_STEP);
-            original_row_lut[i] = te + re * ROW_STEP + 1;  // 1, 501, 1001,...,4500,5000
-        }
-
-        if (mode == 2){  // for testing single row only
-            n_block = 1;
-            for (i = 0; i < n_rows; i++)
-            {
-                if (original_row_lut[i] == sample_row){
-                    reorder_row = i + 1;
-                    break;
-                }
-            }
-            partition_id = (int) ((reorder_row - 1) /  PARTITION) + 1;
-            startingrow_inpartition = reorder_row  - (partition_id - 1) * n_rows / PARTITION ;
-
-        }else{
-            n_block = (int)(n_rows  / n_process);
-            partition_id = (int) (process_id  * PARTITION / n_process) + 1;
-            startingrow_inpartition = process_id * n_rows / n_process - (partition_id - 1) * n_rows / PARTITION + 1;
-        }
-
-    }
-    else{  // if not partitioned images to be processed, keep the same row number
-        if (mode == 2){
-            n_block = 1;
-            reorder_row = sample_row;
-        }else{
-            n_block = (int)(n_rows  / n_process);
-
-        }
-        partition_id = 0;
-        startingrow_inpartition =  sample_row;
-    }
-
-    printf("The process_id = %d; partition_id = %d; "
-           "startingrow_inpartition = %d; reorder_row = %d\n",
-           process_id, partition_id, startingrow_inpartition, reorder_row);
+    snprintf (msg_str, sizeof(msg_str), "The process_id = %d; current_block_x = %d; "
+                                        "current_block_y = %d; block_width = %d; block_height = %d",
+              process_id, current_block_x, current_block_y, block_width, block_height);
+    LOG_MESSAGE (msg_str, FUNC_NAME)
+//    printf("The process_id = %d; current_block_y = %d; current_block_x = %d\n",
+//           process_id, current_block_x, current_block_y);
 //    if (b_singleline == TRUE){
 //        n_block = 1;
 //    }
@@ -732,9 +712,33 @@ int main(int argc, char *argv[])
     // printf("process_id = %d; n_block = %d; num_scenes = %d \n", process_id, n_block, num_scenes);
     //prev_n_block = 119;
 
-    /* for reconstructing rec_cg in sp-cold*/
+
+    /******************************************************************/
+    /*                                                                */
+    /* Start reading dataset into the memory                          */
+    /*                                                                */
+    /******************************************************************/
     if(b_obcold_reconstruction == TRUE)
     {
+        tmp_buf_breakdatemap = malloc(sizeof(int) * block_width * block_height);
+        if (tmp_buf_breakdatemap == NULL)
+        {
+            RETURN_ERROR ("ERROR allocating tmp_buf_breakdatemap",
+                          FUNC_NAME, FAILURE);
+        }
+
+        breakdatemap_list = (char **) allocate_2d_array (MAX_YEAR_RANGE, ARD_STR_LEN, sizeof (char));
+        if (breakdatemap_list == NULL)
+        {
+            RETURN_ERROR("ERROR allocating breakdatemap_list memory", FUNC_NAME, FAILURE);
+        }
+
+        breakdates_block = (int**)allocate_2d_array (block_width * block_height, MAX_YEAR_RANGE, sizeof (int));
+        if(breakdates_block == NULL)
+        {
+            RETURN_ERROR ("Allocating breakdates_block", FUNC_NAME, FAILURE);
+        }
+
         sprintf(breakdatemap_list_directory, "%s/breakdate_maps/%s", argv[5], breakdatemap_list_filename);
         if (access(breakdatemap_list_directory, F_OK) != 0)
             RETURN_ERROR("Can't locate breakdate_map_list file", FUNC_NAME, FAILURE);
@@ -755,230 +759,183 @@ int main(int argc, char *argv[])
         fclose(fd);
 
         for(i = 0; i < num_breakdatemaps; i++){
-            sprintf(img_filename, "%s/breakdate_maps/%s_P%d", argv[5], breakdatemap_list[i], partition_id);
-            fh_breakdatemap[i] = open_raw_binary(img_filename,"rb");
-            if (fh_breakdatemap[i] == NULL)
+            sprintf(img_filename, "%s/breakdate_maps/%s_h%d_v%d", argv[5], breakdatemap_list[i],
+                    current_block_x, current_block_y);
+            fh_breakdatemap = open_raw_binary(img_filename,"rb");
+            if (fh_breakdatemap == NULL)
             {
                 sprintf(errmsg, "error for openning breakdatemaps %s \n", img_filename);
                 RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
             }
-            fseek(fh_breakdatemap[i], ((startingrow_inpartition - 1)  * n_cols) * sizeof(int), SEEK_SET);
+
+            fread(tmp_buf_breakdatemap, sizeof(int), block_width * block_height, fh_breakdatemap);
+            for(k = 0; k < block_width * block_height; k++){
+                breakdates_block[k][i] = tmp_buf_breakdatemap[k];
+            }
+            fclose(fh_breakdatemap);
         }
+        snprintf (msg_str, sizeof(msg_str), "breakdatemap reading finished\n");
+        LOG_MESSAGE (msg_str, FUNC_NAME)
     }
 
+    // printf("%d \n", num_scenes);
 
     for(i = 0; i < num_scenes; i++)
     {
         if(b_partition == TRUE){
-            // printf("%s:%d\n", scene_list[i], i);
-            sprintf(img_filename, "%s/%s/%s_MTLstack_P%d", argv[4], scene_list[i], scene_list[i], partition_id);
-            fh[i] = open_raw_binary(img_filename,"rb");
-            if (fh[i] == NULL)
-            {
-                sprintf(errmsg, "error for openning %s \n", img_filename);
-                RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
-            }
-            fseek(fh[i], ((startingrow_inpartition - 1)  * n_cols * TOTAL_BANDS) * sizeof(short int), SEEK_SET);
+            sprintf(img_filename, "%s/Block_h%d_v%d/%s/%s_MTLstack", argv[4],
+                    current_block_x, current_block_y, scene_list[i], scene_list[i]);
+            //printf("%s:%d\n", img_filename, i);
         }
         else{
             sprintf(img_filename, "%s/%s/%s_MTLstack", argv[4], scene_list[i], scene_list[i]);
-            fh[i] = open_raw_binary(img_filename,"rb");
-            if (fh[i] == NULL)
-            {
-                sprintf(errmsg, "error for openning %s \n", img_filename);
-                RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
-            }
         }
-    }
+        fh = open_raw_binary(img_filename,"rb");
+        if (fh == NULL)
+        {
+            sprintf(errmsg, "error for openning %s\n", img_filename);
+            RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+        }
+        //printf("num_scenes is %d with proccess id %d\n", num_scenes, process_id);
+//             if(scene_list[i][2] == '4' || scene_list[i][2] == '5')
+//                 tmp_sensor = LANDSAT45_TM;
+//             else if(scene_list[i][2] == '7')
+//                 tmp_sensor = LANDSAT7_ETM;
+//             else if(scene_list[i][2] == '8')
+//                 tmp_sensor = LANDSAT8_OLI;
 
-    snprintf (msg_str, sizeof(msg_str), "fopen and fseek finished \n");
+        fread(tmp_buf, sizeof(short int), TOTAL_BANDS * block_width * block_height, fh);
+        if (tmp_buf == NULL)
+        {
+            sprintf(errmsg, "error reading %d scene, Block_h%d_v%d \n", i, current_block_x, current_block_y);
+            RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+        }
+
+        for(k = 0; k < block_width * block_height; k++)
+        {
+
+            for(b = 0; b < TOTAL_IMAGE_BANDS; b++)
+            {
+                // printf("%d\n", valid_scene_count_scanline[k]);
+                buf[b][k * num_scenes + i] = tmp_buf[k * TOTAL_BANDS + b];
+            }
+            fmask_buf_scanline[k][i] = tmp_buf[k * TOTAL_BANDS + TOTAL_BANDS - 1];
+
+            // printf("%d\n",tmp_buf[k * TOTAL_BANDS + 1]);
+        }
+
+        fclose(fh);
+    }
+    /******************************************************************/
+    /*                                                                */
+    /*       Reading dataset finished                                 */
+    /*                                                                */
+    /******************************************************************/
+
+    snprintf (msg_str, sizeof(msg_str), "fopen and fread finished \n");
     LOG_MESSAGE (msg_str, FUNC_NAME)
 
 
     // for(original_row = starting_row; original_row < starting_row + n_block; original_row++)
-    tcg = X2(NUM_LASSO_BANDS, probability_threshold);
 
-    for(j = 0; j < n_block; j++)
+
+    /******************************************************************/
+    /*                                                                */
+    /*        Set up outputting dataset                                */
+    /*                                                                */
+    /******************************************************************/
+    if(b_obcold_reconstruction == TRUE)
     {
+        sprintf(out_filename, "record_change_h%d_v%d_obcold.dat", current_block_x, current_block_y);
+        sprintf(out_fullpath, "%s/obcold/%s", argv[5], out_filename);
+        sprintf(out_fullpath_tmp, "%s/obcold/%s.part", argv[5], out_filename);
+    }
+    else
+    {
+        if(method == COLD){
+            sprintf(out_filename, "record_change_h%d_v%d_cold.dat", current_block_x, current_block_y);
+            sprintf(CM_filename, "CM_h%d_v%d.dat", current_block_x, current_block_y);
+            sprintf(CM_date_filename, "CM_date_h%d_v%d.dat", current_block_x, current_block_y);
+            sprintf(CM_direction_filename, "CM_direction_h%d_v%d.dat", current_block_x, current_block_y);
+            sprintf(out_fullpath, "%s/%s", argv[5], out_filename);
+            sprintf(out_fullpath_tmp, "%s/%s.part", argv[5], out_filename);
+            sprintf(CM_fullpath, "%s/%s", argv[5], CM_filename);
+            sprintf(CM_direction_fullpath, "%s/%s", argv[5], CM_direction_filename);
+            sprintf(CM_date_fullpath, "%s/%s", argv[5], CM_date_filename);
+        }else if(method == SCCD)
+        {
+            sprintf(out_filename, "record_change_h%d_v%d_sccd.dat", current_block_x, current_block_y);
+            sprintf(out_fullpath, "%s/%s", argv[5], out_filename);
+            sprintf(out_fullpath_tmp, "%s/%s.part", argv[5], out_filename);
+        }
+    }
 
-        // for debug
-//        original_row = 58;
-        //j = n_block - 1;
-        if (b_partition == TRUE){
-            if (mode == 2){
-                for (i = 0; i < n_rows; i++)
-                {
-                    if (original_row_lut[i] == sample_row){
-                        reorder_row = i + 1;
-                        break;
-                    }
-                }
-                original_row = sample_row;
-            }
-            else{
-                reorder_row = process_id * n_rows / n_process + j + 1;
-                original_row = original_row_lut[reorder_row - 1];
-            }
-        }else{
-            if (mode == 2){
-                reorder_row = sample_row;
-            }else{
-                reorder_row = process_id + j * n_process + 1;
-            }
-            original_row = reorder_row;
+
+    /******************************************************************/
+    /*                                                                */
+    /*       check if row has be processed or not                     */
+    /*                                                                */
+    /******************************************************************/
+
+    if( access(out_fullpath, F_OK ) == 0 ) {
+        snprintf (msg_str, sizeof(msg_str), "Block_h%d_v%d finished\n", current_block_x, current_block_y);
+        LOG_MESSAGE (msg_str, FUNC_NAME);
+        // jump to the next row
+        return SUCCESS;
+    }
+
+    fhoutput = fopen(out_fullpath_tmp,"w");
+
+    if(b_outputCM == TRUE){
+        fhoutput_cm = fopen(CM_fullpath,"w");
+        fhoutput_cm_direction = fopen(CM_direction_fullpath,"w");
+        fhoutput_cm_date = fopen(CM_date_fullpath,"w");
+    }
+
+    snprintf (msg_str, sizeof(msg_str), "COLD processing for Block_h%d_v%d started\n",
+              current_block_x, current_block_y);
+    LOG_MESSAGE (msg_str, FUNC_NAME)
+
+    /******************************************************************/
+    /*                                                                */
+    /*           Begin CCDC scanline processing                       */
+    /*                                                                */
+    /******************************************************************/
+    for(i_col = 0; i_col < block_width * block_height; i_col++)
+    {
+        original_row = i_col / block_width + (current_block_y - 1) * block_height + 1;
+        original_col = i_col % block_width + (current_block_x - 1) * block_width + 1;
+        // printf("%d\n", i_col + 1);
+
+        num_fc = 0;
+        for(b = 0; b < TOTAL_IMAGE_BANDS; b++)
+        {
+           tmp_buf_2d[b]  = buf[b] + i_col * num_scenes;
         }
 
+        if(b_obcold_reconstruction == TRUE){
+            rec_cg = malloc(NUM_FC * sizeof(Output_t));
+            if (rec_cg == NULL)
+            {
+                RETURN_ERROR ("ERROR allocating rec_cg",
+                              FUNC_NAME, FAILURE);
+            }
+            result = obcold_reconstruction_procedure(tmp_buf_2d, fmask_buf_scanline[i_col], sdate,
+                                                     num_scenes, rec_cg, &num_fc, num_breakdatemaps,
+                                                     breakdates_block[i_col],n_cols, original_col, original_row, 6);
+            // snprintf (msg_str, sizeof(msg_str), "col %d reconstruction calculation finished\n", i_col+1);
+            // LOG_MESSAGE (msg_str, FUNC_NAME)
+            for(i = 0; i < num_fc; i++)
+            {
+               result = write_output_binary(fhoutput, rec_cg[i]);
+            }
+            free(rec_cg);
 
-
-        for (i = 0 ; i < n_cols; i++)
-        {
-            valid_scene_count_scanline[i] = 0;
-        }
-
-
-        snprintf (msg_str, sizeof(msg_str), "Row %d processing started\n", reorder_row);
-        LOG_MESSAGE (msg_str, FUNC_NAME)
-
-        if(b_obcold_reconstruction == TRUE)
-        {
-            sprintf(out_filename, "record_change_row%d_obcold.dat", original_row);
-            sprintf(out_fullpath, "%s/obcold/%s", argv[5], out_filename);
-            sprintf(out_fullpath_tmp, "%s/obcold/%s.part", argv[5], out_filename);
         }
         else
         {
-            if(method == COLD){
-                sprintf(out_filename, "record_change_row%d_cold.dat", original_row);
-                sprintf(CM_filename, "CM_row%d.dat", original_row);
-                sprintf(CM_date_filename, "CM_date_row%d.dat", original_row);
-                sprintf(out_fullpath, "%s/%s", argv[5], out_filename);
-                sprintf(out_fullpath_tmp, "%s/%s.part", argv[5], out_filename);
-                sprintf(CM_fullpath, "%s/%s", argv[5], CM_filename);
-                sprintf(CM_date_fullpath, "%s/%s", argv[5], CM_date_filename);
-                if(b_outputCM == TRUE){
-                    fhoutput_cm = fopen(CM_fullpath,"w");
-                    fhoutput_cm_date = fopen(CM_date_fullpath,"w");
-                }
-            }else if(method == SCCD)
-            {
-                sprintf(out_filename, "record_change_row%d_sccd.dat", original_row);
-                sprintf(out_fullpath, "%s/%s", argv[5], out_filename);
-                sprintf(out_fullpath, "%s/%s.part", argv[5], out_filename);
-            }
-
-        }
-
-
-        /******************************************************************/
-        /*                                                                */
-        /*       check if row has be processed or not                     */
-        /*                                                                */
-        /******************************************************************/
-        if( access(out_fullpath, F_OK ) == 0 ) {
-            // jump to the next row
-            continue;
-        }
-
-        fhoutput = fopen(out_fullpath_tmp,"w");
-
-
-        /******************************************************************/
-        /*                                                                */
-        /* Read the image bands for this scene.                           */
-        /*                                                                */
-        /******************************************************************/
-
-         for (i = 0; i < num_scenes; i++)
-         {
-             //printf("num_scenes is %d with proccess id %d\n", num_scenes, process_id);
-             if(scene_list[i][2] == '4' || scene_list[i][2] == '5')
-                 tmp_sensor = LANDSAT45_TM;
-             else if(scene_list[i][2] == '7')
-                 tmp_sensor = LANDSAT7_ETM;
-             else if(scene_list[i][2] == '8')
-                 tmp_sensor = LANDSAT8_OLI;
-
-            // for complete images, we process row with an interval
-             if (b_partition == FALSE)
-                 fseek(fh[i], ((reorder_row - 1) * n_cols* TOTAL_BANDS) * sizeof(short int), SEEK_SET);
-
-             fread(tmp_buf, sizeof(short int), TOTAL_BANDS * n_cols, fh[i]);
-             if (tmp_buf == NULL)
-             {
-                 sprintf(errmsg, "error reading %d scene, %d row\n", i, reorder_row);
-                 RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
-             }
-
-             for(k = 0; k < n_cols; k++)
-             {
-                 if (tmp_buf[k * TOTAL_BANDS + TOTAL_BANDS - 1] < CFMASK_FILL)
-                 {
-                     for(b = 0; b < TOTAL_IMAGE_BANDS; b++)
-                     {
-                         //printf("%d\n", valid_scene_count[k]);
-                         buf[b][k * num_scenes + valid_scene_count_scanline[k]] = tmp_buf[k * TOTAL_BANDS + b];
-                     }
-                     fmask_buf_scanline[k][valid_scene_count_scanline[k]] = (short int)tmp_buf[k * TOTAL_BANDS + TOTAL_BANDS - 1];
-                     valid_date_array_scanline[k][valid_scene_count_scanline[k]] = sdate[i];
-                     sensor_buf[valid_scene_count_scanline[k]] = tmp_sensor;
-                     valid_scene_count_scanline[k] = valid_scene_count_scanline[k] + 1;
-                 }
-             }
-        }
-
-         snprintf (msg_str, sizeof(msg_str), "Row %d reading Landsat data finished \n", reorder_row);
-         LOG_MESSAGE (msg_str, FUNC_NAME)
-         /* need to work on here later */
-         if(b_obcold_reconstruction == TRUE)
-         {
-             for (i = 0; i < num_breakdatemaps; i++)
-             {
-                 // fseek(fh_breakdatemap[i], ((original_row - 1) * n_cols) * sizeof(int), SEEK_SET);
-                 fread(tmp_buf_breakdatemap, sizeof(int), n_cols, fh_breakdatemap[i]);
-                 for(k = 0; k < n_cols; k++){
-                     breakdates_scanline[k][i] = tmp_buf_breakdatemap[k];
-                 }
-             }
-
-             snprintf (msg_str, sizeof(msg_str), "breakdatemap reading finished\n");
-             LOG_MESSAGE (msg_str, FUNC_NAME)
-         }
-
-        /******************************************************************/
-        /*                                                                */
-        /*           Begin CCDC scanline processing                       */
-        /*                                                                */
-        /******************************************************************/
-        for(i_col = 0; i_col < n_cols; i_col++)
-        {
-            num_fc = 0;
-            for(b = 0; b < TOTAL_IMAGE_BANDS; b++)
-            {
-               tmp_buf_2d[b]  = buf[b] + i_col * num_scenes;
-            }
-
-            if(b_obcold_reconstruction == TRUE){
-                rec_cg = malloc(NUM_FC * sizeof(Output_t));
-                if (rec_cg == NULL)
-                {
-                    RETURN_ERROR ("ERROR allocating rec_cg",
-                                  FUNC_NAME, FAILURE);
-                }
-                result = obcold_reconstruction_procedure(tmp_buf_2d, fmask_buf_scanline[i_col], valid_date_array_scanline[i_col],
-                                                         valid_scene_count_scanline[i_col], rec_cg, &num_fc, num_breakdatemaps,
-                                                         breakdates_scanline[i_col],n_cols, i_col + 1, original_row, conse);
-                // snprintf (msg_str, sizeof(msg_str), "col %d reconstruction calculation finished\n", i_col+1);
-                // LOG_MESSAGE (msg_str, FUNC_NAME)
-                for(i = 0; i < num_fc; i++)
-                {
-                   result = write_output_binary(fhoutput, rec_cg[i]);
-                }
-                free(rec_cg);
-
-            }
-            else{
-                if (method == COLD)
-                {
+               if (method == COLD)
+               {
 
                     rec_cg = malloc(NUM_FC * sizeof(Output_t));
                     if (rec_cg == NULL)
@@ -986,21 +943,21 @@ int main(int argc, char *argv[])
                         RETURN_ERROR ("ERROR allocating rec_cg",
                                       FUNC_NAME, FAILURE);
                     }
-
                     for(i = 0; i < n_cm_maps; i++){
                         CM_outputs[i] = NA_VALUE;
                         CM_outputs_date[i] = 255;
+                        CMdirection_outputs[i] = 255;
                     }
 
-    //                printf("temporal success2 with processid %d\n", process_id);
-    //                printf("valid_scene_count_scanline[i_col] is %d;i_col is %d; original_row is %d; probability threshold is %f\n",
-    //                       valid_scene_count_scanline[i_col], i_col, original_row, probability_threshold);
+        //                printf("temporal success2 with processid %d\n", process_id);
+        //                printf("valid_scene_count_scanline[i_col] is %d;i_col is %d; original_row is %d; probability threshold is %f\n",
+        //                       valid_scene_count_scanline[i_col], i_col, original_row, probability_threshold);
                     result = cold(tmp_buf_2d[0], tmp_buf_2d[1], tmp_buf_2d[2], tmp_buf_2d[3], tmp_buf_2d[4],
-                                  tmp_buf_2d[5], tmp_buf_2d[6], fmask_buf_scanline[i_col], valid_date_array_scanline[i_col],
-                                  valid_scene_count_scanline[i_col], n_cols, i_col + 1, original_row, tcg, conse, b_outputCM,
-                                  starting_date, rec_cg, &num_fc, CM_OUTPUT_INTERVAL, CM_outputs, CM_outputs_date);
+                                  tmp_buf_2d[5], tmp_buf_2d[6], fmask_buf_scanline[i_col], sdate,
+                                  num_scenes, n_cols, original_col, original_row, tcg, conse, b_outputCM,
+                                  starting_date, rec_cg, &num_fc, CM_OUTPUT_INTERVAL, CM_outputs, CMdirection_outputs, CM_outputs_date);
 
-                    // snprintf (msg_str, sizeof(msg_str), "col %d COLD calculation finished\n", i_col+1);
+                    // snprintf (msg_str, sizeof(msg_str), "pixel %d COLD calculation finished\n", i_col+1);
                     // LOG_MESSAGE (msg_str, FUNC_NAME)
 
                     for(i = 0; i < num_fc; i++)
@@ -1014,15 +971,18 @@ int main(int argc, char *argv[])
                         {
                             RETURN_ERROR("Incorrect amount of data written", FUNC_NAME, ERROR);
                         }
-                        nvals = fwrite (CM_outputs_date, sizeof(int8), n_cm_maps, fhoutput_cm_date);
+                        nvals = fwrite (CMdirection_outputs, sizeof(uint8), n_cm_maps, fhoutput_cm_direction);
+                        if (nvals != n_cm_maps)
+                        {
+                            RETURN_ERROR("Incorrect amount of data written", FUNC_NAME, ERROR);
+                        }
+                        nvals = fwrite (CM_outputs_date, sizeof(uint8), n_cm_maps, fhoutput_cm_date);
                         if (nvals != n_cm_maps)
                         {
                             RETURN_ERROR("Incorrect amount of data written", FUNC_NAME, ERROR);
                         }
                     }
 
-                    snprintf (msg_str, sizeof(msg_str), "col %d rec_cg writing finished\n", i_col+1);
-                    LOG_MESSAGE (msg_str, FUNC_NAME)
 
                     free(rec_cg);
                     // for debug
@@ -1037,8 +997,8 @@ int main(int argc, char *argv[])
                                       FUNC_NAME, FAILURE);
                     }
 
-                    result = sccd_hpc(tmp_buf_2d, fmask_buf_scanline[i_col], valid_date_array_scanline[i_col], valid_scene_count_scanline[i_col],
-                                      s_rec_cg, &num_fc,n_cols, i_col + 1, original_row, probability_threshold, MIN_DAYS_CONSE, sensor_buf,conse);
+        //                result = sccd_hpc(tmp_buf_2d, fmask_buf_scanline[i_col], valid_date_array_scanline[i_col], valid_scene_count_scanline[i_col],
+        //                                  s_rec_cg, &num_fc,n_cols, i_col + 1, original_row, probability_threshold, MIN_DAYS_CONSE, sensor_buf,conse);
                     //printf("free stage 9 \n");
                     for(i = 0; i < num_fc; i++)
                     {
@@ -1049,49 +1009,33 @@ int main(int argc, char *argv[])
                     free(s_rec_cg);
 
                 }
-            }
+        }
+        if (result != SUCCESS)
+        {
+            RETURN_ERROR("ccd procedure fails at Block_h%d_v%d \n", current_block_x, current_block_y);
+
+        }
+    //            int count;
+     } // for(i_col = 0; i_col < block_width * block_height; i_col++)
 
 
-            if (result != SUCCESS)
-            {
-                RETURN_ERROR("ccd procedure fails at row %d and col %d \n", reorder_row, i_col + 1);
+    fclose(fhoutput);
 
-            }
-//            int count;
-
-
-        } // end for(i_col = 0; i_col < num_samples; i_col++)
-
-
-       fclose(fhoutput);
-
-       if(b_outputCM == TRUE){
-           fclose(fhoutput_cm);
-           fclose(fhoutput_cm_date);
-       }
-
-       if (rename(out_fullpath_tmp, out_fullpath) == 0)
-       {
-           snprintf (msg_str, sizeof(msg_str), "Row %d finished\n", reorder_row);
-           LOG_MESSAGE (msg_str, FUNC_NAME);
-       }
-       else
-       {
-           snprintf (msg_str, sizeof(msg_str), "Row %d renaming failed\n", reorder_row);
-           LOG_MESSAGE (msg_str, FUNC_NAME);
-       }
-
-    } // for(j = 0; j < n_block; j++)
-
-
-    for(i = 0; i < num_scenes; i++){
-       fclose(fh[i]);
+    if(b_outputCM == TRUE){
+       fclose(fhoutput_cm);
+       fclose(fhoutput_cm_direction);
+       fclose(fhoutput_cm_date);
     }
 
-    if (b_obcold_reconstruction == TRUE){
-        for(i = 0; i < num_breakdatemaps; i++){
-            fclose(fh_breakdatemap[i]);
-        }
+    if (rename(out_fullpath_tmp, out_fullpath) == 0)
+    {
+       snprintf (msg_str, sizeof(msg_str), "Block_h%d_v%d finished\n", current_block_x, current_block_y);
+       LOG_MESSAGE (msg_str, FUNC_NAME);
+    }
+    else
+    {
+       snprintf (msg_str, sizeof(msg_str), "Block_h%d_v%d renaming failed\n", current_block_x, current_block_y);
+       LOG_MESSAGE (msg_str, FUNC_NAME);
     }
 
 
@@ -1100,7 +1044,7 @@ int main(int argc, char *argv[])
     /*                   free memory                        */
     /********************************************************/
 
-
+    free(meta);
     status = free_2d_array((void **)scene_list);
     if (status != SUCCESS)
     {
@@ -1125,41 +1069,34 @@ int main(int argc, char *argv[])
         RETURN_ERROR ("Freeing memory: fmask_buf_scanline\n", FUNC_NAME, FAILURE);
     }
 
-    free(valid_scene_count_scanline);
 
-    status = free_2d_array((void **)valid_date_array_scanline);
-    if (status != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: valid_date_array_scanline\n", FUNC_NAME, FAILURE);
-    }
+    // free(sensor_buf);
 
-    free(num_fc_scanline);
-
-    free(sensor_buf);
-
-
-    free(user_mask_scanline);
     free(tmp_buf);
     free(sdate);
     free(CM_outputs);
     free(CM_outputs_date);
-    free(original_row_lut);
+    free(CMdirection_outputs);
 
-    status = free_2d_array((void **)breakdatemap_list);
-    if (status != SUCCESS)
+    if(b_obcold_reconstruction == TRUE)
     {
-        RETURN_ERROR ("Freeing memory: breakdatemap_list\n", FUNC_NAME, FAILURE);
+        status = free_2d_array((void **)breakdatemap_list);
+        if (status != SUCCESS)
+        {
+            RETURN_ERROR ("Freeing memory: breakdatemap_list\n", FUNC_NAME, FAILURE);
+        }
+
+        status = free_2d_array((void **)breakdates_block);
+        if (status != SUCCESS)
+        {
+            RETURN_ERROR ("Freeing memory: breakdates_block\n", FUNC_NAME, FAILURE);
+        }
+
+        free(tmp_buf_breakdatemap);
     }
 
-    status = free_2d_array((void **)breakdates_scanline);
-    if (status != SUCCESS)
-    {
-        RETURN_ERROR ("Freeing memory: breakdates_scanline\n", FUNC_NAME, FAILURE);
-    }
-
-    free(tmp_buf_breakdatemap);
 
     // free(fh);
-    // return SUCCESS;
+    return SUCCESS;
 
 }

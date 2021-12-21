@@ -133,6 +133,7 @@
 #define KFAS_TOL 1E-14
 
 #define T_MAX_CG 30.8562  // prob = 1-1e-5
+#define T_MAX_CG_RECONSTRUCT 25.745 // prob = 1-1e-4
 #define S_T_MAX_CG_PROB 0.9999
 
 

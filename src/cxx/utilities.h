@@ -110,12 +110,14 @@ int get_coldparameters
 (
     int *n_rows,
     int *n_cols,
-    int *ROW_STEP,
-    int *PARTITION,
+    int *n_block_h,
+    int *n_block_v,
     int *CM_OUTPUT_INTERVAL,
     float *probability_threshold,
-    int *conse
+    int *conse,
+    char *var_path
 );
+
 int usage_message ();
 
 #endif /* UTILITIES_H */

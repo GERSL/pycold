@@ -1125,15 +1125,16 @@ int get_coldparameters
 (
     int *n_rows,
     int *n_cols,
-    int *ROW_STEP,
-    int *PARTITION,
+    int *n_block_h,
+    int *n_block_v,
     int *CM_OUTPUT_INTERVAL,
     float *probability_threshold,
-    int *conse
+    int *conse,
+    char *var_path
 )
 {
     char cwd[MAX_STR_LEN]; // current directory path
-    char var_path[MAX_STR_LEN];
+    // char var_path[MAX_STR_LEN];
     FILE *var_fp;
     char line[MAX_STR_LEN];
     char line1[MAX_STR_LEN];
@@ -1147,15 +1148,15 @@ int get_coldparameters
     int status = 0;
     char s1[] = "n_rows";
     char s2[] = "n_cols";
-    char s3[] = "ROW_STEP";
-    char s4[] = "PARTITION";
+    char s3[] = "n_block_h";
+    char s4[] = "n_block_v";
     char s5[] = "CM_OUTPUT_INTERVAL";
     char s6[] = "probability_threshold";
     char s7[] = "conse";
 
-    getcwd(cwd, sizeof(cwd));
-    //printf("getvariable");
-    sprintf(var_path, "%s/%s", cwd, "parameters.yaml");
+//    getcwd(cwd, sizeof(cwd));
+//    //printf("getvariable");
+//    sprintf(var_path, "%s/%s", cwd, "parameters.yaml");
 
     var_fp = fopen(var_path, "r");
 
@@ -1179,11 +1180,11 @@ int get_coldparameters
           }
           else if (strcmp(token, s3) == 0){
               token = strtok(NULL, deli);
-              *ROW_STEP = atoi(token);
+              *n_block_h = atoi(token);
           }
           else if (strcmp(token, s4) == 0){
               token = strtok(NULL, deli);
-              *PARTITION = atoi(token);
+              *n_block_v = atoi(token);
           }
           else if(strcmp(token, s5) == 0){
               token = strtok(NULL, deli);
@@ -1208,10 +1209,10 @@ int get_coldparameters
         RETURN_ERROR("n_rows is missing in the parameter.yaml", FUNC_NAME, ERROR);
     if (*n_cols == 0)
         RETURN_ERROR("n_cols is missing in the parameter.yaml", FUNC_NAME, ERROR);
-    if (*ROW_STEP == 0)
-        RETURN_ERROR("ROW_STEP is missing in the parameter.yaml", FUNC_NAME, ERROR);
-    if (*PARTITION == 0)
-        RETURN_ERROR("PARTITION is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*n_block_h == 0)
+        RETURN_ERROR("n_block_h is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*n_block_v == 0)
+        RETURN_ERROR("n_block_v is missing in the parameter.yaml", FUNC_NAME, ERROR);
     if (*CM_OUTPUT_INTERVAL == 0)
         RETURN_ERROR("CM_OUTPUT_INTERVAL is missing in the parameter.yaml", FUNC_NAME, ERROR);
     if (*probability_threshold == 0)
