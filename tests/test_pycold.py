@@ -5,7 +5,6 @@ from pycold import cold_detect
 # sys.path.append('/Users/coloury/Dropbox/Documents/pycold/tests')
 # os.chdir('/Users/coloury/Dropbox/Documents/pycold/tests')
 from shared import read_data
-import pandas as pd
 
 Landsat_bandname = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Thermal']
 t_c = -200  # the threshold used for get_breakcategory

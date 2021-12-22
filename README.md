@@ -44,8 +44,8 @@ make
 
 ### 3. Using pycold
 ```python
->>> import pycold
->>> cold_result = pycold(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
+>>> from pycold import cold_detect
+>>> cold_result = cold_detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
 ```
 
-## Please refer to the example in /tool/notebook/pycold_example.ipynb
+### Please refer to the example in /tool/notebook/pycold_example.ipynb
