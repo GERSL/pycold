@@ -15,19 +15,6 @@ slope_scale = 10000  # slope_in_rec_cg = original_slope * slope_scale, we used t
                      # model coefficients in float datatype
 
 
-
-def read_data(path):
-    """Load a sample file containing acquisition days and spectral values.
-    The first column is assumed to be the day number, subsequent columns
-    correspond to the day number. This improves readability of large datasets.
-    Args:
-        path: location of CSV containing test data
-    Returns:
-        A 2D numpy array.
-    """
-    return np.genfromtxt(path, delimiter=',', dtype=np.int).T
-
-
 def get_breakcategory(ccd_plot, i_curve):
     """
     get break category:
@@ -51,20 +38,17 @@ def get_breakcategory(ccd_plot, i_curve):
 ################################################################################
 #         running COLD for a Landsat time series provided by a csv             #
 ################################################################################
-in_path = '/Users/coloury/Dropbox/Documents/pycold/test/spectral_336_3980_obs.csv'  # please change as needed
-# in_path = '/Users/coloury/Dropbox/Dissertation_Analysis/ComprRefData/separate_spectral_csv/spectral_19032017.csv'
-# in_path = '/Users/coloury/Dropbox/UCONN/pycold_accresult/pid19032017_spectral_hpc.csv'
-
-data = read_data(in_path)
+in_path = '/Users/coloury/Dropbox/Documents/pycold/test/spectral_336_3980_obs.csv'
+# data = read_data(in_path)
 # the sensor columnis not useful for now
-dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, sensor = data
-data.columns = ['dates'] + Landsat_bandname + ['qa', 'sensor']
-
+data = pd.read_csv(in_path, header=None)
+dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, sensor = data.to_numpy().T
 cold_result = pycold(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
 
 ################################################################################
 #    plot original time series, curve fitting and breakpoint from COLD result  #
 ################################################################################
+data.columns = ['dates'] + Landsat_bandname + ['qa', 'sensor']
 band = 5  # the band to plot, 4 is nir band, change it as you need
 
 sns.set(style="darkgrid")
@@ -73,12 +57,12 @@ f, ax = plt.subplots(1, figsize=(12, 5))
 
 # plot clean observatyion
 data_clean = data[data['qa'] == 0].copy()
+
 # note that ordinal dates in python is from Jan.1th, 0001, while ordinal dates in MATLAB is from Jan. 0th, 0000,
 # C api used MATLAB ordinal dates to facilitate verification, so the outputted dates have 366 days offset with
 # python ordinal dates. If convert to C/MATLAB ordinal dates from calendar dates, please use
 # ordinal_dates = pd.Timestamp.fromordinal(calendar_dates + 366)
-calendar_dates = [pd.Timestamp.fromordinal(row - 366)
-                        for row in data_clean["dates"]]
+calendar_dates = [pd.Timestamp.fromordinal(row - 366) for row in data_clean["dates"]]
 data_clean.loc[:, 'dates'] = calendar_dates  # convert ordinal dates to calendar
 
 # plot observations
