@@ -49,11 +49,11 @@ cdef extern from "../../cxx/cold.h":
 
 
 
-def pycold(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
-           np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
-           np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
-           double t_cg = 15.0863, int conse=6, int num_samples=5000, int col_pos=1, int row_pos=1, bint b_outputCM=False,
-           int starting_date=0, int CM_OUTPUT_INTERVAL=32):
+def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
+                np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
+                np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
+                double t_cg = 15.0863, int conse=6, int num_samples=5000, int col_pos=1, int row_pos=1, bint b_outputCM=False,
+                int starting_date=0, int CM_OUTPUT_INTERVAL=32):
     """
     Helper function to do COLD algorithm.
 

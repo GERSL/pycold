@@ -1,7 +1,11 @@
 # this script show how to run COLD from a csv file that store time series information
 import numpy as np
 import os
-from pycold import pycold
+from pycold import cold_detect
+# sys.path.append('/Users/coloury/Dropbox/Documents/pycold/tests')
+# os.chdir('/Users/coloury/Dropbox/Documents/pycold/tests')
+from shared import read_data
+import pandas as pd
 
 Landsat_bandname = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Thermal']
 t_c = -200  # the threshold used for get_breakcategory
@@ -36,11 +40,9 @@ def get_breakcategory(ccd_plot, i_curve):
 def main():
     # running COLD for a Landsat time series provided by a csv
     in_path = './resources/spectral_336_3980_obs.csv'
-    # in_path = '/Users/coloury/Dropbox/Documents/pycold/tests/resources/spectral_336_3980_obs.csv'
-
-    data = pd.read_csv(in_path, header=None)
-    dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, sensor = data.to_numpy().T
-    cold_result = pycold(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
+    data = read_data(in_path)
+    dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, sensor = data.copy()  # exclude header
+    cold_result = cold_detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
     assert cold_result[0]['t_break'] == 735040
     assert cold_result[0]['num_obs'] == 139
     assert cold_result[1]['t_end'] == 737352
