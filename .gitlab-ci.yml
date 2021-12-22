@@ -98,7 +98,7 @@ stages:
     script:
         - python -c "import pycold; print(pycold.__file__)"
         - python -c "import pycold; print(pycold.__version__)"
-        - python test_pycold.py
+        - python tests/test_pycold.py
           #- ./run_tests.py --network watch tests scripts
 
     #after_script:
