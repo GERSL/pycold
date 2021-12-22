@@ -47,4 +47,5 @@ make
 >>> import pycold
 >>> cold_result = pycold(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
 ```
-Please see the example in /tests/test_pycold.py
+
+## Please refer to the example in /tool/notebook/pycold_example.ipynb

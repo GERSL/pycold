@@ -5,3 +5,4 @@ __pycache__
 *.cpython-*-*-*.so
 dist 
 _skbuild
+src/python/pycold/_pycold_cython*.so
