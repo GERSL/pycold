@@ -101,12 +101,6 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     cdef long [:] ts_t_view = ts_t
     cdef long [:] qas_view = qas
 
-
-    # examine if the qa input has filled value
-    for x in range(valid_num_scenes):
-        if qas_view[x] == 255:
-            raise ValueError("qa array has filled values (255); please remove the rows of filled values")
-
     assert ts_b_view.shape[0] == dates_view.shape[0]
     assert ts_g_view.shape[0] == dates_view.shape[0]
     assert ts_r_view.shape[0] == dates_view.shape[0]
