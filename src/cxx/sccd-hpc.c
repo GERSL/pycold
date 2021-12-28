@@ -502,7 +502,7 @@ int main(int argc, char *argv[])
     }else{
         current_block_y = process_id / n_block_h + 1;
         current_block_x = process_id % n_block_h + 1;
-        sprintf(scene_list_directory, "%s/Block_h%d_v%d/%s", argv[4],
+        sprintf(scene_list_directory, "%s/block_x%d_y%d/%s", argv[4],
                 current_block_x, current_block_y, scene_list_filename);
     }
 
@@ -783,7 +783,7 @@ int main(int argc, char *argv[])
     for(i = 0; i < num_scenes; i++)
     {
         if(b_partition == TRUE){
-            sprintf(img_filename, "%s/Block_h%d_v%d/%s/%s_MTLstack", argv[4],
+            sprintf(img_filename, "%s/block_x%d_y%d/%s/%s_MTLstack", argv[4],
                     current_block_x, current_block_y, scene_list[i], scene_list[i]);
             //printf("%s:%d\n", img_filename, i);
         }
@@ -807,7 +807,7 @@ int main(int argc, char *argv[])
         fread(tmp_buf, sizeof(short int), TOTAL_BANDS * block_width * block_height, fh);
         if (tmp_buf == NULL)
         {
-            sprintf(errmsg, "error reading %d scene, Block_h%d_v%d \n", i, current_block_x, current_block_y);
+            sprintf(errmsg, "error reading %d scene, block_x%d_y%d \n", i, current_block_x, current_block_y);
             RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
         }
 
@@ -1012,7 +1012,7 @@ int main(int argc, char *argv[])
         }
         if (result != SUCCESS)
         {
-            RETURN_ERROR("ccd procedure fails at Block_h%d_v%d \n", current_block_x, current_block_y);
+            RETURN_ERROR("ccd procedure fails at block_x%d_y%d \n", current_block_x, current_block_y);
 
         }
     //            int count;
@@ -1029,12 +1029,12 @@ int main(int argc, char *argv[])
 
     if (rename(out_fullpath_tmp, out_fullpath) == 0)
     {
-       snprintf (msg_str, sizeof(msg_str), "Block_h%d_v%d finished\n", current_block_x, current_block_y);
+       snprintf (msg_str, sizeof(msg_str), "block_x%d_y%d finished\n", current_block_x, current_block_y);
        LOG_MESSAGE (msg_str, FUNC_NAME);
     }
     else
     {
-       snprintf (msg_str, sizeof(msg_str), "Block_h%d_v%d renaming failed\n", current_block_x, current_block_y);
+       snprintf (msg_str, sizeof(msg_str), "block_x%d_y%d renaming failed\n", current_block_x, current_block_y);
        LOG_MESSAGE (msg_str, FUNC_NAME);
     }
 

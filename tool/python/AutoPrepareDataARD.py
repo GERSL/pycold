@@ -277,8 +277,8 @@ def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_thresho
             QA_band_unpacked[singlepath_tile != pathid] = 255
 
         if is_partition is True:
-            b_width = int(width / stacking_params['n_block_h'])  # width of a block
-            b_height = int(height / stacking_params['n_block_v'])
+            b_width = int(width / stacking_params['n_block_x'])  # width of a block
+            b_height = int(height / stacking_params['n_block_y'])
             # reorder rows, so COLD processing can be spatially homogeneous
             # index = np.array([np.arange(x, height, step=stacking_params['ROW_STEP']).astype(int)
             #                   for x in range(stacking_params['ROW_STEP'])]).flatten()
@@ -287,51 +287,51 @@ def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_thresho
             # strides = (width_image * height_block * bytesize, width_block * bytesize, width_image * bytesize,
             #            bytesize)
             # source: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-in-python-using-numpy-d1bf0dd7b6f7
-            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(stacking_params['n_block_v'],
-                                                        stacking_params['n_block_h'], b_height, b_width),
+            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(stacking_params['n_block_y'],
+                                                        stacking_params['n_block_x'], b_height, b_width),
                                                         strides=(stacking_params['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
                                                                  stacking_params['n_cols'] * bytesize, bytesize))
-            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(stacking_params['n_block_v'],
-                                                        stacking_params['n_block_h'], b_height, b_width),
+            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(stacking_params['n_block_y'],
+                                                        stacking_params['n_block_x'], b_height, b_width),
                                                         strides=(stacking_params['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
                                                                  stacking_params['n_cols'] * bytesize, bytesize))
-            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(stacking_params['n_block_v'],
-                                                        stacking_params['n_block_h'], b_height, b_width),
+            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(stacking_params['n_block_y'],
+                                                        stacking_params['n_block_x'], b_height, b_width),
                                                         strides=(stacking_params['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
                                                                  stacking_params['n_cols'] * bytesize, bytesize))
-            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(stacking_params['n_block_v'],
-                                                        stacking_params['n_block_h'], b_height, b_width),
+            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(stacking_params['n_block_y'],
+                                                        stacking_params['n_block_x'], b_height, b_width),
                                                         strides=(stacking_params['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
                                                                  stacking_params['n_cols'] * bytesize, bytesize))
-            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(stacking_params['n_block_v'],
-                                                        stacking_params['n_block_h'], b_height, b_width),
+            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(stacking_params['n_block_y'],
+                                                        stacking_params['n_block_x'], b_height, b_width),
                                                         strides=(stacking_params['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
                                                                  stacking_params['n_cols'] * bytesize, bytesize))
-            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(stacking_params['n_block_v'],
-                                                        stacking_params['n_block_h'], b_height, b_width),
+            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(stacking_params['n_block_y'],
+                                                        stacking_params['n_block_x'], b_height, b_width),
                                                         strides=(stacking_params['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
                                                                  stacking_params['n_cols'] * bytesize, bytesize))
-            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(stacking_params['n_block_v'],
-                                                        stacking_params['n_block_h'], b_height, b_width),
+            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(stacking_params['n_block_y'],
+                                                        stacking_params['n_block_x'], b_height, b_width),
                                                         strides=(stacking_params['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
                                                                  stacking_params['n_cols'] * bytesize, bytesize))
             QA_blocks = np.lib.stride_tricks.as_strided(QA_band_unpacked,
-                                                       shape=(stacking_params['n_block_v'],
-                                                              stacking_params['n_block_h'], b_height,
+                                                       shape=(stacking_params['n_block_y'],
+                                                              stacking_params['n_block_x'], b_height,
                                                               b_width),
                                                        strides=(stacking_params['n_cols']*b_height*bytesize,
                                                                 b_width * bytesize,
                                                                 stacking_params['n_cols']*bytesize,
                                                                 bytesize))
-            for i in range(stacking_params['n_block_v']):
-                for j in range(stacking_params['n_block_h']):
+            for i in range(stacking_params['n_block_y']):
+                for j in range(stacking_params['n_block_x']):
                     # check if no valid pixels in the chip, then eliminate
                     qa_unique = np.unique(QA_blocks[i][j])
 
@@ -341,7 +341,7 @@ def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_thresho
                             stacking_params['QA_SNOW'] - 1) not in qa_unique:
                         continue
 
-                    block_folder = 'Block_h{}_v{}'.format(j + 1, i + 1)
+                    block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
                     if not os.path.exists(join(join(out_dir, block_folder), folder_name)):
                         os.makedirs(join(join(out_dir, block_folder), folder_name))
 
@@ -461,7 +461,6 @@ def main(source_dir, out_dir, threads_number, parallel_mode, clear_threshold, si
     # clear_threshold = 0
     # single_path = True
     # n_cores = 500
-    # n_cores_step0 = 200
     # parallel_mode = 'HPC'
     # rank = 1
     is_partition = True
@@ -570,9 +569,9 @@ def main(source_dir, out_dir, threads_number, parallel_mode, clear_threshold, si
                 os.mkdir(tmp_path)
 
             if is_partition is True:
-                for i in range(stacking_params['n_block_v']):
-                    for j in range(stacking_params['n_block_h']):
-                        block_folder = 'Block_h{}_v{}'.format(j + 1, i + 1)
+                for i in range(stacking_params['n_block_y']):
+                    for j in range(stacking_params['n_block_x']):
+                        block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
                         if not os.path.exists(join(out_dir, block_folder)):
                             os.mkdir(join(out_dir, block_folder))
 
@@ -651,9 +650,9 @@ def main(source_dir, out_dir, threads_number, parallel_mode, clear_threshold, si
             # out_dir = '/shared/cn450/suuuuuu/h030v005_stack'
             if is_partition is True:
                 scene_list_total = []
-                for i in range(stacking_params['n_block_v']):
-                    for j in range(stacking_params['n_block_h']):
-                        out_dir_block = join(out_dir, 'Block_h{}_v{}'.format(j + 1, i + 1))
+                for i in range(stacking_params['n_block_y']):
+                    for j in range(stacking_params['n_block_x']):
+                        out_dir_block = join(out_dir, 'block_x{}_y{}'.format(j + 1, i + 1))
                         scene_list = [f for f in os.listdir(out_dir_block) if (os.path.isdir(join(out_dir_block, f)))
                                       and (f.startswith('L'))]
                         scene_list_total = scene_list_total + scene_list

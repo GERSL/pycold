@@ -27,7 +27,6 @@ reccg_dt = np.dtype([('t_start', np.int32),  # time when series model gets start
                      ('magnitude', np.float, 7)])  # the magnitude of change difference between model prediction
                                           # and observation for each spectral band)
 
-
 cdef extern from "../../cxx/output.h":
     ctypedef struct Output_t:
         int t_start
@@ -42,21 +41,20 @@ cdef extern from "../../cxx/output.h":
         float magnitude[7]
 
 cdef extern from "../../cxx/cold.h":
-    cdef int cold(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2,
-                  long *buf_t, long *fmask_buf, long *valid_date_array, int valid_num_scenes, int num_samples,
+    cdef int cold(short *buf_b, short *buf_g, short *buf_r, short *buf_n, short *buf_s1, short *buf_s2,
+                  short *buf_t, short *fmask_buf, int *valid_date_array, int valid_num_scenes, int num_samples,
                   int col_pos, int row_pos, double tcg, int conse, bool b_outputCM, int starting_date, Output_t *rec_cg,
                   int *num_fc, int CM_OUTPUT_INTERVAL, short int *CM_outputs, unsigned char *CMdirection_outputs, unsigned char *CM_outputs_date);
 
 
 
-def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
-                np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
-                np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
+def cold_detect(np.ndarray[np.int32_t, ndim=1] dates, np.ndarray[np.int16_t, ndim=1] ts_b, np.ndarray[np.int16_t, ndim=1] ts_g,
+                np.ndarray[np.int16_t, ndim=1] ts_r, np.ndarray[np.int16_t, ndim=1] ts_n, np.ndarray[np.int16_t, ndim=1] ts_s1,
+                np.ndarray[np.int16_t, ndim=1] ts_s2, np.ndarray[np.int16_t, ndim=1] ts_t, np.ndarray[np.int16_t, ndim=1] qas,
                 double t_cg = 15.0863, int conse=6, int num_samples=5000, int col_pos=1, int row_pos=1, bint b_outputCM=False,
                 int starting_date=0, int CM_OUTPUT_INTERVAL=32):
     """
-    Helper function to do COLD algorithm.
-
+    Implementing COLD algorithm for a single-pixel time series 
     	Parameters
     	----------
     	dates: 1d array of shape(observation numbers), list of ordinal dates
@@ -91,15 +89,20 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     # rec_cg = np.ndarray((NUM_FC, dtype=reccg_dt)
     # cdef Output_t [:] rec_cg_view = rec_cg  # memory view, ::1 means C contiguous
 
-    cdef long [:] dates_view = dates
-    cdef long [:] ts_b_view = ts_b
-    cdef long [:] ts_g_view = ts_g
-    cdef long [:] ts_r_view = ts_r
-    cdef long [:] ts_n_view = ts_n
-    cdef long [:] ts_s1_view = ts_s1
-    cdef long [:] ts_s2_view = ts_s2
-    cdef long [:] ts_t_view = ts_t
-    cdef long [:] qas_view = qas
+    cdef int [:] dates_view = dates
+    cdef short [:] ts_b_view = ts_b
+    cdef short [:] ts_g_view = ts_g
+    cdef short [:] ts_r_view = ts_r
+    cdef short [:] ts_n_view = ts_n
+    cdef short [:] ts_s1_view = ts_s1
+    cdef short [:] ts_s2_view = ts_s2
+    cdef short [:] ts_t_view = ts_t
+    cdef short [:] qas_view = qas
+
+    # examine if the qa input has filled value
+    for x in range(valid_num_scenes):
+        if qas_view[x] == 255:
+            raise ValueError("qa array has filled values (255); please remove the rows of filled values")
 
     assert ts_b_view.shape[0] == dates_view.shape[0]
     assert ts_g_view.shape[0] == dates_view.shape[0]

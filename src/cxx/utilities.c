@@ -1148,8 +1148,8 @@ int get_coldparameters
     int status = 0;
     char s1[] = "n_rows";
     char s2[] = "n_cols";
-    char s3[] = "n_block_h";
-    char s4[] = "n_block_v";
+    char s3[] = "n_block_x";
+    char s4[] = "n_block_y";
     char s5[] = "CM_OUTPUT_INTERVAL";
     char s6[] = "probability_threshold";
     char s7[] = "conse";
