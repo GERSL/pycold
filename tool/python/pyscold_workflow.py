@@ -1,8 +1,13 @@
-# This script is an example for running pyscold in UCONN job array environment
-# Due to the independence features of job array, we use writing disk files for communication
+# This script is an example for running pycold in a HPC environment
+# This script requires 'AutoPrepareDataARD.py' to produce intermediate block-based stack. This scripts assign each
+# core to independently process each block, and produce python-native change record formats (.npy) for each block.
+
 # Three types of logging files are used: 1) print() to save block-based  processing info into individual slurm file;
 # 2) system.log is mainly used to log system information; 3) tile_processing_report.log records parameters for each tile
 # 2) and 3) are only called when rank == 1
+
+# For a 42-year Landsat ARD C1 tile (~3000 images), this script averagely produces ~8G change record
+# files, and takes ~1.5 hours to finish if 200 EPYC 7452 cores are used.
 import yaml
 import os
 from os.path import join

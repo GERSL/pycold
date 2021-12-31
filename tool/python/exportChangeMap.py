@@ -1,4 +1,5 @@
-# FOR coldC PostProcessing
+# This script is used to convert change records produced by the COLD algorithm to disturbance maps, including recent
+# disturbance maps and yearly disturbance maps
 import os
 import numpy as np
 import pandas as pd

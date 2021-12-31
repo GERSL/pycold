@@ -1,3 +1,14 @@
+# This script is an example for generating block-based stack files from original ARD zip as intermediate inputs to the
+# COLD algorithm in a HPC environment. As preparation, you need to download '_BT' and '_SR' for all Landsat
+# ARD collection 1.
+# This script has 4 steps: 1) warp single-path array to limit the observation inputs for each pixel
+# if single_path is set True; 2) unzip all images and unpack bit-based QA bands; 3) partition each 5000*5000 temporal
+# images to blocks and eliminate those image blocks if no clear, water or snow pixel were in it (so to save disk space
+# and  enable independent IO for individual block in later time-series analysis); 4) save each image block to
+# python-native binary format (.npy) into its block folders
+
+# For a 42-year Landsat ARD C1 tile (~3000 images), this script averagely produces ~350 G intermediate disk
+# files, and takes ~12 mins to finish if 200 EPYC 7452 cores are used.
 import warnings
 warnings.filterwarnings("ignore")
 import os
