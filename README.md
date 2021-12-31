@@ -49,7 +49,7 @@ pip install dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
 
 ```bash
 pip install -r requirements.txt
-pip install -e .
+bash run_developer_setup.sh
 ```
 
 **Option 3: build standalone binaries with CMake by itself (recommended for C development)**

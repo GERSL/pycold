@@ -1,24 +1,22 @@
-# FOR CCDC PostProcessing
+# FOR coldC PostProcessing
 import os
 import numpy as np
 import pandas as pd
 import gdal
 import click
 import datetime as datetime
-import multiprocessing
-import scipy.io
 import yaml
 from mpi4py import MPI
 from osgeo import gdal_array
 
 
-def getcategory_cold(ccd_plot, i_curve):
+def getcategory_cold(cold_plot, i_curve):
     t_c = -200
-    if ccd_plot[i_curve]['magnitude'][3] > t_c and ccd_plot[i_curve]['magnitude'][2] < -t_c and \
-            ccd_plot[i_curve]['magnitude'][4] < -t_c:
-        if ccd_plot[i_curve + 1]['coefs'][3, 1] > np.abs(ccd_plot[i_curve]['coefs'][3, 1]) and \
-                ccd_plot[i_curve + 1]['coefs'][2, 1] < -np.abs(ccd_plot[i_curve]['coefs'][2, 1]) and \
-                ccd_plot[i_curve + 1]['coefs'][4, 1] < -np.abs(ccd_plot[i_curve]['coefs'][4, 1]):
+    if cold_plot[i_curve]['magnitude'][3] > t_c and cold_plot[i_curve]['magnitude'][2] < -t_c and \
+            cold_plot[i_curve]['magnitude'][4] < -t_c:
+        if cold_plot[i_curve + 1]['coefs'][3, 1] > np.abs(cold_plot[i_curve]['coefs'][3, 1]) and \
+                cold_plot[i_curve + 1]['coefs'][2, 1] < -np.abs(cold_plot[i_curve]['coefs'][2, 1]) and \
+                cold_plot[i_curve + 1]['coefs'][4, 1] < -np.abs(cold_plot[i_curve]['coefs'][4, 1]):
             return 3  # aforestation
         else:
             return 2  # regrowth
@@ -26,22 +24,22 @@ def getcategory_cold(ccd_plot, i_curve):
         return 1  # land disturbance
 
 
-def getcategory_obcold(ccd_plot, i_curve, last_dist_type):
+def getcategory_obcold(cold_plot, i_curve, last_dist_type):
     t_c = -250
-    if ccd_plot[i_curve]['magnitude'][3] > t_c and ccd_plot[i_curve]['magnitude'][2] < -t_c and ccd_plot[i_curve]['magnitude'][4] < -t_c:
-        if ccd_plot[i_curve + 1]['coefs'][3, 1] > np.abs(ccd_plot[i_curve]['coefs'][3, 1]) and \
-                ccd_plot[i_curve + 1]['coefs'][2, 1] < -np.abs(ccd_plot[i_curve]['coefs'][2, 1]) and \
-                ccd_plot[i_curve + 1]['coefs'][4, 1] < -np.abs(ccd_plot[i_curve]['coefs'][4, 1]):
+    if cold_plot[i_curve]['magnitude'][3] > t_c and cold_plot[i_curve]['magnitude'][2] < -t_c and cold_plot[i_curve]['magnitude'][4] < -t_c:
+        if cold_plot[i_curve + 1]['coefs'][3, 1] > np.abs(cold_plot[i_curve]['coefs'][3, 1]) and \
+                cold_plot[i_curve + 1]['coefs'][2, 1] < -np.abs(cold_plot[i_curve]['coefs'][2, 1]) and \
+                cold_plot[i_curve + 1]['coefs'][4, 1] < -np.abs(cold_plot[i_curve]['coefs'][4, 1]):
             return 3  # aforestation
         else:
             return 2  # regrowth
     else:
         if i_curve > 0:
-            if (ccd_plot[i_curve]['t_break'] - ccd_plot[i_curve-1]['t_break'] > 365.25 * 5) or (last_dist_type != 1):
+            if (cold_plot[i_curve]['t_break'] - cold_plot[i_curve-1]['t_break'] > 365.25 * 5) or (last_dist_type != 1):
                 return 1
             flip_count = 0
             for b in range(5):
-                if ccd_plot[i_curve]['magnitude'][b+1] * ccd_plot[i_curve-1]['magnitude'][b+1] < 0:
+                if cold_plot[i_curve]['magnitude'][b+1] * cold_plot[i_curve-1]['magnitude'][b+1] < 0:
                     flip_count = flip_count + 1
             if flip_count >= 4:
                 return 4
@@ -55,10 +53,11 @@ def getcategory_obcold(ccd_plot, i_curve, last_dist_type):
 @click.option('--reccg_path', type=str, help='rec_cg folder')
 @click.option('--reference_path', type=str, help='image path used to provide georeference for output images')
 @click.option('--out_path', type=str, help='output folder for saving image')
-@click.option('--method', type=str, default='COLD', help='COLD, OBCOLD or SCCD')
+@click.option('--method', type=str, default='COLD', help='COLD, OBCOLD or Scold')
+@click.option('--yaml_path', type=str, help='path for yaml file')
 @click.option('--year_lowbound', type=int, default=1982, help='the starting year for exporting')
 @click.option('--year_uppbound', type=int, default=2020, help='the ending year for exporting')
-def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbound):
+def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbound, yaml_path):
     # reference_path = '/Users/coloury/Dropbox/UCONN/spatial/test_results/h016v010/recentdist_map_COLD.tif'
     # method = 'COLD'
     # reccg_path ='/Users/coloury/Dropbox/UCONN/spatial/test_results/h030v006/july_version'
@@ -84,7 +83,7 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
     dt = None
     if method == 'COLD' or method == 'OBCOLD':
         # outname'obcold':
-        # outname = 'breakyear_ccd_h11v9_{}_{}_{}'.format(lower_year, upper_year, method)
+        # outname = 'breakyear_cold_h11v9_{}_{}_{}'.format(lower_year, upper_year, method)
         dt = np.dtype([('t_start', np.int32),
                        ('t_end', np.int32),
                        ('t_break', np.int32),
@@ -92,11 +91,10 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
                        ('num_obs', np.int32),
                        ('category', np.short),
                        ('change_prob', np.short),
-                       ('coefs', np.float32, (7, 8)),
+                       ('coefs', np.float32, (7, 8)),   # note that the slope coefficient was scaled up by 10000
                        ('rmse', np.float32, 7),
                        ('magnitude', np.float32, 7)])
-    elif method == 'SCCD':
-        # outname = 'breakyear_sccd_h11v9_{}_{}_{}'.format(lower_year, upper_year, method)
+    elif method == 's-ccd':
         dt = np.dtype([('t_start', np.int32),
                        ('t_end', np.int32),
                        ('t_break', np.int32),
@@ -120,14 +118,14 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
         cols = ref_image.RasterXSize
         rows = ref_image.RasterYSize
 
-        with open('{}/spatial/parameters.yaml'.format(os.path.dirname(os.path.dirname(os.getcwd()))), 'r') as yaml_obj:
+        with open(yaml_path, 'r') as yaml_obj:
             parameters = yaml.safe_load(yaml_obj)
 
         obcold_params = parameters['obcold']
         obcold_params.update(parameters['common'])
-        obcold_params['block_width'] = int(obcold_params['n_cols'] / obcold_params['n_block_h'])  # width of a block
-        obcold_params['block_height'] = int(obcold_params['n_rows'] / obcold_params['n_block_v'])  # height of a block
-        obcold_params['n_blocks'] = obcold_params['n_block_h'] * obcold_params['n_block_v']  # total number of blocks
+        obcold_params['block_width'] = int(obcold_params['n_cols'] / obcold_params['n_block_x'])  # width of a block
+        obcold_params['block_height'] = int(obcold_params['n_rows'] / obcold_params['n_block_y'])  # height of a block
+        obcold_params['n_blocks'] = obcold_params['n_block_x'] * obcold_params['n_block_y']  # total number of blocks
     else:
         trans = None
         proj = None
@@ -147,28 +145,28 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
         iblock = n_process * i + rank
         if iblock > obcold_params['n_blocks']:
             break
-        current_block_y = int(np.floor(iblock / obcold_params['n_block_h'])) + 1
-        current_block_x = iblock % obcold_params['n_block_h'] + 1
+        current_block_y = int(np.floor(iblock / obcold_params['n_block_x'])) + 1
+        current_block_x = iblock % obcold_params['n_block_x'] + 1
         if method == 'OBCOLD':
-            filename = 'record_change_h{}_v{}_obcold.dat'.format(current_block_x, current_block_y)
+            filename = 'record_change_x{}_y{}_obcold.npy'.format(current_block_x, current_block_y)
         else:
-            filename = 'record_change_h{}_v{}_cold.dat'.format(current_block_x, current_block_y)
-        dat_pth = os.path.join(reccg_path, filename)
-        ccd_block = np.fromfile(dat_pth, dtype=dt)
+            filename = 'record_change_x{}_y{}_cold.npy'.format(current_block_x, current_block_y)
+        cold_block = np.array(np.load(os.path.join(reccg_path, filename)), dtype=dt)
+        # cold_block = [np.array(element, dtype=dt) for element in cold_block]
         results_block = [np.full((obcold_params['block_height'], obcold_params['block_width']), -9999, dtype=np.int32)
                          for t in range(year_uppbound - year_lowbound + 1)]
-        if len(ccd_block) == 0:
+        if len(cold_block) == 0:
             print('the rec_cg file {} is missing'.format(dat_pth))
             for year in range(year_lowbound, year_uppbound+1):
                 outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
                 np.save(outfile, results_block[year - year_lowbound])
             continue
 
-        ccd_block.sort(order='pos')
+        cold_block.sort(order='pos')
 
-        current_processing_pos = ccd_block[0]['pos']
+        current_processing_pos = cold_block[0]['pos']
         current_dist_type = 0
-        for count, curve in enumerate(ccd_block):
+        for count, curve in enumerate(cold_block):
             if curve['pos'] != current_processing_pos:
                 current_processing_pos = curve['pos']
                 current_dist_type = 0
@@ -186,9 +184,9 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
                 return
 
             if method == 'OBCOLD':
-                current_dist_type = getcategory_obcold(ccd_block, count, current_dist_type)
+                current_dist_type = getcategory_obcold(cold_block, count, current_dist_type)
             else:
-                current_dist_type = getcategory_cold(ccd_block, count)
+                current_dist_type = getcategory_cold(cold_block, count)
             break_year = pd.Timestamp.fromordinal(curve['t_break'] - 366).year
             if break_year < year_lowbound or break_year > year_uppbound:
                 continue
@@ -211,7 +209,7 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
                               for x in range(obcold_params['n_blocks'])]
 
             results = np.hstack(tmp_map_blocks)
-            results = np.vstack(np.hsplit(results, obcold_params['n_block_v']))
+            results = np.vstack(np.hsplit(results, obcold_params['n_block_x']))
 
             for x in range(obcold_params['n_blocks']):
                 os.remove(os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(x+1, year)))
@@ -245,8 +243,6 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
         outdata.FlushCache()
         outdata.SetProjection(proj)
         outdata.FlushCache()
-
-
 
 
 if __name__ == '__main__':

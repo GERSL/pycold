@@ -22,10 +22,11 @@ reccg_dt = np.dtype([('t_start', np.int32),  # time when series model gets start
                      ('num_obs', np.int32),  # the number of "good" observations used for model estimation
                      ('category', np.short),  # the quality of the model estimation (what model is used, what process is used)
                      ('change_prob', np.short),  # the probability of a pixel that have undergone change (between 0 and 100)
-                     ('coefs', np.float, (7, 8)),  # coefficients for each time series model for each spectral band
-                     ('rmse', np.float, 7),  # RMSE for each time series model for each spectral band
-                     ('magnitude', np.float, 7)])  # the magnitude of change difference between model prediction
+                     ('coefs', np.float32, (7, 8)),  # coefficients for each time series model for each spectral band
+                     ('rmse', np.float32, 7),  # RMSE for each time series model for each spectral band
+                     ('magnitude', np.float32, 7)])  # the magnitude of change difference between model prediction
                                           # and observation for each spectral band)
+
 
 cdef extern from "../../cxx/output.h":
     ctypedef struct Output_t:
@@ -41,20 +42,28 @@ cdef extern from "../../cxx/output.h":
         float magnitude[7]
 
 cdef extern from "../../cxx/cold.h":
-    cdef int cold(short *buf_b, short *buf_g, short *buf_r, short *buf_n, short *buf_s1, short *buf_s2,
-                  short *buf_t, short *fmask_buf, int *valid_date_array, int valid_num_scenes, int num_samples,
+    cdef int cold(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2,
+                  long *buf_t, long *fmask_buf, long *valid_date_array, int valid_num_scenes, int num_samples,
                   int col_pos, int row_pos, double tcg, int conse, bool b_outputCM, int starting_date, Output_t *rec_cg,
                   int *num_fc, int CM_OUTPUT_INTERVAL, short int *CM_outputs, unsigned char *CMdirection_outputs, unsigned char *CM_outputs_date);
 
 
 
-def cold_detect(np.ndarray[np.int32_t, ndim=1] dates, np.ndarray[np.int16_t, ndim=1] ts_b, np.ndarray[np.int16_t, ndim=1] ts_g,
-                np.ndarray[np.int16_t, ndim=1] ts_r, np.ndarray[np.int16_t, ndim=1] ts_n, np.ndarray[np.int16_t, ndim=1] ts_s1,
-                np.ndarray[np.int16_t, ndim=1] ts_s2, np.ndarray[np.int16_t, ndim=1] ts_t, np.ndarray[np.int16_t, ndim=1] qas,
+def test_func():
+    """
+    This is a docstring
+    """
+    return None
+
+
+def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
+                np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
+                np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
                 double t_cg = 15.0863, int conse=6, int num_samples=5000, int col_pos=1, int row_pos=1, bint b_outputCM=False,
                 int starting_date=0, int CM_OUTPUT_INTERVAL=32):
     """
-    Implementing COLD algorithm for a single-pixel time series 
+    Helper function to do COLD algorithm.
+
     	Parameters
     	----------
     	dates: 1d array of shape(observation numbers), list of ordinal dates
@@ -86,23 +95,17 @@ def cold_detect(np.ndarray[np.int32_t, ndim=1] dates, np.ndarray[np.int16_t, ndi
     cdef int num_fc = 0
     cdef Output_t t
     cdef Output_t* rec_cg = <Output_t*> PyMem_Malloc(NUM_FC * sizeof(t))
-    # rec_cg = np.ndarray((NUM_FC, dtype=reccg_dt)
-    # cdef Output_t [:] rec_cg_view = rec_cg  # memory view, ::1 means C contiguous
 
-    cdef int [:] dates_view = dates
-    cdef short [:] ts_b_view = ts_b
-    cdef short [:] ts_g_view = ts_g
-    cdef short [:] ts_r_view = ts_r
-    cdef short [:] ts_n_view = ts_n
-    cdef short [:] ts_s1_view = ts_s1
-    cdef short [:] ts_s2_view = ts_s2
-    cdef short [:] ts_t_view = ts_t
-    cdef short [:] qas_view = qas
+    cdef long [:] dates_view = dates
+    cdef long [:] ts_b_view = ts_b
+    cdef long [:] ts_g_view = ts_g
+    cdef long [:] ts_r_view = ts_r
+    cdef long [:] ts_n_view = ts_n
+    cdef long [:] ts_s1_view = ts_s1
+    cdef long [:] ts_s2_view = ts_s2
+    cdef long [:] ts_t_view = ts_t
+    cdef long [:] qas_view = qas
 
-    # examine if the qa input has filled value
-    for x in range(valid_num_scenes):
-        if qas_view[x] == 255:
-            raise ValueError("qa array has filled values (255); please remove the rows of filled values")
 
     assert ts_b_view.shape[0] == dates_view.shape[0]
     assert ts_g_view.shape[0] == dates_view.shape[0]
@@ -132,8 +135,11 @@ def cold_detect(np.ndarray[np.int32_t, ndim=1] dates, np.ndarray[np.int16_t, ndi
     if result != 0:
         raise RuntimeError("cold function fails for col_pos = {} and row_pos = {}".format(col_pos, row_pos))
     else:
-        if b_outputCM == False:
-            return np.asarray(<Output_t[:num_fc]>rec_cg) # np.asarray uses also the buffer-protocol and is able to construct
-                                                         # a dtype-object from cython's array
-        else:  # for object-based COLD
-            return [np.asarray(<Output_t[:num_fc]>rec_cg), CM_outputs, CM_direction_outputs, CM_outputs_date]
+        if num_fc <= 0:
+            raise Exception("The COLD function has no change records outputted for col_pos = {} and row_pos = {} (possibly due to no enough clear observation)".format(col_pos, row_pos))
+        else:
+            if b_outputCM == False:
+                return np.asarray(<Output_t[:num_fc]>rec_cg) # np.asarray uses also the buffer-protocol and is able to construct
+                                                             # a dtype-object from cython's array
+            else:  # for object-based COLD
+                return [np.asarray(<Output_t[:num_fc]>rec_cg), CM_outputs, CM_direction_outputs, CM_outputs_date]

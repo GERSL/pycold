@@ -103,7 +103,7 @@ int convert_year_doy_to_ordinal
     int *jday      /* O: julian date since year 0001 */
 )
 {
-    char FUNC_NAME[] = "convert_year_doy_to_jday_from_0001";
+    char FUNC_NAME[] = "convert_year_doy_to_ordinal";
     int i;
     int status;
 
