@@ -64,4 +64,12 @@ make
 >>> cold_result = cold_detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
 ```
 
-### Please refer to the example in /tool/notebook/pycold_example.ipynb
+### 4. Examples
+#### 1) Running single pixel-based time series and plot time series:
+/tool/notebook/pycold_example.ipynb
+#### 2) Converting original ARD to binary uncompressed stack data (preprocessing):
+/tool/python/AutoPrepareDataARD.py
+#### 3) Running tile-based COLD to produce change records based on the stack data:
+/tool/python/pycold_workflow.py
+#### 4) Export disturbance maps from change records:
+/tool/python/exportChangeMap.py
