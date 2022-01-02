@@ -10,6 +10,8 @@
 #include "output.h"
 #include "s_ccd.h"
 #include "distribution_math.h"
+#include "cold.h"
+
 #define N_Columns 8
 #define Max_DOF 30
 

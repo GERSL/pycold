@@ -422,3 +422,9 @@ int getcategorycurve_old
     Output_t_sccd* t,
     int num_curve
 );
+
+int getcategorycurve
+(
+    Output_t_sccd* t,
+    int num_curve
+);

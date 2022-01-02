@@ -54,6 +54,8 @@ int partition_double (double arr[], int left, int right);
 int partition_index (int arr[],  int *index, int left, int right);
 void quick_sort_buf (int arr[], short int **brr, short int *fmask_buf, int left, int right);
 void quick_sort_index (int arr[], int *index,  int left, int right);
+int partition_buf (int arr[], short int **buf, short int *fmask_buf, int left, int right);
+int partition_buf_sensor (int arr[], short int **buf, short int *fmask_buf, short int *sensor, int left, int right);
 
 int get_variables
 (

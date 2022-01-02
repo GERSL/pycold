@@ -1,15 +1,12 @@
 # PYCOLD
 
-# PYthon version of COntinuous monitoring of Land Disturbance algorithm (V0.1)
-####  History
-- Version 0.2: add pip-installable functionality by using scikit-build
-- Version 0.1: a Python package based on C library of COLD. The verification with MATLAB COLD shows that  C-COLD has smaller than <2% differences for breakpoint detection and <2% differences for harmonic coefficients
-
+# A Python library for COntinuous monitoring of Land Disturbance (COLD) and its extension algorithmsat the speed of C language
+The base algorithms were mostly written using C wrapped in python, and have been verified with MATLAB version (if it has). This library provides:
+  1. Original COntinuous monitoring of Land Disturbance (COLD): a upgraded CCDC algorithm proposed by Dr.Zhe Zhu for offline satellite-based time-series analysis
+  2. Stochastic Continuous Change Detection (S-CCD, a near real-time implementation of COLD)
+  3. Object-based COLD (OB-COLD, integrating spatial information into COLD by using a 'change object' view)
 ## 1. Pre-work: clone github repo to your local directory
 ### Clone or pull the latest pycold git repo
-```
-git clone https://gitlab.kitware.com/smart/pycold.git
-```
 
 ## 2. installation
 
