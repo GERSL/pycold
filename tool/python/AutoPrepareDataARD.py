@@ -9,6 +9,7 @@
 
 # For a 42-year Landsat ARD C1 tile (~3000 images), this script averagely produces ~350 G intermediate disk
 # files, and takes ~12 mins to finish if 200 EPYC 7452 cores are used.
+
 import warnings
 warnings.filterwarnings("ignore")
 import os
@@ -266,7 +267,7 @@ def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_thresho
 
         if (B1 is None) or (B2 is None) or (B3 is None) or (B4 is None) or (B5 is None) or (B6 is None) or \
                 (B7 is None):
-            logger.warn('Reading Landsat band fails for {}: {}'.format(folder, e))
+            logger.warn('Reading Landsat band fails for {}'.format(folder))
             return
 
         # if path_array is not None, we will eliminate those observation that has different path with its assigned path
