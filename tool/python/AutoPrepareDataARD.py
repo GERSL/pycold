@@ -430,11 +430,6 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
     if not os.path.exists(source_dir):
         print('Source directory not exists!')
 
-    # parse tile h and v from folder name
-    folder_name = os.path.basename(source_dir)
-    tile_h = int(folder_name[folder_name.find('h')+1: folder_name.find('h')+4])
-    tile_v = int(folder_name[folder_name.find('v') + 1: folder_name.find('v') + 4])
-
     # select only _SR
     folder_list = [f[0:len(f) - 4] for f in listdir(source_dir) if
                    (isfile(join(source_dir, f)) and f.endswith('.tar')
@@ -512,6 +507,11 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
     # read a general path file which can indicate which pixel is assigned to which path
     path_array = None
     if single_path is True:
+        # parse tile h and v from folder name
+        folder_name = os.path.basename(source_dir)
+        tile_h = int(folder_name[folder_name.find('h') + 1: folder_name.find('h') + 4])
+        tile_v = int(folder_name[folder_name.find('v') + 1: folder_name.find('v') + 4])
+
         if hpc is True:
             path_array = gdal_array.LoadFile(join(out_dir, 'singlepath_landsat_tile.tif'))
         else:

@@ -27,7 +27,15 @@ sudo apt-get install gfortran -y
 ```
 
 ### 2.2 install pycold
-**Option 1: Build and install a wheel** 
+**Option 1: Install in development mode**
+
+```bash
+pip install -r requirements.txt
+conda install gdal  # the easiest way to install gdal 
+bash run_developer_setup.sh
+```
+
+**Option 2: Build and install a wheel** 
 
 Scikit-build will invoke CMake and build everything. (you may need to remove
 any existing `_skbuild` directory).
@@ -40,13 +48,6 @@ Then you can pip install the wheel
 
 ```bash
 pip install dist/pycold-0.1.0-cp38-cp38-linux_x86_64.whl
-```
-
-**Option 2: Install in development mode**
-
-```bash
-pip install -r requirements.txt
-bash run_developer_setup.sh
 ```
 
 **Option 3: build standalone binaries with CMake by itself (recommended for C development)**
@@ -67,9 +68,30 @@ make
 ### 4. Examples
 #### 1) Running single pixel-based time series and plot time series:
 /tool/notebook/pycold_example.ipynb
-#### 2) Converting original ARD to binary uncompressed stack data (preprocessing):
-/tool/python/AutoPrepareDataARD.py
-#### 3) Running tile-based COLD to produce change records based on the stack data:
-/tool/python/pycold_workflow.py
-#### 4) Export disturbance maps from change records:
-/tool/python/exportChangeMap.py
+#### 2) A job-array script for converting original ARD to binary uncompressed stack data (preprocessing):
+```
+...
+#SBATCH --array 1-200  # define your job array core number
+
+module load your_modules
+python3 AutoPrepareDataARD.py --source_dir=$source_path --out_dir=$stack_path --rank=$SLURM_ARRAY_TASK_ID --n_cores=$SLURM_ARRAY_TASK_MAX --yaml_path=parameter.yaml
+```
+#### 3) A job-array script for  running tile-based COLD to produce change records based on the stack data:
+```
+...
+#SBATCH --array 1-200  # define your job array core number
+module load your modules
+python3 pycold_workflow.py --rank=$SLURM_ARRAY_TASK_ID --n_cores=$SLURM_ARRAY_TASK_MAX --result_path=$result_path --stack_path=$stack_path --yaml_path=parameter.yaml --method='COLD'
+```
+#### 4) Export disturbance maps from change records (using MPI):
+```
+mpirun python3 exportChangeMap.py --reccg_path=$reccg_path --reference_path=$reference_path --out_path=$out_path --method='COLD' --yaml_path=parameter.yaml
+```
+
+
+### Q&A
+#### Q1: Has pycold been verified with original Matlab codes
+Re: yes, multiple rounds of verification have been done. Comparison based on two testing tiles shows that pycold and Matlab version have smaller than <2% differences for breakpoint detection and <2% differences for harmonic coefficients; the accuracy of pycold was also tested against the same reference dataset used in the original COLD paper (Zhu et al., 2020), and pycold reached the same accuracy (27% omission and 28% commission) showing that the discrepancy doesn't hurt accuracy. The primary source for the discrepancy is mainly from the rounding: MATLAB uses float64 precision, while pycold chose float32 to save the run-time computing memory and boost efficiency. 
+
+#### Q2: how much time for production of a tile-based disturbance map (5000*5000 pixels) using pycold?
+Re: I tested it in UCONN HPC environment (200 EPYC7452 cores): for processing a 40-year Landsat ARD tile (1982-2021), the stacking typically takes 15 mins; per-pixel COLD processing costs averagely 1 hour; exporting maps needs 7 mins.  
