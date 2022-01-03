@@ -1166,9 +1166,7 @@ int cold
     long *fmask_buf,       /* I:  the time series of cfmask values. 0 - clear; 1 - water; 2 - shadow; 3 - snow; 4 - cloud  */
     long *valid_date_array,      /* I:  valid date as matlab serial date form (counting from Jan 0, 0000). Note ordinal date in python is from (Jan 1th, 0001) */
     int valid_num_scenes,       /* I: number of valid scenes  */
-    int num_samples,            /* I: column number per scanline, used to save pixel position */
-    int col_pos,                /* I: column position of current processing pixel, used to save pixel position    */
-    int row_pos,                /* I: raw position of current processing pixel, used to save pixel position  */
+    int pos,                     /* I: the position id of pixel */
     double tcg,                 /* I: threshold of change threshold  */
     int conse,                  /* I: consecutive observation number   */
     bool b_outputCM,            /* I: indicate if outputting change magnitudes for object-based cold, for cold only, it is the false */
@@ -1284,7 +1282,7 @@ int cold
 
     for(i = 0; i < *num_fc; i++)
     {
-        rec_cg[i].pos = num_samples * (row_pos - 1) + col_pos;
+        rec_cg[i].pos = pos;
     }
 
     free(id_range);

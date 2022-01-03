@@ -43,8 +43,8 @@ cdef extern from "../../cxx/output.h":
 
 cdef extern from "../../cxx/cold.h":
     cdef int cold(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2,
-                  long *buf_t, long *fmask_buf, long *valid_date_array, int valid_num_scenes, int num_samples,
-                  int col_pos, int row_pos, double tcg, int conse, bool b_outputCM, int starting_date, Output_t *rec_cg,
+                  long *buf_t, long *fmask_buf, long *valid_date_array, int valid_num_scenes, int pos, 
+                  double tcg, int conse, bool b_outputCM, int starting_date, Output_t *rec_cg,
                   int *num_fc, int CM_OUTPUT_INTERVAL, short int *CM_outputs, unsigned char *CMdirection_outputs, unsigned char *CM_outputs_date);
 
 
@@ -59,7 +59,7 @@ def test_func():
 def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
                 np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
-                double t_cg = 15.0863, int conse=6, int num_samples=5000, int col_pos=1, int row_pos=1, bint b_outputCM=False,
+                double t_cg = 15.0863, int pos=1, int conse=6, bint b_outputCM=False,
                 int starting_date=0, int CM_OUTPUT_INTERVAL=32):
     """
     Helper function to do COLD algorithm.
@@ -76,10 +76,8 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     	ts_t: 1d array of shape(observation numbers), time series of thermal band
     	qas: 1d array, the QA cfmask bands. '0' - clear; '1' - water; '2' - shadow; '3' - snow; '4' - cloud
     	t_cg: threshold of change magnitude, default is chi2.ppf(0.99,5)
+         pos: position id of the pixel
     	conse: consecutive observation number
-    	num_samples: column number per scanline, used to save pixel position
-    	col_pos: column position of current processing pixel, used to save pixel position
-    	row_pos: raw position of current processing pixel, used to save pixel position
     	b_outputCM: bool, 'True' means outputting change magnitude and change magnitude dates, only for object-based COLD
     	starting_date: the starting date of the whole dataset to enable reconstruct CM_date,
                    	all pixels for a tile should have the same date, only for b_outputCM is True
@@ -130,13 +128,13 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     cdef unsigned char [:] CM_outputs_date_view = CM_outputs_date  # memory view
 
     result = cold(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0], &ts_t_view[0],
-                 &qas_view[0], &dates_view[0], valid_num_scenes, num_samples, col_pos, row_pos, t_cg, conse, b_outputCM,
+                 &qas_view[0], &dates_view[0], valid_num_scenes, pos, t_cg, conse, b_outputCM,
                  starting_date, rec_cg, &num_fc, CM_OUTPUT_INTERVAL, &CM_outputs_view[0], &CM_direction_outputs_view[0], &CM_outputs_date_view[0])
     if result != 0:
-        raise RuntimeError("cold function fails for col_pos = {} and row_pos = {}".format(col_pos, row_pos))
+        raise RuntimeError("cold function fails for pos = {} ".format(pos))
     else:
         if num_fc <= 0:
-            raise Exception("The COLD function has no change records outputted for col_pos = {} and row_pos = {} (possibly due to no enough clear observation)".format(col_pos, row_pos))
+            raise Exception("The COLD function has no change records outputted for pos = {} (possibly due to no enough clear observation)".format(pos))
         else:
             if b_outputCM == False:
                 return np.asarray(<Output_t[:num_fc]>rec_cg) # np.asarray uses also the buffer-protocol and is able to construct
