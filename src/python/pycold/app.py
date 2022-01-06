@@ -11,7 +11,8 @@ from Flask.
 source: https://github.com/repository-preservation/lcmap-pyclass/blob/develop/pyclass/app.py
 """
 
-import os, logging
+import os
+import logging
 import yaml
 import sys
 import numpy as np
@@ -20,11 +21,9 @@ __format = '%(asctime)s.%(msecs)03d %(module)s::%(funcName)-20s - %(message)s'
 logging.basicConfig(stream=sys.stdout,
                     level=logging.DEBUG,
                     format=__format,
-                    Loader=yaml.FullLoader,
                     datefmt='%Y-%m-%d %H:%M:%S')
 
 
-# Simplify parameter setting and make it easier for adjustment
 class Defaults(dict):
     def __init__(self, config_path='parameters.yaml'):
         with open(config_path, 'r') as f:
@@ -49,29 +48,4 @@ class Defaults(dict):
 defaults = Defaults(os.path.join(os.path.dirname(__file__), 'obcold_parameters.yaml'))
 
 
-def get_block_y(block_id, n_block_x):
-    """
-    Parameters
-    ----------
-    block_id: integer
-    n_block_x: integer, number of blocks at x xis
 
-    Returns
-    -------
-    current block id at y axis
-    """
-    return int(np.floor((block_id - 1) / n_block_x)) + 1
-
-
-def get_block_x(block_id, n_block_x):
-    """
-    Parameters
-    ----------
-    block_id: integer
-    n_block_x: integer, number of blocks at x xis
-
-    Returns
-    -------
-    current block id at x axis
-    """
-    return (block_id - 1) % n_block_x + 1

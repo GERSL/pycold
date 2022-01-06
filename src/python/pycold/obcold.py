@@ -19,40 +19,32 @@ import joblib
 from scipy.stats import chi2
 from os.path import join, exists
 from shared import gdal_save_file_1band
-from pycold.app import defaults
-from pycold.app import logging, get_block_y, get_block_x
+from pycold.app import defaults, logging
+from pycold.utils import get_block_y, get_block_x
 
 logger = logging.getLogger(__name__)
 
-colddt = np.dtype([('t_start', np.int32),
-                   ('t_end', np.int32),
-                   ('t_break', np.int32),
-                   ('pos', np.int32),
-                   ('num_obs', np.int32),
-                   ('category', np.short),
-                   ('change_prob', np.short),
-                   ('coefs', np.float32, (7, 8)),
-                   ('rmse', np.float32, 7),
-                   ('magnitude', np.float32, 7)])
 
-thematic_mode_types = ('no_input', 'single_map', 'rf_model', 'multi_maps')
+thematic_mode_types = ['no_input', 'single_map', 'rf_model', 'multi_maps']
 
 
-def extract_features(cold_plot, band, ordinal_day_list, parameters, n_features, ismat=False):
+def extract_features(cold_plot, band, ordinal_day_list, nan_val, slope_scale, n_features, ismat=False):
     """
-    output predicted annual reflectance given a list of prediction dates and a band number
-    Args:
-        cold_plot: plot-based rec_cg
-        band: band number, range from 0 to 6 for landsat
-        ordinal_day_list: the list of the ordinal prediction day for outputting reflectance
-        parameters: obcold parameters
-        n_features: the number of features for classification, from 1 to 7. Note 1 is the combination of slope and
-                    intercept
-        ismat: if True, reading rec_cg from matlab outputs
-    Returns:
-        a list of predicted reflectance for ordinal_day_list
+    Parameters
+    ----------
+    cold_plot: nested array, plot-based rec_cg
+    band: integer, the band number range from 0 to 6
+    ordinal_day_list: a list of ordinal days that the output will predict
+    nan_val:
+    slope_scale:
+    n_features: integer the number of features for classification, from an order
+    ismat
+
+    Returns
+    -------
+
     """
-    features = [np.full(len(ordinal_day_list), parameters['NAN_VAL']) for x in range(n_features)]
+    features = [np.full(len(ordinal_day_list), nan_val) for x in range(n_features)]
     for index, ordinal_day in enumerate(ordinal_day_list):
         # print(index)
         for idx, cold_curve in enumerate(cold_plot):
@@ -74,7 +66,7 @@ def extract_features(cold_plot, band, ordinal_day_list, parameters, n_features, 
                         if n == 0:
                             # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
                             features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * ordinal_day / \
-                                          parameters['SLOPE_SCALE']
+                                          slope_scale
                         else:
                             features[n][index] = cold_curve['coefs'][band][n+1]  # n + 1 is because won't need slope as output
                     break
@@ -122,17 +114,19 @@ def datefilename_fromordinaldate(ordinal_date):
 
 def is_change_object(parameters, b_thematic, stats_lut_row, uniform_threshold, uniform_sizeslope, keyword):
     """
-    decide if a segment is change object
-    Args:
-        parameters: obcold parameter structure
-        b_thematic: True -> that has thematic inputs; False-> default parameters will be applied
-        stats_lut_row: a table of ['id', 'change magnitude', 'mode of lc category', 'pixel number']
-        uniform_threshold: grid searching usage
-        uniform_sizeslope: grid searching usage
-        keyword: keyword to calculate change magnitude, 'cm_average' or 'cm_median'
+    Parameters
+    ----------
+    parameters:
+        obcold parameter structure
+    b_thematic: True -> that has thematic inputs; False-> default parameters will be applied
+    stats_lut_row: a table of ['id', 'change magnitude', 'mode of lc category', 'pixel number']
+    uniform_threshold: grid searching usage, overwriting default parameters
+    uniform_sizeslope: grid searching usage, overwriting default parameters
+    keyword: string, keyword to calculate change magnitude, 'cm_average' or 'cm_median'
 
-    Returns:
-        True or false, True -> is a change object, False -> not a change object
+    Returns
+    -------
+
     """
     # LCMAP category id
     # developed_id: 1
@@ -334,53 +328,9 @@ def generate_sample_num(label, parameters):
     return percate_samples
 
 
-def extract_features(cold_plot, band, ordinal_day_list, parameters, n_features, ismat=False):
-    """
-    Extract features (such as harmonic coefficients) for classification from change records
-    Args:
-        cold_plot: plot-based rec_cg
-        band: band number, range from 0 to 6 for landsat
-        ordinal_day_list: the list of the ordinal prediction day for outputting features
-        parameters: obcold parameters
-        n_features: the number of features for classification, from 1 to 7. Note 1 is the combination of
-                    slope and intercept
-        ismat: True -> reading rec_cg from matlab outputs
 
-    Returns:
-        a list of predicted reflectance for ordinal_day_list
-
-    """
-    features = [np.full(len(ordinal_day_list), parameters['NAN_VAL']) for x in range(n_features)]
-    for index, ordinal_day in enumerate(ordinal_day_list):
-        # print(index)
-        for idx, cold_curve in enumerate(cold_plot):
-            if idx == len(cold_plot) - 1:
-                max_days = cold_plot[idx]['t_end']
-            else:
-                max_days = cold_plot[idx + 1]['t_start']
-            if cold_curve['t_start'] <= ordinal_day < max_days:
-                if ismat:
-                    for n in range(n_features):
-                        if n == 0:
-                            # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
-                            features[n][index] = cold_curve['coefs'][0][band] + cold_curve['coefs'][1][band] * ordinal_day
-                        else:
-                            features[n][index] = cold_curve['coefs'][n+1][band]
-                    break
-                else:
-                    for n in range(n_features):
-                        if n == 0:
-                            # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
-                            features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * ordinal_day / \
-                                          parameters['SLOPE_SCALE']
-                        else:
-                            features[n][index] = cold_curve['coefs'][band][n+1]  # n + 1 is because won't need slope as output
-                    break
-    return features
-
-
-def _check_inputs(parameters, stack_path, results_path, year_lowbound, year_uppbound, logger,
-                  thematic_mode, thematic_src, devel_mode):
+def _check_inputs(parameters, stack_path, results_path, year_lowbound, year_uppbound, thematic_mode, thematic_src,
+                  devel_mode):
     """
     Args:
         parameters:
@@ -416,8 +366,8 @@ def _check_inputs(parameters, stack_path, results_path, year_lowbound, year_uppb
         if os.path.exists(join(stack_path, 'starting_last_dates.txt')):
             raise FileExistsError('No starting_last_dates.txt, please specify year_lowbound and year_uppbound')
 
-    if thematic_mode in thematic_mode_types == False:
-        raise ValueError('thematic mode must be in {}'.format(thematic_mode_types))
+    if thematic_mode in thematic_mode_types is False:
+        raise ValueError('thematic mode must be in no_input, single_map, rf_model, multi_maps')
 
     if thematic_mode != 'no_input':
         if thematic_src is None:
@@ -441,7 +391,7 @@ class ObjectAnalyst:
         """
 
         try:
-            _check_inputs(parameters, parameters, stack_path, results_path, year_lowbound, year_uppbound,
+            _check_inputs(parameters, stack_path, results_path, year_lowbound, year_uppbound,
                           thematic_mode, thematic_src, devel_mode)
         except ValueError or FileExistsError as e:
             raise e
@@ -499,19 +449,19 @@ class ObjectAnalyst:
 
         """
         feature_list = [np.full(((self.year_uppbound - self.year_lowbound + 1) * self.parameters['block_height'],
-                                 self.parameters['block_width']), self.parameters['NAN_VAL'], dtype=np.float32)
-                        for x in range(self.parameters['TOTAL_IMAGE_BANDS'] * self.parameters['N_FEATURES'])]
+                                 self.parameters['block_width']), defaults['NAN_VAL'], dtype=np.float32)
+                        for x in range(defaults['TOTAL_IMAGE_BANDS'] * defaults['N_FEATURES'])]
 
         ordinal_day_list = [pd.Timestamp.toordinal(dt.date(year, 7, 1)) + 366 for year
                             in range(self.year_lowbound, self.year_uppbound + 1)]
-
+        current_block_x = get_block_x(block_id, self.parameters['n_block_x'])
+        current_block_y = get_block_y(block_id, self.parameters['n_block_x'])
         if ismat:
             rec_cg_path = os.path.join(self.results_path, 'record_change_r{}.mat'.format(str(row).zfill(5)))
             ccd_scanline = loadmat(rec_cg_path)['rec_cg'][0]
         else:
             rec_cg_path = join(self.results_path, 'record_change_x{}_y{}_cold.npy'
-                               .format(get_block_x(block_id, self.parameters['n_block_x'])),
-                               get_block_y(block_id, self.parameters['n_block_x']))
+                               .format(current_block_x, current_block_y))
             ccd_scanline = np.array(np.load(rec_cg_path))
 
         if len(ccd_scanline) == 0:
@@ -525,25 +475,24 @@ class ObjectAnalyst:
             if curve['pos'] != processing_pos:  # means all curve have been collected for processing_pos
                 if len(identical_pos_curve) == 0:
                     continue
-
-                if ismat:
-                    identical_pos_curve_np = np.array(identical_pos_curve)
+                identical_pos_curve_np = np.array(identical_pos_curve)
 
                 if identical_pos_curve_np[0]["pos"].size == 0:  # MATLAB empty array size == 0
                     continue
 
                 # i_col and i_row is the local location in each block
-                i_col = int((identical_pos_curve_np[0]["pos"] - 1) % parameters['n_cols']) - \
+                i_col = int((identical_pos_curve_np[0]["pos"] - 1) % self.parameters['n_cols']) - \
                             (current_block_x - 1) * self.parameters['block_width']
-                i_row = int((identical_pos_curve_np[0]["pos"] - 1) / parameters['n_cols']) - \
+                i_row = int((identical_pos_curve_np[0]["pos"] - 1) / self.parameters['n_cols']) - \
                             (current_block_y - 1) * self.parameters['block_height']
                 if i_col < 0:
                     self.logger.warning('Processing failed: i_row={}; i_col={} for {}'.format(i_row, i_col, rec_cg_path))
-                for band in range(parameters['TOTAL_IMAGE_BANDS']):
+                for band in range(defaults['TOTAL_IMAGE_BANDS']):
                     feature_row = extract_features(identical_pos_curve_np, band, ordinal_day_list,
-                                                   parameters, parameters['N_FEATURES'], ismat)
-                    for index in range(self.parameters['N_FEATURES']):
-                        feature_list[band * self.parameters['N_FEATURES'] + index][i_row * (self.year_uppbound -
+                                                   defaults['NAN_VAL'], defaults['SLOPE_SCALE'],
+                                                   defaults['N_FEATURES'], ismat)
+                    for index in range(defaults['N_FEATURES']):
+                        feature_list[band * defaults['N_FEATURES'] + index][i_row * (self.year_uppbound -
                                                                                                self.year_lowbound + 1):
                                                                                  (i_row + 1) * (self.year_uppbound -
                                                                                                 self.year_lowbound + 1),
@@ -576,11 +525,12 @@ class ObjectAnalyst:
                 if i_col < 0:
                     self.logger.warning('Processing failed: i_row={}; i_col={} for {}'.format(i_row, i_col, rec_cg_path))
 
-                for band in range(self.parameters['TOTAL_IMAGE_BANDS']):
+                for band in range(defaults['TOTAL_IMAGE_BANDS']):
                     feature_row = extract_features(identical_pos_curve_np, band, ordinal_day_list,
-                                                   self.parameters, self.parameters['N_FEATURES'], ismat)
-                    for index in range(self.parameters['N_FEATURES']):
-                        feature_list[band * self.parameters['N_FEATURES'] + index][i_row * (self.year_uppbound -
+                                                   defaults['NAN_VAL'], defaults['SLOPE_SCALE'],
+                                                   defaults['N_FEATURES'], ismat)
+                    for index in range(defaults['N_FEATURES']):
+                        feature_list[band * defaults['N_FEATURES'] + index][i_row * (self.year_uppbound -
                                      self.year_lowbound + 1): (i_row + 1) * (self.year_uppbound - self.year_lowbound + 1),
                                      i_col] = feature_row[index]
 
