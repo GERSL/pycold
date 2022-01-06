@@ -1,0 +1,77 @@
+""" Main bootstrap and configuration module for pycold.  Any module that
+requires configuration or services should import app and obtain the
+configuration or service from here.
+app.py enables a very basic but sufficient form of loose coupling
+by setting names of services & configuration once and allowing other modules
+that require these services/information to obtain them by name rather than
+directly importing or instantiating.
+Module level constructs are only evaluated once in a Python application's
+lifecycle, usually at the time of first import. This pattern is borrowed
+from Flask.
+source: https://github.com/repository-preservation/lcmap-pyclass/blob/develop/pyclass/app.py
+"""
+
+import os, logging
+import yaml
+import sys
+import numpy as np
+
+__format = '%(asctime)s.%(msecs)03d %(module)s::%(funcName)-20s - %(message)s'
+logging.basicConfig(stream=sys.stdout,
+                    level=logging.DEBUG,
+                    format=__format,
+                    Loader=yaml.FullLoader,
+                    datefmt='%Y-%m-%d %H:%M:%S')
+
+
+# Simplify parameter setting and make it easier for adjustment
+class Defaults(dict):
+    def __init__(self, config_path='parameters.yaml'):
+        with open(config_path, 'r') as f:
+            super(Defaults, self).__init__(yaml.load(f.read()))
+
+    def __getattr__(self, name):
+        if name in self:
+            return self[name]
+        else:
+            raise AttributeError('No such attribute: ' + name)
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+    def __delattr__(self, name):
+        if name in self:
+            del self[name]
+        else:
+            raise AttributeError('No such attribute: ' + name)
+
+
+defaults = Defaults(os.path.join(os.path.dirname(__file__), 'obcold_parameters.yaml'))
+
+
+def get_block_y(block_id, n_block_x):
+    """
+    Parameters
+    ----------
+    block_id: integer
+    n_block_x: integer, number of blocks at x xis
+
+    Returns
+    -------
+    current block id at y axis
+    """
+    return int(np.floor((block_id - 1) / n_block_x)) + 1
+
+
+def get_block_x(block_id, n_block_x):
+    """
+    Parameters
+    ----------
+    block_id: integer
+    n_block_x: integer, number of blocks at x xis
+
+    Returns
+    -------
+    current block id at x axis
+    """
+    return (block_id - 1) % n_block_x + 1

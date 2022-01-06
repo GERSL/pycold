@@ -8,3 +8,4 @@ _skbuild
 src/python/pycold/_pycold_cython*.so
 dist/*.whl
 build
+.idea
