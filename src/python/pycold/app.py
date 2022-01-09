@@ -45,7 +45,6 @@ class Defaults(dict):
             raise AttributeError('No such attribute: ' + name)
 
 
-defaults = Defaults(os.path.join(os.path.dirname(__file__), 'obcold_parameters.yaml'))
-
+defaults = Defaults(os.path.join(os.path.dirname(__file__), 'ob_parameters.yaml'))
 
 

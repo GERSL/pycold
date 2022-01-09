@@ -9,3 +9,4 @@ src/python/pycold/_pycold_cython*.so
 dist/*.whl
 build
 .idea
+src/python/console.py
