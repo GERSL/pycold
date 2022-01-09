@@ -1194,24 +1194,16 @@ int cold
 
     id_range = (int*)calloc(valid_num_scenes, sizeof(int));
 
+    // check if valid_date_array is sorted
+    for (i = 0; i < valid_num_scenes - 1; i++)
+        if (valid_date_array[i] > valid_date_array[i+1]){
+            RETURN_ERROR("The inputted data does not follow an ascending date!", FUNC_NAME, ERROR);
+        }
+
     status = preprocessing(buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
                            fmask_buf, &valid_num_scenes, id_range, &clear_sum,
                            &water_sum, &shadow_sum, &sn_sum, &cloud_sum);
     // printf("preprocessing finished \n");
-      /* checking inputs */
-//    for (i = 0; i < valid_num_scenes; i++)
-//    {
-//        printf("fmask_buf: %d\n", (short int)fmask_buf[i]);
-//        printf("valid_date_array: %d\n", (int)valid_date_array[i]);
-
-//        printf("id: %d\n", (int)id_range[i]);
-//        for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
-//        {
-//           printf("buf: %d\n", (int)buf[k][i]);
-//           //printf("clry: %f\n", (double)clry[k][i]);
-//        }
-
-//    }
 
     if (status != SUCCESS)
     {

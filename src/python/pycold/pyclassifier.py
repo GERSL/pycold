@@ -83,8 +83,10 @@ def generate_sample_num(label, sample_parameters):
         counts_category[unique_category[x]-1] = unique_counts_category[x]
     percate_samples = np.array([round(x * sample_parameters['total_samples'] / sum(counts_category)) for x in
                                 counts_category])
-    percate_samples[percate_samples > sample_parameters['max_category_samples']] = sample_parameters['max_category_samples']
-    percate_samples[percate_samples < sample_parameters['min_category_samples']] = sample_parameters['min_category_samples']
+    percate_samples[percate_samples > sample_parameters['max_category_samples']] = \
+        sample_parameters['max_category_samples']
+    percate_samples[percate_samples < sample_parameters['min_category_samples']] = \
+        sample_parameters['min_category_samples']
     percate_samples = np.minimum(percate_samples, counts_category)  # needs to check not exceed the total category pixels
     return percate_samples
 
@@ -110,14 +112,23 @@ class PyClassifier:
         """
         Parameters
         ----------
-        block_id
-        cold_block
-        year_lowbound
-        year_uppbound
-        ismat
-        Returns: [year_range, block_width*block_height, n_features]
+        block_id: integer
+            the block id
+        cold_block: nested array of colddt datatype
+            the block-based change records produced by cold algorithms
+        year_lowbound: integer
+            the lower bound of the analysis year range
+        year_uppbound: integer
+            the upper bound of the analysis year range
+            Note that the reason for not parsing cold_block to get year bounds is that the year ranges of blocks
+            may vary from each other, so the year bounds are required to be defined from the tile level, not block level
+            such as from 'starting_end_date.txt'
+        ismat:boolean
+            True -> the input is MATLAB-outputted change records
+
+        Returns
         -------
-            block_features
+        an array [year_uppbound-year_lowbound+1, block_width*block_height, n_features]
         """
         block_features = np.full(((year_uppbound - year_lowbound + 1),
                                   self.config['block_width'] * self.config['block_height'],
@@ -149,6 +160,16 @@ class PyClassifier:
         return block_features
 
     def assemble_array(self, array_list):
+        """
+        assemble a list of block-based array to a bigger array that aligns with the dimension of an ARD tile
+        Parameters
+        ----------
+        array_list
+
+        Returns
+        -------
+        an array [nrows, ncols]
+        """
         full_feature_array = np.hstack(array_list)
         full_feature_array = np.vstack(np.hsplit(full_feature_array, self.config['n_block_x']))  # (nrows, ncols, nfeatures)
         return full_feature_array
@@ -199,16 +220,17 @@ class PyClassifier:
         cmap[mask] = 255
         return cmap
 
+
 class PyClassifierHPC(PyClassifier):
     """
     this class adds new IO functions in the HPC environment for the base class
     """
-    def __init__(self, parameters, stack_path, results_path, n_features=None, year_lowbound=None, year_uppbound=None,
+    def __init__(self, config, stack_path, results_path, n_features=None, year_lowbound=None, year_uppbound=None,
                  model_ready=False, thematic_src=None):
         """
         Parameters
         ----------
-        parameters
+        config: configuration structure from config.yaml
         stack_path
         results_path
         year_lowbound
@@ -217,12 +239,12 @@ class PyClassifierHPC(PyClassifier):
         thematic_src
         """
         try:
-            self._check_inputs_thematic(parameters, stack_path, results_path, year_lowbound, year_uppbound, model_ready,
+            self._check_inputs_thematic(config, stack_path, results_path, year_lowbound, year_uppbound, model_ready,
                                         thematic_src)
         except ValueError or FileExistsError as e:
             raise e
 
-        self.config = parameters
+        self.config = config
         self.config['block_width'] = int(self.config['n_cols'] / self.config['n_block_x'])
         self.config['block_height'] = int(self.config['n_rows'] / self.config['n_block_y'])
         self.config['n_blocks'] = self.config['n_block_x'] * self.config['n_block_y']
@@ -245,7 +267,8 @@ class PyClassifierHPC(PyClassifier):
         self.model_ready = model_ready
         self.thematic_src = thematic_src
 
-    def _check_inputs_thematic(self, parameters, stack_path, results_path, year_lowbound, year_uppbound, model_ready,
+    @staticmethod
+    def _check_inputs_thematic(parameters, stack_path, results_path, year_lowbound, year_uppbound, model_ready,
                                thematic_src):
         if type(parameters['n_rows']) != int or parameters['n_rows'] < 0:
             raise ValueError('n_rows must be positive integer')
@@ -272,11 +295,6 @@ class PyClassifierHPC(PyClassifier):
                 raise ValueError('thematic_src must be assigned as value if model_ready is True')
 
     def preparation(self):
-        """
-        Returns
-        -------
-
-        """
         if not exists(self.out_thematic_path):
             os.makedirs(self.out_thematic_path)
 
@@ -297,9 +315,6 @@ class PyClassifierHPC(PyClassifier):
                     block_features[i, :, :])
 
     def is_finished_step1_predict_features(self, in_path):
-        """
-        :return: True or false
-        """
         return any(exists(join(in_path, 'tmp_feature_year{}_block{}.npy').format(year, block + 1))
                    for block in range(self.config['n_blocks']) for year in range(self.year_lowbound,
                                                                                       self.year_uppbound+1))

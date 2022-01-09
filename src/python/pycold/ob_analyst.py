@@ -64,16 +64,16 @@ def datefilename_fromordinaldate(ordinal_date):
                                                                            - 366).timetuple().tm_yday).zfill(3))
 
 
-def is_change_object(parameters, b_thematic, stats_lut_row, uniform_threshold, uniform_sizeslope, keyword):
+def is_change_object(config, b_thematic, stats_lut_row, uniform_threshold, uniform_sizeslope, keyword):
     """
-    Parameters
+    config
     ----------
-    parameters:
+    config:
         obcold parameter structure
-    b_thematic: True -> that has thematic inputs; False-> default parameters will be applied
+    b_thematic: True -> that has thematic inputs; False-> default config will be applied
     stats_lut_row: a table of ['id', 'change magnitude', 'mode of lc category', 'pixel number']
-    uniform_threshold: grid searching usage, overwriting default parameters
-    uniform_sizeslope: grid searching usage, overwriting default parameters
+    uniform_threshold: grid searching usage, overwriting default config
+    uniform_sizeslope: grid searching usage, overwriting default config
     keyword: string, keyword to calculate change magnitude, 'cm_average' or 'cm_median'
 
     Returns
@@ -93,17 +93,17 @@ def is_change_object(parameters, b_thematic, stats_lut_row, uniform_threshold, u
     log10_size = np.log10(int(stats_lut_row['npixels']))
     intercept = 1
     if b_thematic == False:
-        # intercept = 1 - parameters['default_sizeslope']
-        if log10_size * parameters['default_sizeslope'] + intercept < 2:
-            scale = log10_size * parameters['default_sizeslope'] + intercept
+        # intercept = 1 - config['default_sizeslope']
+        if log10_size * config['default_sizeslope'] + intercept < 2:
+            scale = log10_size * config['default_sizeslope'] + intercept
         else:
             scale = 2
-        if np.double(stats_lut_row[keyword]) * scale > parameters['default_threshold']:
+        if np.double(stats_lut_row[keyword]) * scale > config['default_threshold']:
             return True
         else:
             return False
     else:
-        if uniform_threshold != parameters['NAN_VAL'] and uniform_sizeslope != parameters['NAN_VAL']:
+        if uniform_threshold != config['NAN_VAL'] and uniform_sizeslope != config['NAN_VAL']:
             # intercept = 1 - uniform_sizeslope
             if log10_size * uniform_sizeslope + intercept < 2:
                 scale = log10_size * uniform_sizeslope + intercept
@@ -115,92 +115,92 @@ def is_change_object(parameters, b_thematic, stats_lut_row, uniform_threshold, u
                 return False
         else:
             if int(stats_lut_row['mode']) == 255:
-                # intercept = 1 - parameters['default_sizeslope']
-                if log10_size * parameters['default_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['default_sizeslope'] + intercept
+                # intercept = 1 - config['default_sizeslope']
+                if log10_size * config['default_sizeslope'] + intercept < 2:
+                    scale = log10_size * config['default_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['default_threshold']:
+                if float(stats_lut_row[keyword]) * scale > config['default_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 1:  # develop in LCMAP
-                # intercept = 1 - parameters['C1_sizeslope']
-                if log10_size * parameters['C1_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['C1_sizeslope'] + intercept
+                # intercept = 1 - config['C1_sizeslope']
+                if log10_size * config['C1_sizeslope'] + intercept < 2:
+                    scale = log10_size * config['C1_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['C1_threshold']:
+                if float(stats_lut_row[keyword]) * scale > config['C1_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 2:  # cropland in LCMAP
-                # intercept = 1 - parameters['C2_sizeslope']
-                if log10_size * parameters['C2_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['C2_sizeslope'] + intercept
+                # intercept = 1 - config['C2_sizeslope']
+                if log10_size * config['C2_sizeslope'] + intercept < 2:
+                    scale = log10_size * config['C2_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['C2_threshold']:
+                if float(stats_lut_row[keyword]) * scale > config['C2_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 3:  # grassland in LCMAP
-                # intercept = 1 - parameters['C3_sizeslope']
-                if log10_size * parameters['C3_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['C3_sizeslope'] + intercept
+                # intercept = 1 - config['C3_sizeslope']
+                if log10_size * config['C3_sizeslope'] + intercept < 2:
+                    scale = log10_size * config['C3_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['C3_threshold']:
+                if float(stats_lut_row[keyword]) * scale > config['C3_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 4:  # forest in LCMAP
-                # intercept = 1 - parameters['C4_sizeslope']
-                if log10_size * parameters['C4_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['C4_sizeslope'] + intercept
+                # intercept = 1 - config['C4_sizeslope']
+                if log10_size * config['C4_sizeslope'] + intercept < 2:
+                    scale = log10_size * config['C4_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['C4_threshold']:
+                if float(stats_lut_row[keyword]) * scale > config['C4_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 5:  # water in LCMAP
-                # intercept = 1 - parameters['C5_sizeslope']
-                if log10_size * parameters['C5_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['C5_sizeslope'] + intercept
+                # intercept = 1 - config['C5_sizeslope']
+                if log10_size * config['C5_sizeslope'] + intercept < 2:
+                    scale = log10_size * config['C5_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['C5_threshold']:
+                if float(stats_lut_row[keyword]) * scale > config['C5_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 6:  # wetland in LCMAP
-                # intercept = 1 - parameters['C6_sizeslope']
-                if log10_size * parameters['C6_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['C6_sizeslope'] + intercept
+                # intercept = 1 - config['C6_sizeslope']
+                if log10_size * config['C6_sizeslope'] + intercept < 2:
+                    scale = log10_size * config['C6_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['C6_threshold']:
+                if float(stats_lut_row[keyword]) * scale > config['C6_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 7:  # ice in LCMAP
-                # intercept = 1 - parameters['C7_sizeslope']
-                if log10_size * parameters['C7_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['C7_sizeslope'] + intercept
+                # intercept = 1 - config['C7_sizeslope']
+                if log10_size * config['C7_sizeslope'] + intercept < 2:
+                    scale = log10_size * config['C7_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['C7_threshold']:
+                if float(stats_lut_row[keyword]) * scale > config['C7_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 8:  # barren in LCMAP
-                # intercept = 1 - parameters['C8_sizeslope']
-                if log10_size * parameters['C8_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['C8_sizeslope'] + intercept
+                # intercept = 1 - config['C8_sizeslope']
+                if log10_size * config['C8_sizeslope'] + intercept < 2:
+                    scale = log10_size * config['C8_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['C8_threshold']:
+                if float(stats_lut_row[keyword]) * scale > config['C8_threshold']:
                     return True
                 else:
                     return False
@@ -260,23 +260,44 @@ def mode_median_by(input_array_mode, input_array_median, index_array):
 
 
 class ObjectAnalyst:
-    def __init__(self, parameters, stack_path, results_path, thematic_mode='no_input', thematic_src=None):
+    def __init__(self, config, results_path, model_ready=False, thematic_src=None):
         """
-        Parameters
-        ----------
         parameters
-        stack_path
+        ----------
+        config
         results_path
         year_lowbound
         year_uppbound
         thematic_mode
         thematic_src
         """
-        self.parameters = parameters
+        self.config = config
         self.results_path = results_path
-        self.thematic_mode = thematic_mode
+        self.model_ready = model_ready
         self.thematic_src = thematic_src
         self.obiaresults_path = join(results_path, 'OBIAresults')
+
+    @staticmethod
+    def _check_inputs(parameters, stack_path, results_path, model_ready,thematic_src):
+        if type(parameters['n_rows']) != int or parameters['n_rows'] < 0:
+            raise ValueError('n_rows must be positive integer')
+        if type(parameters['n_cols']) != int or parameters['n_cols'] < 0:
+            raise ValueError('n_cols must be positive integer')
+        if type(parameters['n_block_x']) != int or parameters['n_block_x'] < 0:
+            raise ValueError('n_block_x must be positive integer')
+        if type(parameters['n_block_y']) != int or parameters['n_block_y'] < 0:
+            raise ValueError('n_block_y must be positive integer')
+        if type(parameters['n_block_y']) != int or parameters['n_block_y'] < 0:
+            raise ValueError('n_block_y must be positive integer')
+
+        if os.path.isdir(stack_path) is False:
+            raise FileExistsError('No such directory: {}'.format(stack_path))
+        if os.path.isdir(results_path) is False:
+            raise FileExistsError('No such directory: {}'.format(results_path))
+        if model_ready:
+            if thematic_src is None:
+                raise ValueError('thematic_src must be assigned as value if model_ready is True')
+
 
     def hpc_preparation(self):
         """
@@ -286,7 +307,6 @@ class ObjectAnalyst:
         """
         if not exists(self.obiaresults_path):
             os.makedirs(self.obiaresults_path)
-
 
     def get_classification(self, date):
         if pd.Timestamp.fromordinal(date - 366).year - 1 < self.year_lowbound:  # we used the the year before the date
@@ -300,8 +320,8 @@ class ObjectAnalyst:
             classification_map = gdal_array.LoadFile(
                 join(self.thematic_src, 'yearlyclassification_{}.tif'.format(classified_year)))
         else:
-            classification_map = np.full((self.parameters['n_rows'], self.parameters['n_cols']),
-                                         self.parameters['NAN_VAL'],
+            classification_map = np.full((self.config['n_rows'], self.config['n_cols']),
+                                         self.config['NAN_VAL'],
                                          dtype=np.int32)
         return classification_map
 
@@ -312,71 +332,71 @@ class ObjectAnalyst:
         peak_threshold = chi2.ppf(0.95, 5)
 
         # assign valid CM values in the stack into current cm array where NA values are
-        cm_array[cm_array == self.parameters['NAN_VAL']] = cm_array_l1[cm_array == self.parameters['NAN_VAL']]
+        cm_array[cm_array == self.config['NAN_VAL']] = cm_array_l1[cm_array == self.config['NAN_VAL']]
 
-        # parameters['NAN_VAL_UINT8'], i.e., 255, is also the NA value of direction.
-        cm_direction_array[cm_direction_array == self.parameters['NAN_VAL_UINT8']] = \
-            cm_array_l1_direction[cm_direction_array == self.parameters['NAN_VAL_UINT8']]
+        # config['NAN_VAL_UINT8'], i.e., 255, is also the NA value of direction.
+        cm_direction_array[cm_direction_array == self.config['NAN_VAL_UINT8']] = \
+            cm_array_l1_direction[cm_direction_array == self.config['NAN_VAL_UINT8']]
 
-        cm_date_array[cm_date_array == self.parameters['NAN_VAL']] = \
-            cm_array_l1_date[cm_date_array == self.parameters['NAN_VAL']]
+        cm_date_array[cm_date_array == self.config['NAN_VAL']] = \
+            cm_array_l1_date[cm_date_array == self.config['NAN_VAL']]
 
         if devel_mode is True:
             gdal_save_file_1band(join(self.obiaresults_path, filenm + '_cm_array.tif'), cm_array,
-                                 gdal.GDT_Float32, self.trans, self.proj, self.parameters['n_cols'],
-                                 self.parameters['n_rows'])
+                                 gdal.GDT_Float32, self.trans, self.proj, self.config['n_cols'],
+                                 self.config['n_rows'])
             gdal_save_file_1band(join(self.obiaresults_path, filenm + '_cm_direction_array.tif'), cm_direction_array,
-                                 gdal.GDT_Byte, self.trans, self.proj, self.parameters['n_cols'],
-                                 self.parameters['n_rows'])
+                                 gdal.GDT_Byte, self.trans, self.proj, self.config['n_cols'],
+                                 self.config['n_rows'])
 
         #######################################################################################
         #                               Scale 1: change superpixel                            #
         #######################################################################################
-        cm_array[cm_array < peak_threshold * (1 - self.parameters['floodfill_thres'])] = np.nan
+        cm_array[cm_array < peak_threshold * (1 - self.config['floodfill_thres'])] = np.nan
         bandwidth = 1
         
         # using gaussian kernel ( with 1 sigma value) to smooth images in preparation for floodfill
         kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
         cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary='extend', preserve_nan=True)
-        cm_array_gaussian_s1[np.isnan(cm_array)] = self.parameters['NAN_VAL']
+        cm_array_gaussian_s1[np.isnan(cm_array)] = self.config['NAN_VAL']
 
         # cm_array_gaussian_s1 = cm_array  # try not using gaussian
         if devel_mode is True:
             gdal_save_file_1band(join(self.obiaresults_path, filenm + '_cm_array_gaussian_s1.tif'),
                                  cm_array_gaussian_s1,
-                                 gdal.GDT_Float32, self.trans, self.proj, self.parameters['n_cols'],
-                                 self.parameters['n_rows'])
+                                 gdal.GDT_Float32, self.trans, self.proj, self.config['n_cols'],
+                                 self.config['n_rows'])
 
         seed_index = peak_local_max(cm_array_gaussian_s1, threshold_abs=peak_threshold,
                                     exclude_border=False, min_distance=0)
         # seed_index = np.flip(seed_index, axis=0)
 
-        seed_labels = np.zeros((self.parameters['n_rows'], self.parameters['n_cols']))
+        seed_labels = np.zeros((self.config['n_rows'], self.config['n_cols']))
         seed_labels[tuple(np.transpose(seed_index))] = 1
         if devel_mode:
             gdal_save_file_1band(join(self.obiaresults_path, filenm + '_seed.tif'), seed_labels,
-                                 gdal.GDT_Byte, self.trans, self.proj, self.parameters['n_cols'],
-                                 self.parameters['n_rows'])
+                                 gdal.GDT_Byte, self.trans, self.proj, self.config['n_cols'],
+                                 self.config['n_rows'])
 
-        mask_s1 = np.zeros((self.parameters['n_rows'] + 2, self.parameters['n_cols'] + 2)).astype(np.uint8)
-        mask_label_s1 = np.zeros((self.parameters['n_rows'] + 2, self.parameters['n_cols'] + 2))
+        mask_s1 = np.zeros((self.config['n_rows'] + 2, self.config['n_cols'] + 2)).astype(np.uint8)
+        mask_label_s1 = np.zeros((self.config['n_rows'] + 2, self.config['n_cols'] + 2))
         floodflags_base = 8
         floodflags_base |= cv2.FLOODFILL_MASK_ONLY
         floodflags_base |= cv2.FLOODFILL_FIXED_RANGE
         no = 0
         i = 0
         cm_stack = np.dstack([cm_array_gaussian_s1, cm_direction_array, cm_date_array]).astype(np.float32)
-        # parameters['floodfill_thres'] = 0.5
+        # config['floodfill_thres'] = 0.5
         for i in range(len(seed_index)):
             # print(i)
             remainder = i % 255
             floodflags = floodflags_base | ((remainder + 1) << 8)
             seedcm = cm_array_gaussian_s1[tuple(seed_index[i])]
             num, im, mask_s1, rect = floodFill(cm_stack, mask_s1, tuple(reversed(seed_index[i])), 0,
-                                               loDiff=[seedcm * self.parameters['floodfill_thres'], 0,
-                                                       self.parameters['CM_OUTPUT_INTERVAL']],
-                                               upDiff=[seedcm * self.parameters['floodfill_thres'], 0,
-                                                       self.parameters['CM_OUTPUT_INTERVAL']],
+                                               loDiff=[seedcm * self.config['floodfill_thres'], 0,
+                                                       self.config['CM_OUTPUT_INTERVAL']],
+                                               upDiff=[seedcm * self.config['floodfill_thres'], 0,
+                                                       self.config['CM_OUTPUT_INTERVAL']],
                                                flags=floodflags)
             # the opencv mask only supports 8-bit, so every 255 seed needs to update values in mask_label
             if remainder == 254:
@@ -396,13 +416,13 @@ class ObjectAnalyst:
             mask_label_s1[(mask_label_s1 == 0) & (mask_s1 > 0)] = mask_s1[(mask_label_s1 == 0) & (mask_s1 > 0)].astype(
                 int) + no * 255
 
-        object_map_s1 = mask_label_s1[1:self.parameters['n_rows'] + 1, 1:self.parameters['n_cols'] + 1]
+        object_map_s1 = mask_label_s1[1:self.config['n_rows'] + 1, 1:self.config['n_cols'] + 1]
 
         if devel_mode:
             gdal_save_file_1band(
                 os.path.join(self.obiaresults_path, filenm + '_floodfill_gaussian_{}_s1.tif'.format(bandwidth)),
-                object_map_s1, gdal.GDT_Int32, self.trans, self.proj, self.parameters['n_rows'],
-                self.parameters['n_cols'])
+                object_map_s1, gdal.GDT_Int32, self.trans, self.proj, self.config['n_rows'],
+                self.config['n_cols'])
 
         #######################################################################################
         #                                 Scale 2: change patch                              #
@@ -411,32 +431,32 @@ class ObjectAnalyst:
         # create a object-based change
         unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
         mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
-        mean_list[unq_s1 == 0] = self.parameters['NAN_VAL']  # force mean of unchanged objects to be -9999
+        mean_list[unq_s1 == 0] = self.config['NAN_VAL']  # force mean of unchanged objects to be -9999
         lut_dict_s1 = dict(zip(unq_s1, mean_list))
         cm_array_s2 = np.vectorize(lut_dict_s1.get)(object_map_s1)
 
         bandwidth = 1
         # using gaussian kernel ( with 0.5 sigma value) to smooth images in preparation for floodfill
-        # cm_array_s2[cm_array_s2 == parameters['NAN_VAL']] = np.nan
+        # cm_array_s2[cm_array_s2 == config['NAN_VAL']] = np.nan
         # kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
         # cm_array_gaussian_s2 = convolve(cm_array_s2, kernel, boundary='extend', preserve_nan=True)
-        # cm_array_gaussian_s2[np.isnan(cm_array_s2)] = parameters['NAN_VAL']
+        # cm_array_gaussian_s2[np.isnan(cm_array_s2)] = config['NAN_VAL']
 
         cm_array_gaussian_s2 = cm_array_s2  # not using gaussian
         if devel_mode:
             gdal_save_file_1band(join(self.obiaresults_path,  filenm + '_cm_array_gaussian_s2.tif'),
                                  cm_array_gaussian_s2,
-                                 gdal.GDT_Float32, self.trans, self.proj, self.parameters['n_cols'],
-                                 self.parameters['n_rows'])
+                                 gdal.GDT_Float32, self.trans, self.proj, self.config['n_cols'],
+                                 self.config['n_rows'])
 
-        mask_s2 = np.zeros((self.parameters['n_rows'] + 2, self.parameters['n_cols'] + 2)).astype(np.uint8)
-        mask_label_s2 = np.zeros((self.parameters['n_rows'] + 2, self.parameters['n_cols'] + 2))
+        mask_s2 = np.zeros((self.config['n_rows'] + 2, self.config['n_cols'] + 2)).astype(np.uint8)
+        mask_label_s2 = np.zeros((self.config['n_rows'] + 2, self.config['n_cols'] + 2))
         floodflags_base = 8
         floodflags_base |= cv2.FLOODFILL_MASK_ONLY
         i = 0
         cm_array_gaussian_s2 = cm_array_gaussian_s2.astype(np.float32)
         # cm_stack = np.dstack([cm_array_gaussian_s2, cm_direction_array, cm_direction_array]).astype(np.float32)
-        # parameters['floodfill_thres'] = 0.5
+        # config['floodfill_thres'] = 0.5
         for i in range(len(seed_index)):
             # print(i)
             remainder = i % 255
@@ -464,12 +484,12 @@ class ObjectAnalyst:
             mask_label_s2[(mask_label_s2 == 0) & (mask_s2 > 0)] = mask_s2[(mask_label_s2 == 0) & (mask_s2 > 0)].astype(
                 int) + no * 255
 
-        object_map_s2 = mask_label_s2[1:self.parameters['n_rows'] + 1, 1:self.parameters['n_cols'] + 1]
+        object_map_s2 = mask_label_s2[1:self.config['n_rows'] + 1, 1:self.config['n_cols'] + 1]
         if devel_mode:
             gdal_save_file_1band(
                 join(self.obiaresults_path,  'test_floodfill_gaussian_{}_s2.tif'.format(bandwidth)),
-                object_map_s2, gdal.GDT_Int32, self.trans, self.proj, self.parameters['n_rows'],
-                self.parameters['n_cols'])
+                object_map_s2, gdal.GDT_Int32, self.trans, self.proj, self.config['n_rows'],
+                self.config['n_cols'])
 
         return object_map_s1, object_map_s2, ids_s1, unq_s1, mean_list
 
@@ -478,7 +498,7 @@ class ObjectAnalyst:
         #######################################################################################
         #                                 object-based decision                               #
         #######################################################################################
-        change_map = np.zeros((self.parameters['n_rows'], self.parameters['n_cols'])).astype(np.uint8)
+        change_map = np.zeros((self.config['n_rows'], self.config['n_cols'])).astype(np.uint8)
         change_group = []
 
         if devel_mode:
@@ -511,7 +531,7 @@ class ObjectAnalyst:
                 else:
                     b_thematic = True
                 # print(count)
-                if is_change_object(self.parameters, b_thematic, stats_lut_row, uniform_threshold, uniform_sizeslope,
+                if is_change_object(self.config, b_thematic, stats_lut_row, uniform_threshold, uniform_sizeslope,
                                     'cm_average'):
                     change_group.append(index)
 
@@ -521,8 +541,8 @@ class ObjectAnalyst:
 
         # if devel_mode:
         #     gdal_save_file_1band(join(self.obiaresults_path, filenm + '_OBIAresult.tif'), change_map,
-        #                          gdal.GDT_Byte, self.trans, self.proj, self.parameters['n_cols'],
-        #                          self.parameters['n_rows'])
+        #                          gdal.GDT_Byte, self.trans, self.proj, self.config['n_cols'],
+        #                          self.config['n_rows'])
         # else:
         #     np.save(join(self.obiaresults_path, filenm + '_OBIAresult.tif'), change_map)
 
@@ -539,13 +559,13 @@ class ObjectAnalyst:
         else:
             np.save(join(self.obiaresults_path, filenm + '_OBIAresult.npy'), change_map)
         
-    def checkfinished_object_analysis(self):
+    def is_finished_object_analysis(self):
         """
         :return:
         """
-        for n in range(self.parameters['n_cm_maps']):
-            if not exists(join(self.obiaresults_path, filename_fromordinaldate(self.parameters['starting_date'] +
-                                                                        n * self.parameters['CM_OUTPUT_INTERVAL']) +
+        for n in range(self.config['n_cm_maps']):
+            if not exists(join(self.obiaresults_path, filename_fromordinaldate(self.config['starting_date'] +
+                                                                        n * self.config['CM_OUTPUT_INTERVAL']) +
                                                '_OBIAresult.tif')):
                 return False
         return True
