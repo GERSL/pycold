@@ -18,7 +18,7 @@ from sklearn.ensemble import RandomForestClassifier
 import joblib
 from scipy.stats import chi2
 from os.path import join, exists
-from shared import gdal_save_file_1band
+from utils import gdal_save_file_1band
 from pycold.app import defaults, logging
 from pycold.utils import get_block_y, get_block_x, get_col_index, get_row_index
 
