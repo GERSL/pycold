@@ -1,5 +1,4 @@
-# This script is used to convert change records produced by the COLD algorithm to disturbance maps, including recent
-# disturbance maps and yearly disturbance maps
+# FOR coldC PostProcessing
 import os
 import numpy as np
 import pandas as pd
@@ -54,22 +53,11 @@ def getcategory_obcold(cold_plot, i_curve, last_dist_type):
 @click.option('--reccg_path', type=str, help='rec_cg folder')
 @click.option('--reference_path', type=str, help='image path used to provide georeference for output images')
 @click.option('--out_path', type=str, help='output folder for saving image')
-@click.option('--method', type=str, default='COLD', help='COLD, OBCOLD or Scold')
+@click.option('--method', type=click.Choice(['COLD', 'OBCOLD', 'SCCD']), default='COLD', help='the algorithm used for processing')
 @click.option('--yaml_path', type=str, help='path for yaml file')
 @click.option('--year_lowbound', type=int, default=1982, help='the starting year for exporting')
 @click.option('--year_uppbound', type=int, default=2020, help='the ending year for exporting')
 def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbound, yaml_path):
-    # reference_path = '/Users/coloury/Dropbox/UCONN/spatial/test_results/h016v010/recentdist_map_COLD.tif'
-    # method = 'COLD'
-    # reccg_path ='/Users/coloury/Dropbox/UCONN/spatial/test_results/h030v006/july_version'
-    # mode = 'r'
-    # out_path = '/Users/coloury/tmp'
-    # targeted_year = 0
-    # results_block = np.full(cols, -9999, dtype=np.int32)
-    # threads = 1
-    # is_mat = False
-    # singlerow_execution(reccg_path, filename, dt, cols, method, mode, targeted_year, t_c, bias, i_row, results_block)
-
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     n_process = comm.Get_size()
@@ -122,39 +110,36 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
         with open(yaml_path, 'r') as yaml_obj:
             parameters = yaml.safe_load(yaml_obj)
 
-        obcold_params = parameters['obcold']
-        obcold_params.update(parameters['common'])
-        obcold_params['block_width'] = int(obcold_params['n_cols'] / obcold_params['n_block_x'])  # width of a block
-        obcold_params['block_height'] = int(obcold_params['n_rows'] / obcold_params['n_block_y'])  # height of a block
-        obcold_params['n_blocks'] = obcold_params['n_block_x'] * obcold_params['n_block_y']  # total number of blocks
+        parameters['block_width'] = int(parameters['n_cols'] / parameters['n_block_x'])  # width of a block
+        parameters['block_height'] = int(parameters['n_rows'] / parameters['n_block_y'])  # height of a block
+        parameters['n_blocks'] = parameters['n_block_x'] * parameters['n_block_y']  # total number of blocks
     else:
         trans = None
         proj = None
         cols = None
         rows = None
-        obcold_params = None
+        parameters = None
 
     trans = comm.bcast(trans, root=0)
     proj = comm.bcast(proj, root=0)
     cols = comm.bcast(cols, root=0)
     rows = comm.bcast(rows, root=0)
-    obcold_params = comm.bcast(obcold_params, root=0)
+    parameters = comm.bcast(parameters, root=0)
 
-    ranks_percore = int(np.ceil(obcold_params['n_blocks'] / n_process))
-    print(rank, n_process)
+    ranks_percore = int(np.ceil(parameters['n_blocks'] / n_process))
     for i in range(ranks_percore):
         iblock = n_process * i + rank
-        if iblock > obcold_params['n_blocks']:
+        if iblock > parameters['n_blocks']:
             break
-        current_block_y = int(np.floor(iblock / obcold_params['n_block_x'])) + 1
-        current_block_x = iblock % obcold_params['n_block_x'] + 1
+        current_block_y = int(np.floor(iblock / parameters['n_block_x'])) + 1
+        current_block_x = iblock % parameters['n_block_x'] + 1
         if method == 'OBCOLD':
             filename = 'record_change_x{}_y{}_obcold.npy'.format(current_block_x, current_block_y)
         else:
             filename = 'record_change_x{}_y{}_cold.npy'.format(current_block_x, current_block_y)
         cold_block = np.array(np.load(os.path.join(reccg_path, filename)), dtype=dt)
         # cold_block = [np.array(element, dtype=dt) for element in cold_block]
-        results_block = [np.full((obcold_params['block_height'], obcold_params['block_width']), -9999, dtype=np.int32)
+        results_block = [np.full((parameters['block_height'], parameters['block_width']), -9999, dtype=np.int32)
                          for t in range(year_uppbound - year_lowbound + 1)]
         if len(cold_block) == 0:
             print('the rec_cg file {} is missing'.format(dat_pth))
@@ -175,10 +160,10 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
             if curve['change_prob'] < 100 or curve['t_break'] == 0:  # last segment
                 continue
 
-            i_col = int((curve["pos"] - 1) % obcold_params['n_cols']) - \
-                    (current_block_x - 1) * obcold_params['block_width']
-            i_row = int((curve["pos"] - 1) / obcold_params['n_cols']) - \
-                    (current_block_y - 1) * obcold_params['block_height']
+            i_col = int((curve["pos"] - 1) % parameters['n_cols']) - \
+                    (current_block_x - 1) * parameters['block_width']
+            i_row = int((curve["pos"] - 1) / parameters['n_cols']) - \
+                    (current_block_y - 1) * parameters['block_height']
             if i_col < 0:
                 print('Processing {} failed: i_row={}; i_col={} for {}'.format(filename,
                                                                                   i_row, i_col, dat_pth))
@@ -207,12 +192,12 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
         # assemble
         for year in range(year_lowbound, year_uppbound + 1):
             tmp_map_blocks = [np.load(os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(x+1, year)))
-                              for x in range(obcold_params['n_blocks'])]
+                              for x in range(parameters['n_blocks'])]
 
             results = np.hstack(tmp_map_blocks)
-            results = np.vstack(np.hsplit(results, obcold_params['n_block_x']))
+            results = np.vstack(np.hsplit(results, parameters['n_block_x']))
 
-            for x in range(obcold_params['n_blocks']):
+            for x in range(parameters['n_blocks']):
                 os.remove(os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(x+1, year)))
             mode_string = str(year) + '_break_map'
             outname = '{}_{}.tif'.format(mode_string, method)
@@ -227,7 +212,7 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
             outdata.FlushCache()
 
         # output recent disturbance year
-        recent_dist = np.full((obcold_params['n_rows'], obcold_params['n_cols']), 0, dtype=np.int16)
+        recent_dist = np.full((parameters['n_rows'], parameters['n_cols']), 0, dtype=np.int16)
         for year in range(year_lowbound, year_uppbound + 1):
             mode_string = str(year) + '_break_map'
             outname = '{}_{}.tif'.format(mode_string, method)

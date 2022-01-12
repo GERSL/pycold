@@ -31,6 +31,13 @@ import yaml
 import pandas as pd
 from os.path import isfile, join, isdir
 
+# define constant here
+QA_CLEAR = 0
+QA_WATER = 1
+QA_SHADOW = 2
+QA_SNOW = 3
+QA_CLOUD = 4
+QA_FILL = 255
 
 def mask_value(vector, val):
     """
@@ -45,28 +52,7 @@ def mask_value(vector, val):
     return vector == val
 
 
-class Parameters(dict):
-    def __init__(self, params):
-
-        super(Parameters, self).__init__(params)
-
-    def __getattr__(self, name):
-        if name in self:
-            return self[name]
-        else:
-            raise AttributeError('No such attribute: ' + name)
-
-    def __setattr__(self, name, value):
-        self[name] = value
-
-    def __delattr__(self, name):
-        if name in self:
-            del self[name]
-        else:
-            raise AttributeError('No such attribute: ' + name)
-
-
-def qabitval_array(packedint_array, stacking_params):
+def qabitval_array(packedint_array):
     """
     Institute a hierarchy of qa values that may be flagged in the bitpacked
     value.
@@ -75,27 +61,21 @@ def qabitval_array(packedint_array, stacking_params):
 
     Args:
         packedint: int value to bit check
-        stacking_params: dictionary of processing parameters
     Returns:
         offset value to use
     """
-    unpacked = np.full(packedint_array.shape, stacking_params['QA_FILL'])
-    QA_CLOUD_unpacked = geek.bitwise_and(packedint_array, 1 << (stacking_params['QA_CLOUD']+1))
-    QA_SHADOW_unpacked = geek.bitwise_and(packedint_array, 1 << (stacking_params['QA_SHADOW']+1))
-    QA_SNOW_unpacked = geek.bitwise_and(packedint_array, 1 << (stacking_params['QA_SNOW']+1))
-    QA_WATER_unpacked = geek.bitwise_and(packedint_array, 1 << (stacking_params['QA_WATER']+1))
-    QA_CLEAR_unpacked = geek.bitwise_and(packedint_array, 1 << (stacking_params['QA_CLEAR']+1))
-    # QA_CIRRUS1 = geek.bitwise_and(packedint_array, 1 << stacking_params.QA_CIRRUS1)
-    # QA_CIRRUS2 = geek.bitwise_and(packedint_array, 1 << stacking_params.QA_CIRRUS2)
-    # QA_OCCLUSION = geek.bitwise_and(packedint_array, 1 << stacking_params.QA_OCCLUSION)
+    unpacked = np.full(packedint_array.shape, QA_FILL)
+    QA_CLOUD_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_CLOUD+1))
+    QA_SHADOW_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_SHADOW+1))
+    QA_SNOW_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_SNOW+1))
+    QA_WATER_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_WATER+1))
+    QA_CLEAR_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_CLEAR+1))
 
-    # unpacked[QA_OCCLUSION > 0] = stacking_params.QA_CLEAR
-    # unpacked[np.logical_and(QA_CIRRUS1 > 0, QA_CIRRUS2 > 0)] = stacking_params.QA_CLEAR
-    unpacked[QA_CLEAR_unpacked > 0] = stacking_params['QA_CLEAR']
-    unpacked[QA_WATER_unpacked > 0] = stacking_params['QA_WATER']
-    unpacked[QA_SNOW_unpacked > 0] = stacking_params['QA_SNOW']
-    unpacked[QA_SHADOW_unpacked > 0] = stacking_params['QA_SHADOW']
-    unpacked[QA_CLOUD_unpacked > 0] = stacking_params['QA_CLOUD']
+    unpacked[QA_CLEAR_unpacked > 0] = QA_CLEAR
+    unpacked[QA_WATER_unpacked > 0] = QA_WATER
+    unpacked[QA_SNOW_unpacked > 0] = QA_SNOW
+    unpacked[QA_SHADOW_unpacked > 0] = QA_SHADOW
+    unpacked[QA_CLOUD_unpacked > 0] = QA_CLOUD
     return unpacked
 
 
@@ -134,8 +114,8 @@ def load_data(file_name, gdal_driver='GTiff'):
     return image_array, (geotransform, inDs)
 
 
-def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger, stacking_params,
-                            is_partition=True):
+def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger, parameters,
+                            is_partition=True, low_year_bound=1, upp_year_bound=9999):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy as
     :param tmp_path: tmp folder to save unzip image
@@ -146,8 +126,10 @@ def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_thresho
     :param path_array: path array has the same dimension of inputted image, and the pixel value indicates
                       the path which the pixel belongs to; if path_array == none, we will use all path
     :param logger: the handler of logger file
-    :param stacking_params: a struct of all parameters
+    :param parameters
     :param is_partition: True, partition each image into blocks; False, save original size of image
+    :param low_year_bound: the lower bound of user interested year range
+    :param upp_year_bound: the upper bound of user interested year range
     :return:
     """
     # unzip SR
@@ -194,11 +176,11 @@ def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_thresho
         return
 
     # convertQA = np.vectorize(qabitval)
-    QA_band_unpacked = qabitval_array(QA_band, stacking_params).astype(np.short)
+    QA_band_unpacked = qabitval_array(QA_band).astype(np.short)
     if clear_threshold > 0:
-        clear_ratio = np.sum(np.logical_or(QA_band_unpacked == stacking_params['QA_CLEAR'],
-                                           QA_band_unpacked == stacking_params['QA_WATER'])) \
-                      / np.sum(QA_band_unpacked != stacking_params['QA_FILL'])
+        clear_ratio = np.sum(np.logical_or(QA_band_unpacked == QA_CLEAR,
+                                           QA_band_unpacked == QA_WATER)) \
+                      / np.sum(QA_band_unpacked != QA_FILL)
     else:
         clear_ratio = 1
 
@@ -221,6 +203,13 @@ def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_thresho
         collection = "C{}".format(folder[35:36])
         version = folder[37:40]
         file_name = sensor + col + row + year + doy + collection + version
+        if low_year_bound != 0:
+            if int(year) < low_year_bound:
+                return
+        if upp_year_bound != 9999:
+            if int(year) > upp_year_bound:
+                return
+
 
         if sensor == 'LT5' or sensor == 'LE7' or sensor == 'LT4':
             try:
@@ -289,67 +278,67 @@ def single_image_processing(tmp_path, source_dir, out_dir, folder, clear_thresho
             pathid = int(elements[0].attrib['path'])
 
             # assign filled value to the pixels has different path id so won't be processed
-            QA_band_unpacked[path_array != pathid] = stacking_params['QA_FILL']
+            QA_band_unpacked[path_array != pathid] = QA_FILL
 
         if is_partition is True:
-            b_width = int(stacking_params['n_cols'] / stacking_params['n_block_x'])  # width of a block
-            b_height = int(stacking_params['n_rows'] / stacking_params['n_block_y'])
+            b_width = int(parameters['n_cols'] / parameters['n_block_x'])  # width of a block
+            b_height = int(parameters['n_rows'] / parameters['n_block_y'])
             bytesize = 2  # short16 = 2 * byte
             # source: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-in-python-using-numpy-d1bf0dd7b6f7
-            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(stacking_params['n_block_y'],
-                                                        stacking_params['n_block_x'], b_height, b_width),
-                                                        strides=(stacking_params['n_cols'] * b_height * bytesize,
+            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(parameters['n_block_y'],
+                                                        parameters['n_block_x'], b_height, b_width),
+                                                        strides=(parameters['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 stacking_params['n_cols'] * bytesize, bytesize))
-            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(stacking_params['n_block_y'],
-                                                        stacking_params['n_block_x'], b_height, b_width),
-                                                        strides=(stacking_params['n_cols'] * b_height * bytesize,
+                                                                 parameters['n_cols'] * bytesize, bytesize))
+            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(parameters['n_block_y'],
+                                                        parameters['n_block_x'], b_height, b_width),
+                                                        strides=(parameters['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 stacking_params['n_cols'] * bytesize, bytesize))
-            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(stacking_params['n_block_y'],
-                                                        stacking_params['n_block_x'], b_height, b_width),
-                                                        strides=(stacking_params['n_cols'] * b_height * bytesize,
+                                                                 parameters['n_cols'] * bytesize, bytesize))
+            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(parameters['n_block_y'],
+                                                        parameters['n_block_x'], b_height, b_width),
+                                                        strides=(parameters['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 stacking_params['n_cols'] * bytesize, bytesize))
-            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(stacking_params['n_block_y'],
-                                                        stacking_params['n_block_x'], b_height, b_width),
-                                                        strides=(stacking_params['n_cols'] * b_height * bytesize,
+                                                                 parameters['n_cols'] * bytesize, bytesize))
+            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(parameters['n_block_y'],
+                                                        parameters['n_block_x'], b_height, b_width),
+                                                        strides=(parameters['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 stacking_params['n_cols'] * bytesize, bytesize))
-            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(stacking_params['n_block_y'],
-                                                        stacking_params['n_block_x'], b_height, b_width),
-                                                        strides=(stacking_params['n_cols'] * b_height * bytesize,
+                                                                 parameters['n_cols'] * bytesize, bytesize))
+            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(parameters['n_block_y'],
+                                                        parameters['n_block_x'], b_height, b_width),
+                                                        strides=(parameters['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 stacking_params['n_cols'] * bytesize, bytesize))
-            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(stacking_params['n_block_y'],
-                                                        stacking_params['n_block_x'], b_height, b_width),
-                                                        strides=(stacking_params['n_cols'] * b_height * bytesize,
+                                                                 parameters['n_cols'] * bytesize, bytesize))
+            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(parameters['n_block_y'],
+                                                        parameters['n_block_x'], b_height, b_width),
+                                                        strides=(parameters['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 stacking_params['n_cols'] * bytesize, bytesize))
-            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(stacking_params['n_block_y'],
-                                                        stacking_params['n_block_x'], b_height, b_width),
-                                                        strides=(stacking_params['n_cols'] * b_height * bytesize,
+                                                                 parameters['n_cols'] * bytesize, bytesize))
+            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(parameters['n_block_y'],
+                                                        parameters['n_block_x'], b_height, b_width),
+                                                        strides=(parameters['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 stacking_params['n_cols'] * bytesize, bytesize))
+                                                                 parameters['n_cols'] * bytesize, bytesize))
             QA_blocks = np.lib.stride_tricks.as_strided(QA_band_unpacked,
-                                                        shape=(stacking_params['n_block_y'],
-                                                               stacking_params['n_block_x'], b_height,
+                                                        shape=(parameters['n_block_y'],
+                                                               parameters['n_block_x'], b_height,
                                                                b_width),
-                                                        strides=(stacking_params['n_cols']*b_height*bytesize,
+                                                        strides=(parameters['n_cols']*b_height*bytesize,
                                                                  b_width * bytesize,
-                                                                 stacking_params['n_cols']*bytesize,
+                                                                 parameters['n_cols']*bytesize,
                                                                  bytesize))
-            for i in range(stacking_params['n_block_y']):
-                for j in range(stacking_params['n_block_x']):
+            for i in range(parameters['n_block_y']):
+                for j in range(parameters['n_block_x']):
                     # check if no valid pixels in the chip, then eliminate
                     qa_unique = np.unique(QA_blocks[i][j])
 
                     # skip blocks are all cloud, shadow or filled values
                     # in DHTC, we also don't need to save pixel that has qa value of 'QA_CLOUD',
                     # 'QA_SHADOW', or FILLED value (255)
-                    if (stacking_params['QA_CLEAR']) not in qa_unique and \
-                            (stacking_params['QA_WATER']) not in qa_unique and (
-                            stacking_params['QA_SNOW']) not in qa_unique:
+                    if QA_CLEAR not in qa_unique and \
+                            QA_WATER not in qa_unique and \
+                            QA_SNOW not in qa_unique:
                         continue
 
                     block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
@@ -417,7 +406,7 @@ def checkfinished_step3_nopartition(out_dir):
 @click.command()
 @click.option('--source_dir', type=str, default=None, help='the folder directory of Landsat tar files '
                                                            'downloaded from USGS website')
-@click.option('--out_dir', type=str, default=None, help='the folder directory for ENVI outputs')
+@click.option('--out_dir', type=str, default=None, help='the folder directory for storing stacks')
 @click.option('--clear_threshold', type=float, default=0, help='user-defined clear pixel proportion')
 @click.option('--single_path', type=bool, default=True, help='indicate if using single_path or sidelap')
 @click.option('--rank', type=int, default=1, help='the rank id')
@@ -425,8 +414,10 @@ def checkfinished_step3_nopartition(out_dir):
 @click.option('--is_partition', type=bool, default=True, help='partition the output to blocks')
 @click.option('--yaml_path', type=str, help='yaml file path')
 @click.option('--hpc', type=bool, default=True, help='if it is set for HPC or DHTC environment')
-def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_partition, yaml_path, hpc):
-
+@click.option('--low_year_bound', type=int, default=1, help='the lower bound of the year range of user interest')
+@click.option('--upp_year_bound', type=int, default=9999, help='the upper bound of the year range of user interest')
+def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_partition, yaml_path, hpc, low_year_bound,
+         upp_year_bound):
     if not os.path.exists(source_dir):
         print('Source directory not exists!')
 
@@ -436,25 +427,24 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                     and f[len(f) - 6:len(f) - 4] == 'SR')]
     tmp_path = join(out_dir, 'tmp')
 
+    tz = timezone('US/Eastern')
     with open(yaml_path) as yaml_obj:
         parameters = yaml.safe_load(yaml_obj)
-    stacking_params = parameters['stacking']
-    stacking_params.update(parameters['common'])
 
-    tz = timezone('US/Eastern')
-    logging.basicConfig(filename=join(os.getcwd(), 'AutoPrepareDataARD.log'),
-                        filemode='w', level=logging.INFO)  # mode = w enables the log file to be overwritten
-    logger = logging.getLogger(__name__)
-
+    logger = None
     # create needed folders
     if rank == 1:
+        logging.basicConfig(filename=join(os.getcwd(), 'AutoPrepareDataARD.log'),
+                            filemode='w', level=logging.INFO)  # mode = w enables the log file to be overwritten
+        logger = logging.getLogger(__name__)
+
         logger.info('AutoPrepareDataARD starts: {}'.format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
         if not os.path.exists(out_dir):
             os.mkdir(out_dir)
         if is_partition is True:
-            for i in range(stacking_params['n_block_y']):
-                for j in range(stacking_params['n_block_x']):
+            for i in range(parameters['n_block_y']):
+                for j in range(parameters['n_block_x']):
                     block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
                     if not os.path.exists(join(out_dir, block_folder)):
                         os.mkdir(join(out_dir, block_folder))
@@ -471,7 +461,6 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                     tar_ref.extractall(join(tmp_path, folder_list[0]))
                 except:
                     logger.warning('Unzip fails for {}'.format(folder))
-                        # print('Unzip fails for {} and gdal-warp single-path fail'.format(folder_list[0]))
             ref_image = gdal.Open(join(join(tmp_path, folder_list[0]), "{}B1.tif".format(folder_list[0])))
             trans = ref_image.GetGeoTransform()
             proj = ref_image.GetProjection()
@@ -496,9 +485,15 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         ordinal_Dates.sort()
         file = open(join(out_dir, "starting_last_dates.txt"), "w+")  # need to save out starting and
         # lasting date for this tile
-        file.writelines("{}\n".format(str(ordinal_Dates[0])))
-        file.writelines("{}\n".format(str(ordinal_Dates[-1])))
+        file.writelines("{}\n".format(str(np.max([ordinal_Dates[0],
+                                                 pd.Timestamp.toordinal(dt.datetime(low_year_bound, 1, 1)) + 366]))))
+        file.writelines("{}\n".format(str(np.min([ordinal_Dates[-1],
+                                                 pd.Timestamp.toordinal(dt.datetime(upp_year_bound, 12, 31)) + 366]))))
         file.close()
+    else:
+        logging.basicConfig(filename=join(os.getcwd(), 'AutoPrepareDataARD.log'),
+                            filemode='a', level=logging.INFO)  # mode = w enables the log file to be overwritten
+        logger = logging.getLogger(__name__)
 
     # use starting_last_dates.txt to indicate all folder have been created. Very stupid way. Need improve it in future.
     while not checkfinished_step1(join(out_dir, "starting_last_dates.txt")):
@@ -511,16 +506,15 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         folder_name = os.path.basename(source_dir)
         tile_h = int(folder_name[folder_name.find('h') + 1: folder_name.find('h') + 4])
         tile_v = int(folder_name[folder_name.find('v') + 1: folder_name.find('v') + 4])
-
         if hpc is True:
             path_array = gdal_array.LoadFile(join(out_dir, 'singlepath_landsat_tile.tif'))
         else:
             try:
                 path_array = gdal_array.LoadFile(join(os.getcwd(), 'singlepath_landsat_tile_crop_compress.tif'),
-                                                 xoff=tile_h * stacking_params['n_cols'],
-                                                 yoff=tile_v * stacking_params['n_rows'],
-                                                 xsize=stacking_params['n_cols'],
-                                                 ysize=stacking_params['n_rows'])  # read a partial array
+                                                 xoff=tile_h * parameters['n_cols'],
+                                                 yoff=tile_v * parameters['n_rows'],
+                                                 xsize=parameters['n_cols'],
+                                                 ysize=parameters['n_rows'])  # read a partial array
                 # from a large file
             except IOError as e:
                 logger.error(e)
@@ -533,7 +527,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             break
         folder = folder_list[new_rank]
         single_image_processing(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger,
-                                stacking_params, is_partition=is_partition)
+                                parameters, is_partition=is_partition, low_year_bound=low_year_bound,
+                                upp_year_bound=upp_year_bound)
 
     # create an empty file for signaling the core that has been finished
     with open(os.path.join(out_dir, 'rank{}_finished.txt'.format(rank)), 'w') as fp:
@@ -547,30 +542,7 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
     if rank == 1:
         # remove tmp folder
         shutil.rmtree(tmp_path, ignore_errors=True)
-#        if is_partition is True:
-#            for i in range(stacking_params['n_block_y']):
-#                for j in range(stacking_params['n_block_x']):
-#                    out_dir_block = join(out_dir, 'block_x{}_y{}'.format(j + 1, i + 1))
-#                    scene_list = [f for f in os.listdir(out_dir_block) if f.startswith('L')]
-#                    scene_file = open(join(out_dir_block, "scene_list.txt"), "w+")
-#                    for L in scene_list:
-#                        scene_file.writelines("{}\n".format(L))
-#                    scene_file.close()
-#        else:
-#            scene_list = [f for f in os.listdir(out_dir) if f.startswith('L')]
-#            scene_file = open(join(out_dir, "scene_list.txt"), "w+")
-#            for L in scene_list:
-#                scene_file.writelines("{}\n".format(L))
-#            scene_file.close()
         logger.info('Stacking procedure finished: {}'.format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
-
-    # for other cores needed to wait for rank 1 to be finished
-#    if is_partition is True:
-#        while not checkfinished_step3_partition(out_dir):
-#            time.sleep(5)
-#    else:
-#        while not checkfinished_step3_nopartition(out_dir):
-#            time.sleep(5)
 
 
 if __name__ == '__main__':

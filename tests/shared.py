@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def read_data(path):
     """Load a sample file containing acquisition days and spectral values.
     The first column is assumed to be the day number, subsequent columns

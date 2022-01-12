@@ -27,7 +27,7 @@ logging.basicConfig(stream=sys.stdout,
 class Defaults(dict):
     def __init__(self, config_path='parameters.yaml'):
         with open(config_path, 'r') as f:
-            super(Defaults, self).__init__(yaml.load(f.read()))
+            super(Defaults, self).__init__(yaml.safe_load(f.read()))
 
     def __getattr__(self, name):
         if name in self:

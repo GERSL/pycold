@@ -2,7 +2,9 @@
 import numpy as np
 import os
 from pycold import cold_detect
-from tests.shared import read_data
+# sys.path.append('/Users/coloury/Dropbox/Documents/pycold')
+# os.chdir('/Users/coloury/Dropbox/Documents/pycold')
+from shared import read_data
 
 Landsat_bandname = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Thermal']
 t_c = -200  # the threshold used for get_breakcategory
@@ -15,13 +17,10 @@ slope_scale = 10000
 
 def get_breakcategory(ccd_plot, i_curve):
     """
-    get break category
-    Args:
-        ccd_plot: rec_cg
-        i_curve: the number of the curve to be analysed
-
-    Returns:
-    1 - disturbance break; 2 - natural recovery; 3 - aforestation
+    get break category:
+    :param ccd_plot: rec_cg
+    :param i_curve: the number of the curve to be analysised
+    :return: 1 - disturbance break; 2 - natural recovery; 3 - aforestation
     see section 3.3.7 in Zhu, Z., Zhang, J., Yang, Z., Aljaddani, A. H., Cohen, W. B., Qiu, S., & Zhou, C. (2020).
     Continuous monitoring of land disturbance based on Landsat time series. Remote Sensing of Environment, 238, 111116.
     """
@@ -37,7 +36,7 @@ def get_breakcategory(ccd_plot, i_curve):
         return 1
 
 
-def test_pycold():
+def main():
     # running COLD for a Landsat time series provided by a csv
     in_path = 'tests/resources/spectral_336_3980_obs.csv'
     data = read_data(in_path)
@@ -49,4 +48,4 @@ def test_pycold():
 
 
 if __name__ == '__main__':
-    test_pycold()
+    main()

@@ -1,13 +1,8 @@
-# This script is an example for running pycold in a HPC environment
-# This script requires 'AutoPrepareDataARD.py' to produce intermediate block-based stack. This scripts assign each
-# core to independently process each block, and produce python-native change record formats (.npy) for each block.
-
+# This script is an example for running pyscold in UCONN job array environment
+# Due to the independence features of job array, we use writing disk files for communication
 # Three types of logging files are used: 1) print() to save block-based  processing info into individual slurm file;
 # 2) system.log is mainly used to log system information; 3) tile_processing_report.log records parameters for each tile
 # 2) and 3) are only called when rank == 1
-
-# For a 42-year Landsat ARD C1 tile (~3000 images), this script averagely produces ~8G change record
-# files, and takes ~1.5 hours to finish if 200 EPYC 7452 cores are used.
 import yaml
 import os
 from os.path import join
@@ -18,10 +13,13 @@ import pycold
 import logging
 from datetime import datetime
 from pytz import timezone
-from datetime import timedelta
 import click
 import time
 from pycold import cold_detect
+from scipy.stats import chi2
+
+
+TOTAL_IMAGE_BANDS = 7
 
 
 def get_rowcol_intile(pos, block_width, block_height, block_x, block_y):
@@ -39,50 +37,50 @@ def get_rowcol_intile(pos, block_width, block_height, block_x, block_y):
     return original_row, original_col
 
 
-def tileprocessing_report(result_log_path, stack_path, version, algorithm, params, startpoint, tz):
+def tileprocessing_report(result_log_path, stack_path, version, algorithm, parameters, startpoint, tz):
     """
     output tile-based processing report
     :param result_log_path: outputted log path
     :param stack_path: stack data folder
     :param version: version of current pyscold software
     :param algorithm: COLD, OBCOLD, or S-CCD
-    :param params: a structure of inputted parameters
+    :param parameters: a structure of inputted parameters
     :param startpoint: timepoint that the program starts
     :param tz: time zone
     :return:
     """
     endpoint = datetime.now(tz)
     file = open(result_log_path, "w")
-    file.write("S-COLD V{} \n".format(version))
+    file.write("PYCOLD V{} \n".format(version))
     file.write("Author: Su Ye(remoteseningsuy@gmail.com)\n")
     file.write("Algorithm: {} \n".format(algorithm))
     file.write("Starting_time: {}\n".format(startpoint.strftime('%Y-%m-%d %H:%M:%S')))
-    file.write("Change probability threshold: {}\n".format(params['probability_threshold']))
-    file.write("Conse: {}\n".format(params['conse']))
-    file.write("First date: {}\n".format(params['starting_date']))
-    file.write("n_cm_maps: {}\n".format(params['n_cm_maps']))
+    file.write("Change probability threshold: {}\n".format(parameters['probability_threshold']))
+    file.write("Conse: {}\n".format(parameters['conse']))
+    file.write("First date: {}\n".format(parameters['starting_date']))
+    file.write("n_cm_maps: {}\n".format(parameters['n_cm_maps']))
     file.write("stack_path: {}\n".format(stack_path))
     file.write("The program starts at {}\n".format(startpoint.strftime('%Y-%m-%d %H:%M:%S')))
     file.write("The program ends at {}\n".format(endpoint.strftime('%Y-%m-%d %H:%M:%S')))
-    file.write("The program lasts for {:.2f}mins\n".format((endpoint - startpoint) / timedelta(minutes=1)))
+    file.write("The program lasts for {:.2f}mins\n".format((endpoint - startpoint) / dt.timedelta(minutes=1)))
     if algorithm == 'OBCOLD':
         file.write("Land-cover-specific parameters:\n")
-        file.write("  C1_threshold: {}\n".format(params['C1_threshold']))
-        file.write("  C1_sizeslope: {}\n".format(params['C1_sizeslope']))
-        file.write("  C2_threshold: {}\n".format(params['C2_threshold']))
-        file.write("  C2_sizeslope: {}\n".format(params['C2_sizeslope']))
-        file.write("  C3_threshold: {}\n".format(params['C3_threshold']))
-        file.write("  C3_sizeslope: {}\n".format(params['C3_sizeslope']))
-        file.write("  C4_threshold: {}\n".format(params['C4_threshold']))
-        file.write("  C4_sizeslope: {}\n".format(params['C4_sizeslope']))
-        file.write("  C5_threshold: {}\n".format(params['C5_threshold']))
-        file.write("  C5_sizeslope: {}\n".format(params['C5_sizeslope']))
-        file.write("  C6_threshold: {}\n".format(params['C6_threshold']))
-        file.write("  C6_sizeslope: {}\n".format(params['C6_sizeslope']))
-        file.write("  C7_threshold: {}\n".format(params['C7_threshold']))
-        file.write("  C7_sizeslope: {}\n".format(params['C7_sizeslope']))
-        file.write("  C8_threshold: {}\n".format(params['C8_threshold']))
-        file.write("  C8_sizeslope: {}\n".format(params['C8_sizeslope']))
+        file.write("  C1_threshold: {}\n".format(parameters['C1_threshold']))
+        file.write("  C1_sizeslope: {}\n".format(parameters['C1_sizeslope']))
+        file.write("  C2_threshold: {}\n".format(parameters['C2_threshold']))
+        file.write("  C2_sizeslope: {}\n".format(parameters['C2_sizeslope']))
+        file.write("  C3_threshold: {}\n".format(parameters['C3_threshold']))
+        file.write("  C3_sizeslope: {}\n".format(parameters['C3_sizeslope']))
+        file.write("  C4_threshold: {}\n".format(parameters['C4_threshold']))
+        file.write("  C4_sizeslope: {}\n".format(parameters['C4_sizeslope']))
+        file.write("  C5_threshold: {}\n".format(parameters['C5_threshold']))
+        file.write("  C5_sizeslope: {}\n".format(parameters['C5_sizeslope']))
+        file.write("  C6_threshold: {}\n".format(parameters['C6_threshold']))
+        file.write("  C6_sizeslope: {}\n".format(parameters['C6_sizeslope']))
+        file.write("  C7_threshold: {}\n".format(parameters['C7_threshold']))
+        file.write("  C7_sizeslope: {}\n".format(parameters['C7_sizeslope']))
+        file.write("  C8_threshold: {}\n".format(parameters['C8_threshold']))
+        file.write("  C8_sizeslope: {}\n".format(parameters['C8_sizeslope']))
     file.close()
 
 
@@ -110,6 +108,37 @@ def reading_start_end_dates(stack_path):
         ending_date = int(f.readline().rstrip('\n'))
         f.close()
         return starting_date, ending_date
+
+
+def gdal_save_file_1band(out_path, array, gdal_type, trans, proj, cols, rows, image_format='GTiff'):
+    """
+    save array as tiff format
+    Parameters
+    ----------
+    out_path : full outputted path
+    array : numpy array to be saved
+    gdal_type: gdal type
+    trans: transform coefficients
+    proj: projection
+    rows: the row number
+    cols: the col number
+    image_format: default is GTiff
+    Returns
+    -------
+    TRUE OR FALSE
+    """
+    outdriver = gdal.GetDriverByName(image_format)
+    outdata = outdriver.Create(out_path, cols, rows, 1, gdal_type)
+    if outdata == None:
+        return False
+    outdata.GetRasterBand(1).WriteArray(array)
+    outdata.FlushCache()
+    outdata.SetGeoTransform(trans)
+    outdata.FlushCache()
+    outdata.SetProjection(proj)
+    outdata.FlushCache()
+    outdata = None
+    return True
 
 
 def check_cold_blockfinished(result_path, nblocks):
@@ -156,8 +185,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method):
     # Reading parameters
     with open(yaml_path, 'r') as yaml_obj:
         parameters = yaml.safe_load(yaml_obj)
-    params = parameters['obcold']
-    params.update(parameters['common'])
+    threshold = chi2.ppf(parameters['probability_threshold'], 5)
 
     # set up some additional parameters
     try:
@@ -165,19 +193,19 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method):
     except IOError as e:
         exit()
 
-    params['block_width'] = int(params['n_cols'] / params['n_block_x'])  # width of a block
-    params['block_height'] = int(params['n_rows'] / params['n_block_y'])  # height of a block
-    params['starting_date'] = starting_date
-    params['n_cm_maps'] = int((ending_date - starting_date + 1) / params['CM_OUTPUT_INTERVAL'])
+    parameters['block_width'] = int(parameters['n_cols'] / parameters['n_block_x'])  # width of a block
+    parameters['block_height'] = int(parameters['n_rows'] / parameters['n_block_y'])  # height of a block
+    parameters['starting_date'] = starting_date
+    parameters['n_cm_maps'] = int((ending_date - starting_date + 1) / parameters['CM_OUTPUT_INTERVAL'])
 
-    nblock_eachcore = int(np.ceil(params['n_block_x'] * params['n_block_y'] / n_cores))
+    nblock_eachcore = int(np.ceil(parameters['n_block_x'] * parameters['n_block_y'] / n_cores))
     for i in range(nblock_eachcore):
         block_id = n_cores * i + rank
-        if block_id > params['n_block_x'] * params['n_block_y']:
+        if block_id > parameters['n_block_x'] * parameters['n_block_y']:
             break
 
-        block_y = int((block_id - 1) / params['n_block_x']) + 1  # note that block_x and block_y start from 1
-        block_x = int((block_id - 1) % params['n_block_x']) + 1
+        block_y = int((block_id - 1) / parameters['n_block_x']) + 1  # note that block_x and block_y start from 1
+        block_x = int((block_id - 1) % parameters['n_block_x']) + 1
 
         # skip the block if the change record block has been created
         if os.path.exists(join(result_path, 'record_change_x{}_y{}_cold.npy'.format(block_x, block_y))):
@@ -194,8 +222,8 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method):
         files_date_zip = sorted(zip(img_dates, img_files))
         img_files_sorted = [x[1] for x in files_date_zip]
         img_dates_sorted = np.asarray([x[0] for x in files_date_zip])
-        img_tstack = [np.load(join(block_folder, f)).reshape(params['block_width'] * params['block_height'],
-                                                             params['TOTAL_IMAGE_BANDS'] + 1)
+        img_tstack = [np.load(join(block_folder, f)).reshape(parameters['block_width'] * parameters['block_height'],
+                                                             TOTAL_IMAGE_BANDS + 1)
                       for f in img_files_sorted]
         img_tstack = np.dstack(img_tstack)
 
@@ -206,9 +234,9 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method):
         date_collect = []
 
         # start looping every pixel in the block
-        for pos in range(params['block_width'] * params['block_height']):
-            original_row, original_col = get_rowcol_intile(pos, params['block_width'],
-                                                           params['block_height'], block_x, block_y)
+        for pos in range(parameters['block_width'] * parameters['block_height']):
+            original_row, original_col = get_rowcol_intile(pos, parameters['block_width'],
+                                                           parameters['block_height'], block_x, block_y)
             try:
                 if b_outputCM:
                     [cold_result, CM, CM_direction, CM_date] = cold_detect(img_dates_sorted,
@@ -220,13 +248,11 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method):
                                                                            img_tstack[pos, 5, :].astype(np.int64),
                                                                            img_tstack[pos, 6, :].astype(np.int64),
                                                                            img_tstack[pos, 7, :].astype(np.int64),
-                                                                           col_pos=original_col,
-                                                                           row_pos=original_row,
-                                                                           t_cg=params['default_threshold'],
-                                                                           conse=params['conse'],
-                                                                           num_samples=params['n_cols'],
-                                                                           starting_date=params['starting_date'],
-                                                                           CM_OUTPUT_INTERVAL=params[
+                                                                           pos=parameters['n_cols'] * (original_row - 1) +
+                                                                           original_col,
+                                                                           conse=parameters['conse'],
+                                                                           starting_date=parameters['starting_date'],
+                                                                           CM_OUTPUT_INTERVAL=parameters[
                                                                                'CM_OUTPUT_INTERVAL'],
                                                                            b_outputCM=b_outputCM)
                 else:
@@ -239,14 +265,9 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method):
                                               img_tstack[pos, 5, :].astype(np.int64),
                                               img_tstack[pos, 6, :].astype(np.int64),
                                               img_tstack[pos, 7, :].astype(np.int64),
-                                              col_pos=original_col,
-                                              row_pos=original_row,
-                                              t_cg=params['default_threshold'],
-                                              conse=params['conse'],
-                                              num_samples=params['n_cols'],
-                                              starting_date=params['starting_date'],
-                                              CM_OUTPUT_INTERVAL=params['CM_OUTPUT_INTERVAL'],
-                                              b_outputCM=b_outputCM)
+                                              t_cg=threshold,
+                                              conse=parameters['conse'],
+                                              pos=parameters['n_cols'] * (original_row - 1) + original_col)
             except RuntimeError:
                 print("COLD fails at original_row {}, original_col {} ({})".format(original_row, original_col,
                                                                                    datetime.now(tz)
@@ -261,11 +282,11 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method):
                     date_collect.append(CM_date)
 
         # save the dataset
-        np.save(join(result_path, 'CM_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(CM_collect))
+        np.save(join(result_path, 'record_change_x{}_y{}_cold.npy'.format(block_x, block_y)), np.hstack(result_collect))
         if b_outputCM:
             np.save(join(result_path, 'CM_date_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(date_collect))
             np.save(join(result_path, 'CM_direction_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(direction_collect))
-            np.save(join(result_path, 'record_change_x{}_y{}_cold.npy'.format(block_x, block_y)), np.hstack(result_collect))
+            np.save(join(result_path, 'CM_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(CM_collect))
 
         with open(os.path.join(result_path, 'COLD_block{}_finished.txt'.format(block_id)), 'w') as fp:
             pass
@@ -273,13 +294,13 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method):
         print("Per-pixel COLD processing is finished for block_x{}_y{} ({})"
               .format(block_x, block_y, datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
-    while not check_cold_blockfinished(result_path, params['n_block_x'] * params['n_block_y']):
+    while not check_cold_blockfinished(result_path, parameters['n_block_x'] * parameters['n_block_y']):
         time.sleep(15)
 
     if rank == 1:
         # tile_based report
         tileprocessing_report(join(result_path, 'tile_processing_report.log'),
-                              stack_path, pycold.__version__, method, params, start_time, tz)
+                              stack_path, pycold.__version__, method, parameters, start_time, tz)
         # if b_outputCM:
         #     deleted_files = [file for file in os.listdir(result_path) if file.startswith('CM_')]
         #     for file in deleted_files:

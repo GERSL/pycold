@@ -12,8 +12,6 @@ from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 
 cdef int NUM_FC = 40  # define the maximum number of outputted curves
 
-DTYPE_date = np.float64
-ctypedef np.float64_t DTYPE_t
 
 reccg_dt = np.dtype([('t_start', np.int32),  # time when series model gets started
                      ('t_end', np.int32),  # time when series model gets ended
@@ -45,7 +43,8 @@ cdef extern from "../../cxx/cold.h":
     cdef int cold(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2,
                   long *buf_t, long *fmask_buf, long *valid_date_array, int valid_num_scenes, int pos, 
                   double tcg, int conse, bool b_output_cm, int starting_date, Output_t *rec_cg,
-                  int *num_fc, int cm_output_interval, short int *cm_outputs, unsigned char *CMdirection_outputs, unsigned char *cm_outputs_date);
+                  int *num_fc, int cm_output_interval, short int *cm_outputs, unsigned char *CMdirection_outputs,
+                  unsigned char *cm_outputs_date);
 
 
 

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import os
 import datetime as dt
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 from sklearn.ensemble import RandomForestClassifier
 from os.path import join, exists
 from pycold.app import defaults, logging
@@ -186,6 +187,7 @@ class PyClassifier:
         -------
             a sklearn random forest model
         """
+        assert label.shape == (self.config['n_rows'], self.config['n_cols'])
         samplecount = generate_sample_num(label, defaults)
         index_list = []
         label_list = []
@@ -216,7 +218,7 @@ class PyClassifier:
         # image_flat = np.zeros((parameters['n_rows'] * parameters['n_cols'], parameters['TOTAL_IMAGE_BANDS']))
         cmap = rf_model.predict(tmp_feature).reshape(self.config['block_height'], self.config['block_width'])
         mask = np.all(tmp_feature == defaults['NAN_VAL'], axis=1).reshape(self.config['block_height'],
-                                                                                       self.config['block_width'])
+                                                                          self.config['block_width'])
         cmap[mask] = 255
         return cmap
 
@@ -225,22 +227,20 @@ class PyClassifierHPC(PyClassifier):
     """
     this class adds new IO functions in the HPC environment for the base class
     """
-    def __init__(self, config, stack_path, results_path, n_features=None, year_lowbound=None, year_uppbound=None,
-                 model_ready=False, thematic_src=None):
+    def __init__(self, config, record_path, year_lowbound=1982, year_uppbound=2021, tmp_path=None, output_path=None,
+                 n_features=None, labelmap_path=None, rf_path=None):
         """
         Parameters
         ----------
         config: configuration structure from config.yaml
-        stack_path
-        results_path
+        record_path
         year_lowbound
         year_uppbound
-        model_ready
-        thematic_src
+        labelmap_path
         """
         try:
-            self._check_inputs_thematic(config, stack_path, results_path, year_lowbound, year_uppbound, model_ready,
-                                        thematic_src)
+            self.__check_inputs_thematic(config, record_path, year_lowbound, year_uppbound, tmp_path,
+                                         labelmap_path, rf_path)
         except ValueError or FileExistsError as e:
             raise e
 
@@ -248,79 +248,91 @@ class PyClassifierHPC(PyClassifier):
         self.config['block_width'] = int(self.config['n_cols'] / self.config['n_block_x'])
         self.config['block_height'] = int(self.config['n_rows'] / self.config['n_block_y'])
         self.config['n_blocks'] = self.config['n_block_x'] * self.config['n_block_y']
-        self.results_path = results_path
-        self.stack_path = stack_path
-        self.out_cmmap_path = join(results_path, 'cm_maps')
-        self.out_thematic_path = join(results_path, 'feature_maps')
+        self.record_path = record_path
+
+        if tmp_path is None:
+            self.tmp_path = join(record_path, 'feature_maps')  # default path
+        else:
+            self.tmp_path = tmp_path
+
+        if output_path is None:
+            self.output_path = join(record_path, 'feature_maps')  # default path
+        else:
+            self.output_path = tmp_path
+
         if n_features is None:
             self.n_features = defaults['TOTAL_IMAGE_BANDS'] * defaults['N_FEATURES']
         else:
             self.n_features = n_features
-        if year_uppbound is None and year_lowbound is None:
-            with open(join(stack_path, 'starting_last_dates.txt')) as f:
-                date_list = f.readlines()
-            self.year_lowbound = pd.Timestamp.fromordinal(int(date_list[0]) - 366).year
-            self.year_uppbound = pd.Timestamp.fromordinal(int(date_list[1]) - 366).year
+
+        self.year_lowbound = year_lowbound
+        self.year_uppbound = year_uppbound
+        self.labelmap_path = labelmap_path
+        if rf_path is None:
+            self.rf_path = join(self.output_path, 'rf.model')  # default path
         else:
-            self.year_lowbound = year_lowbound
-            self.year_uppbound = year_uppbound
-        self.model_ready = model_ready
-        self.thematic_src = thematic_src
+            self.rf_path = rf_path
 
     @staticmethod
-    def _check_inputs_thematic(parameters, stack_path, results_path, year_lowbound, year_uppbound, model_ready,
-                               thematic_src):
-        if type(parameters['n_rows']) != int or parameters['n_rows'] < 0:
+    def __check_inputs_thematic(config, record_path, year_lowbound, year_uppbound, tmp_path,  labelmap_path,
+                                rf_path):
+        if type(config['n_rows']) != int or config['n_rows'] < 0:
             raise ValueError('n_rows must be positive integer')
-        if type(parameters['n_cols']) != int or parameters['n_cols'] < 0:
+        if type(config['n_cols']) != int or config['n_cols'] < 0:
             raise ValueError('n_cols must be positive integer')
-        if type(parameters['n_block_x']) != int or parameters['n_block_x'] < 0:
+        if type(config['n_block_x']) != int or config['n_block_x'] < 0:
             raise ValueError('n_block_x must be positive integer')
-        if type(parameters['n_block_y']) != int or parameters['n_block_y'] < 0:
+        if type(config['n_block_y']) != int or config['n_block_y'] < 0:
             raise ValueError('n_block_y must be positive integer')
-        if type(parameters['n_block_y']) != int or parameters['n_block_y'] < 0:
+        if type(config['n_block_y']) != int or config['n_block_y'] < 0:
             raise ValueError('n_block_y must be positive integer')
 
-        if os.path.isdir(stack_path) is False:
-            raise FileExistsError('No such directory: {}'.format(stack_path))
-        if os.path.isdir(results_path) is False:
-            raise FileExistsError('No such directory: {}'.format(results_path))
+        if os.path.isdir(record_path) is False:
+            raise FileExistsError('No such directory: {}'.format(record_path))
 
-        if year_lowbound is None and year_uppbound is None:
-            if os.path.exists(join(stack_path, 'starting_last_dates.txt')):
-                raise FileExistsError('No starting_last_dates.txt, please specify year_lowbound and year_uppbound')
+        if labelmap_path is not None:
+            if os.path.isfile(labelmap_path) is False:
+                raise FileExistsError('No such file: {}'.format(labelmap_path))
 
-        if model_ready:
-            if thematic_src is None:
-                raise ValueError('thematic_src must be assigned as value if model_ready is True')
+        if rf_path is not None:
+            if os.path.isfile(rf_path) is False:
+                raise FileExistsError('No such file: {}'.format(rf_path))
 
-    def preparation(self):
-        if not exists(self.out_thematic_path):
-            os.makedirs(self.out_thematic_path)
+    def hpc_preparation(self):
+        if exists(self.tmp_path) is False:
+            try:
+                os.mkdir(self.tmp_path)
+            except IOError as e:
+                raise e
 
-    def save_features(self, block_id, block_features, out_path):
+        if exists(self.output_path) is False:
+            try:
+                os.mkdir(self.output_path)
+            except IOError as e:
+                raise e
+
+    def save_features(self, block_id, block_features):
         '''
         Parameters
         ----------
         block_id: integer
         block_features
-        out_path
         Returns
         -------
 
         '''
         for i in range(block_features.shape[0]):
-            np.save(os.path.join(out_path, 'tmp_feature_year{}_block{}.npy').format(self.year_lowbound+i,
+            np.save(os.path.join(self.tmp_path, 'tmp_feature_year{}_block{}.npy').format(self.year_lowbound+i,
                                                                                                   block_id),
                     block_features[i, :, :])
 
-    def is_finished_step1_predict_features(self, in_path):
-        return any(exists(join(in_path, 'tmp_feature_year{}_block{}.npy').format(year, block + 1))
+    def is_finished_step1_predict_features(self):
+        return any(exists(join(self.tmp_path, 'tmp_feature_year{}_block{}.npy').format(year, block + 1))
                    for block in range(self.config['n_blocks']) for year in range(self.year_lowbound,
-                                                                                      self.year_uppbound+1))
+                                                                                 self.year_uppbound+1))
 
-    def get_fullfeature_forcertainyear(self, in_path, year):
-        tmp_feature_filenames = [file for file in os.listdir(in_path)
+    def get_fullfeature_forcertainyear(self, year):
+        tmp_feature_filenames = [file for file in os.listdir(self.tmp_path)
                                  if file.startswith('tmp_feature_year{}'.format(year))]
         if len(tmp_feature_filenames) < self.config['n_blocks']:
             logger.warning('tmp features are incomplete! should have {}; but actually have {} feature images'.
@@ -328,7 +340,7 @@ class PyClassifierHPC(PyClassifier):
 
         tmp_feature_filenames.sort(
             key=lambda t: t[t.find('block'): t.find('.npy')])  # sorted by row number
-        full_feature_array = self.assemble_array([np.load(join(in_path, file))
+        full_feature_array = self.assemble_array([np.load(join(self.tmp_path, file))
                                                  .reshape(self.config['block_height'],
                                                           self.config['block_width'],
                                                           self.n_features)
@@ -338,49 +350,47 @@ class PyClassifierHPC(PyClassifier):
             logger.error('The feature image is incomplete for {}'.format(year))
         return full_feature_array
 
-    def save_rf_model(self, rf_model, out_path):
-        joblib.dump(rf_model, join(out_path, 'rf.model'))
+    @staticmethod
+    def save_rf_model(rf_model, rf_path):
+        joblib.dump(rf_model, rf_path)
 
-    def is_finished_step2_train_rfmodel(self, in_path):
-        return exists(join(in_path, 'rf.model'))
+    def is_finished_step2_train_rfmodel(self):
+        return exists(self.rf_path)
 
-    def get_features(self, year, block_id, in_path):
+    @staticmethod
+    def get_features(path):
         """
         Parameters
         ----------
-        year: integer
-            the targeted year
-        block_id: integer
-            block id
-        in_path:
+        path:
         Returns: (block_width*block_height, total feature) array
         -------
             the feature temp array file for block_id and year
         """
-        return np.load(join(in_path, 'tmp_feature_year{}_block{}.npy'.format(year, block_id)))
+        return np.load(path)
 
-    def get_rf_model(self, rf_path):
-        return joblib.load(rf_path)
+    def get_rf_model(self):
+        return joblib.load(self.rf_path)
 
-    def save_yearlyclassification_maps(self, block_id, year, cmap, out_path):
-        outfile = join(out_path, 'tmp_yearlyclassification{}_block{}.npy'.format(year, block_id))
+    def save_yearlyclassification_maps(self, block_id, year, cmap):
+        outfile = join(self.tmp_path, 'tmp_yearlyclassification{}_block{}.npy'.format(year, block_id))
         np.save(outfile, cmap)
 
-    def is_finished_step3_classification(self, in_path):
+    def is_finished_step3_classification(self):
         """
         :return: True or false
         """
-        return any(exists(join(in_path, 'tmp_yearlyclassification{}_block{}.npy'.format(year, iblock + 1)))
+        return any(exists(join(self.tmp_path, 'tmp_yearlyclassification{}_block{}.npy'.format(year, iblock + 1)))
                    for iblock in range(self.config['n_blocks']) for year in range(self.year_lowbound,
                                                                                       self.year_uppbound + 1))
 
-    def assemble_covermap(self, in_path, year):
-        tmp_yearlyclass_filenames = [file for file in os.listdir(in_path)
+    def assemble_covermap(self, year):
+        tmp_yearlyclass_filenames = [file for file in os.listdir(self.tmp_path)
                                      if file.startswith('tmp_yearlyclassification{}'.format(year))]
 
         # sort to guarantee order follows low to high rows
         tmp_yearlyclass_filenames.sort(key=lambda t: t[t.find('block'): t.find('.npy')])
-        full_yearlyclass_array = self.assemble_array([np.load(join(in_path, file))
+        full_yearlyclass_array = self.assemble_array([np.load(join(self.tmp_path, file))
                                                      .reshape(self.config['block_height'],
                                                               self.config['block_width'], 1)
                                                       for file in tmp_yearlyclass_filenames])
@@ -388,68 +398,56 @@ class PyClassifierHPC(PyClassifier):
         if (full_yearlyclass_array.shape[1] != self.config['n_cols']) or (full_yearlyclass_array.shape[0] !=
                                                                               self.config['n_rows']):
             logger.error('The assemble category map is incomplete for {}'.format(year))
-        return full_yearlyclass_array
+        return full_yearlyclass_array[:, :, 0]  # we only return the first channel
 
-    def save_covermaps(self, full_yearlyclass_array, year, out_path):
-        np.save(join(out_path, 'yearlyclassification_{}.npy'.format(year)), full_yearlyclass_array)
+    def save_covermaps(self, full_yearlyclass_array, year):
+        np.save(join(self.output_path, 'yearlyclassification_{}.npy'.format(year)), full_yearlyclass_array)
 
-    def clean(self, path):
-        tmp_yearlyclass_filenames = [file for file in os.listdir(path)
+    def clean(self):
+        tmp_yearlyclass_filenames = [file for file in os.listdir(self.tmp_path)
                                      if file.startswith('tmp_')]
         for file in tmp_yearlyclass_filenames:
-            os.remove(join(path, file))
+            os.remove(join(self.tmp_path, file))
 
-    def step1_feature_generation(self, block_id, in_path=None, out_path=None):
-        if in_path is None:
-            in_path = self.out_thematic_path
-        if out_path is None:
-            out_path = self.out_thematic_path
-        cold_block = np.load(join(in_path, 'record_change_x{}_y{}_cold.npy').format(
+    def step1_feature_generation(self, block_id):
+        cold_block = np.load(join(self.record_path, 'record_change_x{}_y{}_cold.npy').format(
                              get_block_x(block_id, self.config['n_block_x']),
                              get_block_y(block_id, self.config['n_block_x'])))
         block_features = self.predict_features(block_id, cold_block, self.year_lowbound, self.year_uppbound)
-        self.save_features(block_id, block_features, out_path)
+        self.save_features(block_id, block_features)
 
-    def step2_train_rf(self, ref_year=None, in_path=None, out_path=None):
-        if in_path is None:
-            in_path = self.out_thematic_path
-        if out_path is None:
-            out_path = self.out_thematic_path
+    def step2_train_rf(self, ref_year=None):
         if ref_year is None:
             ref_year = defaults['classification_year']
-        while not self.is_finished_step1_predict_features(in_path):
+        while not self.is_finished_step1_predict_features():
             time.sleep(5)
-        full_feature_array = self.get_fullfeature_forcertainyear(in_path, ref_year)
-        rf_model = self.train_rfmodel(full_feature_array, gdal_array.LoadFile(self.thematic_src))
-        self.save_rf_model(rf_model, out_path)
+        full_feature_array = self.get_fullfeature_forcertainyear(ref_year)
+        rf_model = self.train_rfmodel(full_feature_array, gdal_array.LoadFile(self.labelmap_path))
+        self.save_rf_model(rf_model, self.rf_path)
 
-    def step3_classification(self, block_id, rf_path=None, in_path=None, out_path=None):
-        if in_path is None:
-            in_path = self.out_thematic_path
-        if out_path is None:
-            out_path = self.out_thematic_path
-        if rf_path is None:
-            rf_path = join(self.out_thematic_path, 'rf.model')
-        while not self.is_finished_step2_train_rfmodel(in_path):
+    def step3_classification(self, block_id):
+        while not self.is_finished_step2_train_rfmodel():
             time.sleep(5)
-        rf_model = self.get_rf_model(rf_path)
+
+        try:
+            rf_model = self.get_rf_model()
+        except IOError as e:
+            raise ("Please double check your rf model file directory or generate random forest model first:"
+                   " {}".format(e))
+
         for year in range(self.year_lowbound, self.year_uppbound + 1):
-            tmp_feature_block = self.get_features(year, block_id, in_path)
+            tmp_feature_block = self.get_features(join(self.tmp_path, 'tmp_feature_year{}_block{}.npy'.format(year,
+                                                                                                        block_id)))
             cmap = self.classification_block(rf_model, tmp_feature_block)
-            self.save_yearlyclassification_maps(block_id, year, cmap, out_path)
+            self.save_yearlyclassification_maps(block_id, year, cmap)
 
-    def step4_assemble(self, in_path=None, out_path=None):
-        if in_path is None:
-            in_path = self.out_thematic_path
-        if out_path is None:
-            out_path = self.out_thematic_path
-        while not self.is_finished_step3_classification(in_path):
+    def step4_assemble(self):
+        while not self.is_finished_step3_classification():
             time.sleep(5)
         for year in range(self.year_lowbound, self.year_uppbound + 1):
-            full_yearlyclass_array = self.assemble_covermap(in_path, year)
-            self.save_covermaps(full_yearlyclass_array, year, out_path)
-        self.clean(in_path)  # clean all temp files
-        self.clean(out_path)  # clean all temp files
+            full_yearlyclass_array = self.assemble_covermap(year)
+            self.save_covermaps(full_yearlyclass_array, year)
+        self.clean()  # clean all temp files
 
 
 

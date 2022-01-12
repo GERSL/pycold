@@ -71,8 +71,8 @@ else
 fi
 
 # Compile and install PyCold in development mode.
-pip install --verbose -e . 
-
+# pip install --verbose -e . 
+pip install --no-build-isolation --verbose -e .
 
 # Quick tests that the install worked
 echo "Pycold Version: $(python -c 'import pycold; print(pycold.__version__)')"
