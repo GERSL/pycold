@@ -49,8 +49,10 @@ void quick_sort(int arr[], char *brr[], int crr[], int left, int right);
 int partition(int arr[], char *brr[], int crr[], int left, int right);
 void quick_sort_float(float arr[], int left, int right);
 void quick_sort_double(double arr[], int left, int right);
+void quick_sort_long(long arr[], int left, int right);
 int partition_float (float arr[], int left, int right);
 int partition_double (double arr[], int left, int right);
+int partition_long (long arr[], int left, int right);
 int partition_index (int arr[],  int *index, int left, int right);
 void quick_sort_buf (int arr[], short int **brr, short int *fmask_buf, int left, int right);
 void quick_sort_index (int arr[], int *index,  int left, int right);
@@ -116,8 +118,7 @@ int get_coldparameters
     int *n_block_v,
     int *CM_OUTPUT_INTERVAL,
     float *probability_threshold,
-    int *conse,
-    char *var_path
+    int *conse
 );
 
 int usage_message ();

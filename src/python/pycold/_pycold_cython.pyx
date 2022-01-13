@@ -47,6 +47,11 @@ cdef extern from "../../cxx/cold.h":
                   unsigned char *cm_outputs_date);
 
 
+cdef extern from "../../cxx/cold.h":
+    cdef int obcold_reconstruction_procedure(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2, long *buf_t,  
+long *fmask_buf, long *valid_date_array, int valid_num_scenes, long *break_dates, int break_date_len, int pos, int conse, Output_t *rec_cg, int *num_fc)
+
+
 
 def test_func():
     """
@@ -147,3 +152,68 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
                                                              # a dtype-object from cython's array
             else:  # for object-based COLD
                 return [np.asarray(<Output_t[:num_fc]>rec_cg), cm_outputs, cm_direction_outputs, cm_outputs_date]
+
+
+def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
+                np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
+                np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas, np.ndarray[np.int64_t, ndim=1] break_dates, 
+                int pos=1, int conse=6):
+    """
+    Helper function to do COLD algorithm.
+
+    	Parameters
+    	----------
+    	dates: 1d array of shape(observation numbers), list of ordinal dates
+    	ts_b: 1d array of shape(observation numbers), time series of blue band.
+    	ts_g: 1d array of shape(observation numbers), time series of green band
+    	ts_r: 1d array of shape(observation numbers), time series of red band
+    	ts_n: 1d array of shape(observation numbers), time series of nir band
+   	ts_s1: 1d array of shape(observation numbers), time series of swir1 band
+    	ts_s2: 1d array of shape(observation numbers), time series of swir2 band
+    	ts_t: 1d array of shape(observation numbers), time series of thermal band
+    	qas: 1d array, the QA cfmask bands. '0' - clear; '1' - water; '2' - shadow; '3' - snow; '4' - cloud
+    	break_dates: 1d array, the break dates obtained from other procedures such as obia
+    	conse: consecutive observation number (for calculating change magnitudes)
+    	Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
+    	Returns
+    	----------
+    	change records: the COLD outputs that characterizes each temporal segment
+    """
+
+    cdef int valid_num_scenes = qas.shape[0]
+    cdef int break_date_len = break_dates.shape[0]
+    # allocate memory for rec_cg
+    cdef int num_fc = 0
+    cdef Output_t t
+    cdef Output_t* rec_cg = <Output_t*> PyMem_Malloc(NUM_FC * sizeof(t))
+
+    cdef long [:] dates_view = dates
+    cdef long [:] ts_b_view = ts_b
+    cdef long [:] ts_g_view = ts_g
+    cdef long [:] ts_r_view = ts_r
+    cdef long [:] ts_n_view = ts_n
+    cdef long [:] ts_s1_view = ts_s1
+    cdef long [:] ts_s2_view = ts_s2
+    cdef long [:] ts_t_view = ts_t
+    cdef long [:] qas_view = qas
+    cdef long [:] break_dates_view = break_dates
+
+    assert ts_b_view.shape[0] == dates_view.shape[0]
+    assert ts_g_view.shape[0] == dates_view.shape[0]
+    assert ts_r_view.shape[0] == dates_view.shape[0]
+    assert ts_n_view.shape[0] == dates_view.shape[0]
+    assert ts_s1_view.shape[0] == dates_view.shape[0]
+    assert ts_s2_view.shape[0] == dates_view.shape[0]
+    assert ts_t_view.shape[0] == dates_view.shape[0]
+    assert qas_view.shape[0] == dates_view.shape[0]
+
+
+    result = obcold_reconstruction_procedure(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0], &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, &break_dates_view[0], break_date_len, pos, conse, rec_cg, &num_fc)
+    if result != 0:
+        raise RuntimeError("cold function fails for pos = {} ".format(pos))
+    else:
+        if num_fc <= 0:
+            raise Exception("The reconstruct function has no change records outputted for pos = {} (possibly due to no enough clear observation)".format(pos))
+        else:
+            return np.asarray(<Output_t[:num_fc]>rec_cg) # np.asarray uses also the buffer-protocol and is able to construct a dtype-object from cython's array
+      

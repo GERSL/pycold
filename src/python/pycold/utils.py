@@ -3,6 +3,8 @@ from datetime import datetime
 import pandas as pd
 from os.path import join
 import gdal
+import os
+import datetime as dt
 
 NAN_VAL = -9999
 
@@ -219,3 +221,50 @@ def get_anchor_days(starting_day, n_cm_maps, interval):
     """
     return np.arange(start=starting_day, stop=starting_day + n_cm_maps * interval,
                      step=interval)
+
+
+def assemble_array(array_list, n_block_x):
+    """
+    assemble a list of block-based array to a bigger array that aligns with the dimension of an ARD tile
+    Parameters
+    ----------
+    array_list
+    n_block_x: block number at x axis
+
+    Returns
+    -------
+    an array [nrows, ncols]
+    """
+    full_feature_array = np.hstack(array_list)
+    full_feature_array = np.vstack(np.hsplit(full_feature_array, n_block_x))  # (nrows, ncols, nfeatures)
+    return full_feature_array
+
+
+def read_blockdata(block_folder, total_pixels, total_bands):
+    img_files = [f for f in os.listdir(block_folder) if f.startswith('L')]
+
+    # sort image files by dates
+    img_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder_name[9:13]), 1, 1) +
+                                        dt.timedelta(int(folder_name[13:16]) - 1)) + 366
+                 for folder_name in img_files]
+    files_date_zip = sorted(zip(img_dates, img_files))
+    img_files_sorted = [x[1] for x in files_date_zip]
+    img_dates_sorted = np.asarray([x[0] for x in files_date_zip])
+    img_stack = [np.load(join(block_folder, f)).reshape(total_pixels, total_bands)
+                 for f in img_files_sorted]
+    img_stack = np.dstack(img_stack)
+    return img_stack, img_dates_sorted
+
+
+def read_data(path):
+    """Load a sample file containing acquisition days and spectral values.
+    The first column is assumed to be the day number, subsequent columns
+    correspond to the day number. This improves readability of large datasets.
+    Args:
+        path: location of CSV containing test data
+    Returns:
+        A 2D numpy array.
+    """
+    return np.genfromtxt(path, delimiter=',', dtype=np.int64).T
+
+

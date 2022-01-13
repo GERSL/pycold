@@ -1197,7 +1197,7 @@ int cold
     // check if valid_date_array is sorted
     for (i = 0; i < valid_num_scenes - 1; i++)
         if (valid_date_array[i] > valid_date_array[i+1]){
-            RETURN_ERROR("The inputted data does not follow an ascending date!", FUNC_NAME, ERROR);
+            RETURN_ERROR("The inputted data does not follow an ascending order!", FUNC_NAME, ERROR);
         }
 
     status = preprocessing(buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
@@ -6456,618 +6456,7 @@ int inefficientobs_procedure
 
 }
 
-/******************************************************************************
-MODULE:  ccd_scanline
 
-PURPOSE:  Running CCD for scanline-based processing
-
-RETURN VALUE:
-Type = int (SUCCESS, ERROR or FAILURE)
-
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-11/14/2018   Su Ye         Original Development
-******************************************************************************/
-int ccd_scanline
-(
-    int row,                 /* I:   input row. The beginning number is 1, not 0!   */
-    char *in_path,           /* I:   Landsat ARD directory  */
-    char **scene_list,       /* I:   current scene name in list of sceneIDs       */
-    //char *mask_path,       /* I:   mask_path */
-    char *user_mask_path,     /* I:   the path of inputted mask       */
-    int  num_samples,        /* I:   number of image samples (X width)      */
-    int  num_scenes,         /* I:   current num. in list of scenes to read */
-    int *sdate,              /* I:   Original array of julian date values         */
-    char *out_path,
-    int method,
-    double probability_threshold,
-    int min_days_conse,
-    int n_focus_variable,
-    int n_total_variable,
-    int* focus_blist,
-    bool NDVI_INCLUDED,
-    bool NBR_INCLUDED,
-    bool RGI_INCLUDED,
-    bool TCTWETNESS_INCLUDED,
-    bool TCTGREENNESS_INCLUDED,
-    bool EVI_INCLUDED,
-    bool DI_INCLUDED,
-    bool NDMI_INCLUDED,
-//    BoosterHandle booster,
-    bool b_landspecific_mode,
-    char *auxiliary_var_path,
-    int conse,
-    bool b_outputCM,
-    bool b_outputCM_reconstruction,
-    int CM_OUTPUT_INTERVAL
-)
-{
-    int **valid_date_array_scanline;
-    short int **fmask_buf_scanline;        /* fmask buf, valid pixels only*/
-    int* valid_scene_count_scanline;
-    short int **buf;                       /* This is the image bands buffer, valid pixel only*/
-    Output_t*  rec_cg;                     /* CCDC outputted recorded  */
-    Output_t_sccd*  s_rec_cg;
-    int i, j;                                 /* Loop counters                         */
-    int i_col;
-    short int **tmp_buf;                   /* This is the image bands buffer, valid pixel only*/
-    short int *tmp_fmask_buf;              /* fmask buf, valid pixels only          */
-    int *tmp_valid_date_array;             /* Sdate array after cfmask filtering    */
-    char *user_mask_scanline;
-    //short int out_p;                       /* outputted pixel values                   */
-    int num_fc;
-    char FUNC_NAME[] = "ccd_scanline";       /* For printing error messages           */
-    int result;
-    FILE *fusermask_bip;
-    char errmsg[MAX_STR_LEN];   /* for printing error text to the log.  */
-    bool user_mask_hasvalidcount = FALSE;
-    FILE *fdoutput;
-    FILE *fhoutput_cm;
-    FILE *fhoutput_cm_date;
-
-    char out_fullpath[MAX_STR_LEN] ="";
-    char out_filename[MAX_STR_LEN];
-    char CM_filename[MAX_STR_LEN];
-    char CM_date_filename[MAX_STR_LEN];
-    char CM_fullpath[MAX_STR_LEN] ="";
-    char CM_date_fullpath[MAX_STR_LEN] ="";
-    bool isUserMaskExist;     /*  if user mask exists or not        */
-    char states_output_dir[MAX_STR_LEN];
-//    char curr_scene_name[MAX_STR_LEN]; /* current scene name */
-    short int *sensor_buf;
-    short int *auxval_scanline;
-    FILE *fauxval_bip;
-    int category;
-    int auxval;
-    double tcg;
-    // double tcg = 11.07;
-//    gsl_matrix **ini_P;          /* initial P1 for each band */
-//    double *ini_H;              /* initial H for each band */
-//    gsl_matrix **ini_Q;          /* initial Q for each band */
-//    GDALDriverH   hDriver;
-//    GDALDatasetH  hDataset;
-//    GDALRasterBandH hBand;
-    int starting_date; // the initial date of the whole dataset
-    int n_CM_maps;
-    short int* CM_outputs;
-    unsigned char* CM_outputs_date;
-    int **breakdate_scanline;
-    char breakdatemap_list_directory[MAX_STR_LEN];
-    char breakdatemap_list_filename[] = "breakdatemap_list.txt";
-    FILE *fd, *fh_breakdatemap;
-    char tmpstr[MAX_STR_LEN];        /* char string for text manipulation      */
-    char **breakdatemap_list;
-    int num_breakdatemaps;
-    char img_filename[MAX_STR_LEN];
-    int *tmp_buf_breakdatemap;
-    int **breakdates_scanline;
-    int nvals;
-
-    buf = (short int **) allocate_2d_array (TOTAL_IMAGE_BANDS, num_scenes * num_samples, sizeof (short int));
-
-    fmask_buf_scanline = (short int **)allocate_2d_array (num_samples, num_scenes, sizeof (short int));
-    tmp_buf = (short int **) allocate_2d_array (TOTAL_IMAGE_BANDS, num_scenes, sizeof (short int));
-    valid_scene_count_scanline = (int*)malloc(num_samples * sizeof(int));
-    valid_date_array_scanline = (int**)allocate_2d_array (num_samples, num_scenes, sizeof (int));
-    sensor_buf = (short int *) malloc(num_scenes * sizeof(short int));
-
-    starting_date = sdate[0];
-    n_CM_maps = (sdate[num_scenes - 1] - sdate[0]) / CM_OUTPUT_INTERVAL + 1;
-    CM_outputs = malloc(sizeof (short int) * n_CM_maps);
-    if(CM_outputs == NULL){
-         RETURN_ERROR("ERROR allocating n_CM_maps", FUNC_NAME, FAILURE);
-    }
-
-    CM_outputs_date =  malloc(sizeof (unsigned char) * n_CM_maps);
-    if(CM_outputs_date == NULL){
-         RETURN_ERROR("ERROR allocating n_CM_maps", FUNC_NAME, FAILURE);
-    }
-
-
-    breakdatemap_list = (char **) allocate_2d_array (MAX_YEAR_RANGE, ARD_STR_LEN, sizeof (char));
-    if (breakdatemap_list == NULL)
-    {
-        RETURN_ERROR("ERROR allocating breakdatemap_list memory", FUNC_NAME, FAILURE);
-    }
-
-    tmp_buf_breakdatemap = malloc(sizeof(int) * num_samples);
-    if (tmp_buf_breakdatemap == NULL)
-    {
-        RETURN_ERROR ("ERROR allocating tmp_buf_breakdatemap",
-                      FUNC_NAME, FAILURE);
-    }
-
-    breakdates_scanline = (int**)allocate_2d_array (num_samples, MAX_YEAR_RANGE, sizeof (int));
-    if(breakdates_scanline == NULL)
-    {
-        RETURN_ERROR ("Allocating breakdates_scanline", FUNC_NAME, FAILURE);
-    }
-
-    /*******************************************************/
-    /******************* output full path ****************/
-    /*****************************************************/
-    if (method == SCCD){
-        sprintf(out_filename, "record_change_row%d_s.dat", row);
-        sprintf(out_fullpath, "%s/%s", out_path, out_filename);
-    }
-    else if(b_outputCM_reconstruction == TRUE && method == COLD){
-        sprintf(out_filename, "record_change_row%d_obcold.dat", row);
-        sprintf(out_fullpath, "%s/%s", out_path, out_filename);
-    }
-    else if (method == COLD){
-        sprintf(out_filename, "record_change_row%d.dat", row);
-        sprintf(out_fullpath, "%s/%s", out_path, out_filename);
-        sprintf(CM_filename, "CM_row%d.dat", row);
-        sprintf(CM_date_filename, "CM_date_row%d.dat", row);
-        sprintf(CM_fullpath, "%s/%s", out_path, CM_filename);
-        sprintf(CM_date_fullpath, "%s/%s", out_path, CM_date_filename);
-        if(b_outputCM == TRUE){
-            fhoutput_cm = fopen(CM_fullpath,"w");
-            fhoutput_cm_date = fopen(CM_date_fullpath,"w");
-        }
-    }
-
-
-
-    if (*user_mask_path == '\0')
-    {
-        isUserMaskExist = FALSE;
-    }
-    else
-    {
-        isUserMaskExist = TRUE;
-    }
-
-
-    // printf("it is processing Row_%d....\n", row);
-
-    /********************************************************/
-    /*      check if has valid pixels give user mask        */
-    /********************************************************/
-
-    if (isUserMaskExist)
-    {
-
-        user_mask_scanline = (char* )malloc(num_samples * sizeof(char));
-
-//        if(format == ENVI_FORMAT){
-        fusermask_bip = open_raw_binary(user_mask_path,"rb");
-
-        if (fusermask_bip == NULL)
-        {
-
-            RETURN_ERROR("Opening user mask fails", FUNC_NAME, FAILURE);
-
-        }
-        fseek(fusermask_bip, (row - 1)* num_samples * sizeof(char), SEEK_SET);
-
-        if(read_raw_binary(fusermask_bip, 1, num_samples,
-                                         sizeof(char), user_mask_scanline) != 0)
-        {
-
-            RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
-        }
-
-        close_raw_binary(fusermask_bip);
-//        }else if(format == TIFF_FORMAT){
-//            hDataset = GDALOpen(user_mask_path, GA_ReadOnly);
-//            hBand = GDALGetRasterBand(hDataset, 1);
-//            GDALRasterIO(hBand, GF_Read, 0, row - 1, num_samples, 1,
-//                         user_mask_scanline, num_samples, 1, GDT_Byte,
-//                         0, 0 );
-//            GDALClose(hDataset);
-//        }
-
-
-        for (i = 0 ; i < num_samples; i++)
-        {
-            if (user_mask_scanline[i] != 0)
-            {
-                user_mask_hasvalidcount = TRUE;
-                break;
-            }
-        }
-
-        /* skip if there are not avaiable pixels in this scanline */
-        if (user_mask_hasvalidcount == FALSE)
-        {
-
-            //free_2d_array ((void **) fp_bip);
-            return SUCCESS;
-        }
-    }
-
-    if (b_landspecific_mode)
-    {
-
-        auxval_scanline = (short int* )malloc(num_samples * sizeof(short int));
-
-//        if(format == ENVI_FORMAT){
-        fauxval_bip = open_raw_binary(auxiliary_var_path,"rb");
-
-        if (fauxval_bip == NULL)
-        {
-
-            RETURN_ERROR("Opening auxillary variable fails", FUNC_NAME, FAILURE);
-
-        }
-        fseek(fauxval_bip, (row - 1)* num_samples * sizeof(short int), SEEK_SET);
-
-        if(read_raw_binary(fauxval_bip, 1, num_samples,
-                                         sizeof(short int), auxval_scanline) != 0)
-        {
-
-            RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
-        }
-
-        close_raw_binary(fauxval_bip);
-    }
-
-
-    /* for obcold reconstructing rec_cg step */
-    if(b_outputCM_reconstruction == TRUE && method == COLD){
-        sprintf(breakdatemap_list_directory, "%s/breakdate_maps/%s", out_path, breakdatemap_list_filename);
-        if (access(breakdatemap_list_directory, F_OK) != 0)
-            RETURN_ERROR("Can't locate breakdate_map_list file", FUNC_NAME, FAILURE);
-        fd = fopen(breakdatemap_list_directory, "r");
-        if (fd == NULL)
-        {
-            RETURN_ERROR("Opening scene_list file", FUNC_NAME, FAILURE);
-        }
-
-        for (i = 0; i < MAX_YEAR_RANGE; i++)
-        {
-            if (fscanf(fd, "%s", tmpstr) == EOF)
-                break;
-            strcpy(breakdatemap_list[i], tmpstr);
-        }
-        num_breakdatemaps = i;
-        fclose(fd);
-
-        breakdate_scanline = (int **)allocate_2d_array (num_samples, num_breakdatemaps, sizeof (int));
-
-        for (i = 0; i < num_breakdatemaps; i++)
-        {
-            sprintf(img_filename, "%s/breakdate_maps/%s", out_path, breakdatemap_list[i]);
-            fh_breakdatemap = open_raw_binary(img_filename,"rb");
-            if (fh_breakdatemap == NULL)
-            {
-
-                RETURN_ERROR("Opening fh_breakdatemap variable fails", FUNC_NAME, FAILURE);
-
-            }
-            fseek(fh_breakdatemap, (row - 1)* num_samples * sizeof(int), SEEK_SET);
-
-            if(read_raw_binary(fh_breakdatemap, 1, num_samples,
-                                             sizeof(int), tmp_buf_breakdatemap) != 0)
-            {
-
-                RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
-            }
-
-            for(j = 0; j < num_samples; j++){
-                breakdates_scanline[j][i] = tmp_buf_breakdatemap[j];
-            }
-            fclose(fh_breakdatemap);
-        }
-    }else{
-         tcg = X2(NUM_LASSO_BANDS, probability_threshold);
-         //tcg = 15; //for debug
-    }
-
-
-
-    for (i = 0 ; i < num_samples; i++)
-    {
-        valid_scene_count_scanline[i] = 0;
-    }
-
-//    long ms_start = getMicrotime();
-//    if(format == ENVI_FORMAT)
-    result = read_bip_lines(in_path, scene_list, row, num_samples, num_scenes, sdate, buf,
-                            fmask_buf_scanline, valid_scene_count_scanline,valid_date_array_scanline,
-                            sensor_buf);
-
-
-
-//    else if(format == TIFF_FORMAT)
-//        result = read_tif_lines(in_path, scene_list, row, num_samples, num_scenes, sdate, buf,
-//                                fmask_buf_scanline, valid_scene_count_scanline, valid_date_array_scanline,
-//                                sensor_buf);
-
-//    long ms_end = getMicrotime();
-//    char msg_str[MAX_STR_LEN];       /* Input data scene name                 */
-//    snprintf (msg_str, sizeof(msg_str), "CCDC reading scanline time (in ms)=%ld\n", ms_end - ms_start);
-//    LOG_MESSAGE (msg_str, FUNC_NAME);
-
-    if (result != SUCCESS)
-    {
-        free_2d_array ((void **) buf);
-        free_2d_array((void **) fmask_buf_scanline);
-        free_2d_array((void **)valid_date_array_scanline);
-        free(valid_scene_count_scanline);
-        free_2d_array((void **)tmp_buf);
-
-        if (isUserMaskExist)
-        {
-           free(user_mask_scanline);
-        }
-        sprintf(errmsg, "Error in reading Landsat data for row_%d \n", row);
-        RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
-    }
-
-    fdoutput= fopen(out_fullpath, "w");
-
-    /**********************************************************/
-    /*                   write csv header                     */
-    /**********************************************************/
-
-//    if (fdoutput == NULL)
-//    {
-//        RETURN_ERROR("Please provide correct path for output csv", FUNC_NAME, FAILURE);
-//    }
-
-//    fprintf(fdoutput, "POS,CATEGORY,T_START,T_END,T_BREAK,NUM_OBS,CHANGE_PROBABILITY,");
-//    for (i = 0; i < TOTAL_IMAGE_BANDS; i++)
-//        fprintf(fdoutput, "MAGNITUDE_BAND_%d,", i+1);
-
-//    for (i = 0; i < TOTAL_IMAGE_BANDS; i++)
-//        for(j = 0; j < NUM_COEFFS; j++)
-//           fprintf(fdoutput, "COEFF_%d_BAND_%d,", j+1, i+1);
-
-//    for (i = 0; i < TOTAL_IMAGE_BANDS; i++)
-//        fprintf(fdoutput, "RMSE_%d_BAND_%d,", i+1);
-
-//    fprintf(fdoutput,"\n");
-    //neighborhood
-//    if (method == SCCD)
-//    {
-//        /*************************************************************/
-//        /*          alloc memory for initial KF parameters           */
-//        /*************************************************************/
-//        ini_P = (gsl_matrix**) allocate_2d_array(TOTAL_IMAGE_BANDS, 1, sizeof(gsl_matrix));
-//        if (ini_P == NULL)
-//        {
-//            RETURN_ERROR ("Allocating ini_P memory", FUNC_NAME, FAILURE);
-//        }
-//        ini_Q = (gsl_matrix**) allocate_2d_array(TOTAL_IMAGE_BANDS, 1, sizeof(gsl_matrix));
-//        if (ini_Q == NULL)
-//        {
-//            RETURN_ERROR ("Allocating ini_Q  memory", FUNC_NAME, FAILURE);
-//        }
-
-//        ini_H = (double *)malloc(TOTAL_IMAGE_BANDS * sizeof(double));
-
-//        for(i = 0; i < TOTAL_IMAGE_BANDS; i ++)
-//        {
-//           ini_P[i] = gsl_matrix_calloc (DEFAULT_M, DEFAULT_M);
-//           ini_Q[i] = gsl_matrix_calloc (DEFAULT_M, DEFAULT_M);
-//        }
-//    }
-
-    for(i_col = 0; i_col < num_samples; i_col++)
-    {
-        /*for test */
-        // printf("%d\n", i_col);
-        // if user mask exists
-        if (isUserMaskExist)
-        {
-            if (user_mask_scanline[i_col] == 0)
-            {
-                continue;
-            }
-        }
-
-        // if it is the pixel to be processed
-        num_fc = 0;
-        for(j = 0; j < TOTAL_IMAGE_BANDS; j++)
-        {
-           tmp_buf[j]  = buf[j] + i_col * num_scenes;
-        }
-
-        tmp_valid_date_array = (int*)valid_date_array_scanline[i_col];
-        tmp_fmask_buf = (short int*)fmask_buf_scanline[i_col];
-
-        if(method == COLD && b_outputCM_reconstruction == FALSE)
-        {
-            for(i = 0; i < n_CM_maps; i++){
-                CM_outputs[i] = NA_VALUE;
-                CM_outputs_date[i] = NA_VALUE;
-            }
-
-            rec_cg = malloc(NUM_FC * sizeof(Output_t));
-//            result = cold(tmp_buf[0], tmp_buf[1], tmp_buf[2], tmp_buf[3], tmp_buf[4],
-//                          tmp_buf[5], tmp_buf[6], tmp_fmask_buf, tmp_valid_date_array,
-//                          valid_scene_count_scanline[i_col], num_samples, i_col + 1,
-//                          row, tcg, conse, FALSE, starting_date,rec_cg, &num_fc, CM_outputs,
-//                          CM_outputs_date, CM_OUTPUT_INTERVAL);
-
-            if (result != SUCCESS)
-            {
-                printf("cold procedure fails at row %d and col %d \n",i_col + 1, row);
-            }
-
-            for(i = 0; i < num_fc; i++)
-            {
-                result = write_output_binary(fdoutput, rec_cg[i]);
-            }
-            if (b_outputCM == TRUE){
-                nvals = fwrite (CM_outputs, sizeof(int16), n_CM_maps, fhoutput_cm);
-                if (nvals != n_CM_maps)
-                {
-                    RETURN_ERROR("Incorrect amount of data written", FUNC_NAME, ERROR);
-                }
-                nvals = fwrite (CM_outputs_date, sizeof(int8), n_CM_maps, fhoutput_cm_date);
-                if (nvals != n_CM_maps)
-                {
-                    RETURN_ERROR("Incorrect amount of data written", FUNC_NAME, ERROR);
-                }
-            }
-            free(rec_cg);
-        }
-        else if (method == SCCD)
-        {
-            s_rec_cg = malloc(NUM_FC * sizeof(Output_t_sccd));
-            if (b_landspecific_mode == TRUE){
-                category = getlabelfromNLCD(user_mask_scanline[i_col]);
-                for(i = 0; i < NUM_FC; i++){
-                    if (i == 0)
-                        s_rec_cg[i].land_type = category;
-                    else
-                        s_rec_cg[i].land_type = NA_VALUE;
-                }
-
-                auxval = auxval_scanline[i];
-
-            }
-            else{
-                for(i = 0; i < NUM_FC; i++)
-                    s_rec_cg[i].land_type = NA_VALUE;
-                auxval = NA_VALUE;
-            }
-
-
-            result = sccd(tmp_buf, tmp_fmask_buf, tmp_valid_date_array, valid_scene_count_scanline[i_col], s_rec_cg,
-                          &num_fc, num_samples, i_col + 1, row, TRUE, states_output_dir, probability_threshold,
-                          min_days_conse, 0, 0, 0, sensor_buf,
-                          n_focus_variable, n_total_variable, focus_blist, NDVI_INCLUDED, NBR_INCLUDED, RGI_INCLUDED,
-                          TCTWETNESS_INCLUDED,TCTGREENNESS_INCLUDED, EVI_INCLUDED, DI_INCLUDED, NDMI_INCLUDED,
-                          b_landspecific_mode, auxval, conse);
-
-            if (result != SUCCESS)
-            {
-                printf("sccd procedure fails at row %d and col %d \n",i_col + 1, row);
-
-            }
-
-            for(i = 0; i < num_fc + 1; i++)
-            {
-                result = write_output_binary_sccd(fdoutput, s_rec_cg[i]);
-            }
-            free(s_rec_cg);
-            s_rec_cg = NULL;
-        }
-        else if(method == OBCOLD_RECONSTRUCT && b_outputCM_reconstruction == TRUE){
-            rec_cg = malloc(NUM_FC * sizeof(Output_t));
-            result = obcold_reconstruction_procedure(tmp_buf, tmp_fmask_buf, tmp_valid_date_array, valid_scene_count_scanline[i_col],
-                                                     rec_cg, &num_fc, num_breakdatemaps, breakdate_scanline[i_col],
-                                                     num_samples, i_col + 1, row, conse);
-
-
-            if (result != SUCCESS)
-            {
-                printf("obcold reconstructing procedure fails at row %d and col %d \n",i_col + 1, row);
-
-            }
-            for(i = 0; i < num_fc; i++)
-            {
-                result = write_output_binary(fdoutput, rec_cg[i]);
-            }
-            /**********************************************************/
-            /****************** write binary header **********************/
-            /**********************************************************/
-            for(i = 0; i < num_fc; i++)
-            {
-                write_output_binary(fdoutput, rec_cg[i]);
-            }
-
-            free(rec_cg);
-        }
-
-    } // end for(i_col = 0; i_col < num_samples; i_col++)
-//neighborhood
-//    if(SCCD == method)
-//    {
-//        for(i = 0; i < TOTAL_IMAGE_BANDS; i ++)
-//        {
-//             gsl_matrix_free(ini_P[i]);
-//             gsl_matrix_free(ini_Q[i]);
-//        }
-
-//        status = free_2d_array ((void **)ini_P);
-//        if (status != SUCCESS)
-//        {
-//            RETURN_ERROR ("Freeing memory: ini_P\n", FUNC_NAME, FAILURE);
-//        }
-
-//        status = free_2d_array ((void **)ini_Q);
-//        if (status != SUCCESS)
-//        {
-//            RETURN_ERROR ("Freeing memory: ini_Q\n", FUNC_NAME, FAILURE);
-//        }
-//        free(ini_H);
-//    }
-    if(b_outputCM == TRUE){
-        fclose(fhoutput_cm);
-        fclose(fhoutput_cm_date);
-    }
-    fclose(fdoutput);
-    free_2d_array ((void **) buf);
-    free_2d_array((void **) fmask_buf_scanline);
-    free_2d_array((void **)valid_date_array_scanline);
-    free(valid_scene_count_scanline);
-    free_2d_array((void **)tmp_buf);
-    free((void *) sensor_buf);
-    free_2d_array((void **)breakdatemap_list);
-
-    if(method == OBCOLD_RECONSTRUCT){
-        free_2d_array((void **)breakdate_scanline);
-    }
-    free(CM_outputs);
-    free(CM_outputs_date);
-    free(tmp_buf_breakdatemap);
-    free_2d_array((void **)breakdates_scanline);
-
-    if (isUserMaskExist)
-    {
-       free(user_mask_scanline);
-    }
-
-    if (b_landspecific_mode)
-    {
-        free(auxval_scanline);
-    }
-
-    return SUCCESS;
-}
-
-//double angle_decaying(double input, double lowbound, double highbound){
-//    double prob;
-//    if (input < lowbound){
-//        prob = 1;
-//    }else if (input > highbound)
-//    {
-//        prob = 0;
-
-//    }else{
-//        double a = (log(999) - log(1.0 / 999)) / (lowbound - highbound);
-//        double b = (lowbound * log(999) - highbound * log(1.0 / 999)) / (lowbound - highbound);
-//        prob = 1.0 / (1 + exp(-a * input + b));
-//    }
-//    return prob;
-
-//}
 
 double angle_decaying(double input, double lowbound, double highbound){
     double prob;
@@ -7087,6 +6476,7 @@ double angle_decaying(double input, double lowbound, double highbound){
 }
 
 
+
 /******************************************************************************
 MODULE:  obcold_reconstruction_procedure
 PURPOSE:  standard procedure when having enough clear pixels
@@ -7097,21 +6487,24 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 02/14/2021   Su Ye          rescontructing rec_cg using breakdate
 ******************************************************************************/
-
 int obcold_reconstruction_procedure
 (
-    short int **buf,            /* I:  pixel-based time series  */
-    short int *fmask_buf,      /* I:  mask-based time series  */
-    int *valid_date_array,    /* I: valid date time series  */
-    int valid_num_scenes,             /* I:  number of scenes  */
+    long *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *fmask_buf,       /* I:  the time series of cfmask values. 0 - clear; 1 - water; 2 - shadow; 3 - snow; 4 - cloud  */
+    long *valid_date_array,      /* I:  valid date as matlab serial date form (counting from Jan 0, 0000). Note ordinal date in python is from (Jan 1th, 0001) */
+    int valid_num_scenes,       /* I: number of valid scenes  */
+    long *break_dates, /*an array of break dates with a fixed length of num_year, '0' means no breaks */
+    int break_date_len,       /*I: the length of break_dates */
+    int pos,              /*I: the position of the pixel */
+    int conse,
     Output_t *rec_cg,    /* O: Initialize NUM of Functional Curves    */
-    int *num_fc,
-    int num_year,       /*I: the number of focused years */
-    int *break_dates, /*an array of break dates with a fixed length of num_year, '0' means no breaks */
-    int num_samples,            /* I: column number per scanline                    */
-    int col_pos,                /* I: column position of current processing pixel   */
-    int row_pos,
-    int conse
+    int *num_fc
 )
 {
     int status;
@@ -7159,13 +6552,15 @@ int obcold_reconstruction_procedure
     int result;
     int *break_list;
     int i_break;
+    int i_break_tmp;
 
     int break_num = 0;
-    int last_break_i = 0;
+    int i_last_break = 0;
     int ini_date;
 
     int adj_conse = conse;
     float **v_dif_mag;
+    int last_break_record = 0;  // used to record the year of the last break
 
     id_range = (int*)calloc(valid_num_scenes, sizeof(int));
 
@@ -7194,12 +6589,19 @@ int obcold_reconstruction_procedure
     }
 
     v_dif_allbands = (float *)calloc(TOTAL_BANDS, sizeof(float));
-    if (v_dif == NULL)
+    if (v_dif_allbands == NULL)
     {
         RETURN_ERROR("ERROR allocating v_dif memory", FUNC_NAME, FAILURE);
     }
 
     n_clr = 0;
+
+    // check if validate_date_array follow a ascending order
+    for (i = 0; i < valid_num_scenes - 1; i++)
+        if (valid_date_array[i] > valid_date_array[i+1]){
+            RETURN_ERROR("The inputted data does not follow an ascending order!", FUNC_NAME, ERROR);
+        }
+
 
     clrx = (int* )malloc(valid_num_scenes * sizeof(int));
     clry = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS, valid_num_scenes,
@@ -7212,8 +6614,8 @@ int obcold_reconstruction_procedure
 
 
 
-    status = preprocessing(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6],
-                            fmask_buf, &valid_num_scenes, id_range, &clear_sum,
+    status = preprocessing(buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
+                           fmask_buf, &valid_num_scenes, id_range, &clear_sum,
                            &water_sum, &shadow_sum, &sn_sum, &cloud_sum);
     if (status != SUCCESS)
     {
@@ -7233,7 +6635,20 @@ int obcold_reconstruction_procedure
                 //printf("%d is %d\n", n_clr + 1, clrx[n_clr]);
                 for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
                 {
-                    clry[k][n_clr] = (float)buf[k][i];
+                    if (k == 0)
+                        clry[k][n_clr] = (float)buf_b[i];
+                    else if (k == 1)
+                        clry[k][n_clr] = (float)buf_g[i];
+                    else if (k == 2)
+                        clry[k][n_clr] = (float)buf_r[i];
+                    else if (k == 3)
+                        clry[k][n_clr] = (float)buf_n[i];
+                    else if (k == 4)
+                        clry[k][n_clr] = (float)buf_s1[i];
+                    else if (k == 5)
+                        clry[k][n_clr] = (float)buf_s2[i];
+                    else if (k == 6)
+                        clry[k][n_clr] = (float)buf_t[i];
                     //printf("%3.2f\n", clry[k][n_clr]);
                 }
                 n_clr++;
@@ -7262,10 +6677,10 @@ int obcold_reconstruction_procedure
 
     end = n_clr;
 
-    break_list = (int* )malloc(num_year * sizeof(int));
+    break_list = (int* )malloc(break_date_len * sizeof(int));
 
     if (clear_sum < N_TIMES * MAX_NUM_C){
-        result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6],
+        result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
                                  fmask_buf, id_range,sn_pct,rec_cg, num_fc);
     }else
     {
@@ -7283,9 +6698,14 @@ int obcold_reconstruction_procedure
         }
 
 
-        for(i = 0; i< num_year; i++){
-            if(break_dates[i] > 0){
-               break_list[break_num] = break_dates[i];
+        /* sort the date array first in case that they are not sorted */
+        quick_sort_long(break_dates, 0, break_date_len-1);
+
+        // guarantee that the interval of two breaks has at least 365 days
+        for(i = 0; i< break_date_len; i++){
+            if((break_dates[i] > 0) & (break_dates[i] - last_break_record >= AVE_DAYS_IN_A_YEAR)){
+               break_list[break_num] = (int)break_dates[i];
+               last_break_record = break_dates[i];
                break_num ++;
             }
         }
@@ -7294,44 +6714,24 @@ int obcold_reconstruction_procedure
         for(j = 0; j < break_num + 1; j++) // break_num + 1 is because the segment = break_num + 1
         {
             if (j == break_num) // last break, using last_obs + 1 as break
-            {
-                i_break = end;
-            }else{
-                i_break = find_index_clrx(clrx, end, break_list[j]);
-            }
-
-            if (last_break_i == 0)
-                ini_date = 0;
+                i_break_tmp = end;
             else
-                ini_date = clrx[last_break_i-1];
+                i_break_tmp = find_index_clrx(clrx, end, break_list[j]);
 
 
-
-            if(i_break - 1 - last_break_i + 1 < LASSO_MIN)
+            if(i_break_tmp - 1 - i_last_break + 1 < LASSO_MIN)
                 continue;
 
-            if(j > 0 && j < break_num) // for not the first or the last segment
+            // if 6 <=number of observations < 12, no needs to filter out outliers, direct fitting
+            if(i_break_tmp - 1 - i_last_break + 1 >= MIN_NUM_C * N_TIMES && j < break_num)
             {
                 end_copy = end;
-                if(clrx[i_break - 1] - ini_date + 1 < NUM_YEARS){
-                    continue;
-                }
 
-                /**************************************************/
-                /*                                                */
-                /* Clear the IDs buffers.                         */
-                /*                                                */
-                /**************************************************/
-
-    //            for (m = 0; m < n_clr; m++)
-    //                bl_ids[m] = 0;
-
-
-                /********************************************/
-                /* the first test (t-mask)*/
-                /*******************************************/
-                status = auto_mask(clrx, clry, last_break_i, i_break - 1,
-                                    (float)(clrx[i_break - 1]-clrx[last_break_i] + 1) / NUM_YEARS,
+                /*****************************************************/
+                /*         test 1:    t-mask                        */
+                /****************************************************/
+                status = auto_mask(clrx, clry, i_last_break, i_break_tmp - 1,
+                                    (float)(clrx[i_break_tmp - 1]-clrx[i_last_break] + 1) / NUM_YEARS,
                                     adj_rmse[1], adj_rmse[4], (float)T_CONST, bl_ids);
                 // printf("auto_mask finished \n");
                 if (status != SUCCESS)
@@ -7347,19 +6747,16 @@ int obcold_reconstruction_procedure
                 /**************************************************/
                 rm_ids_len = 0;
 
-                for (k = last_break_i; k < i_break; k++) /** 02282019 SY **/
+                for (k = i_last_break; k < i_break_tmp; k++) /** 02282019 SY **/
                 {
-                    if (bl_ids[k - last_break_i] == 1)
+                    if (bl_ids[k - i_last_break] == 1)
                     {
                         rm_ids[rm_ids_len] = k;
                         rm_ids_len++;
                     }
                 }
 
-
-                /* step 2: outlier analysis*/
-                /**************************************************/
-                if(i_break - 1 - last_break_i + 1 - rm_ids_len < LASSO_MIN) // first test not passsed
+                if(i_break_tmp - 1 - i_last_break + 1 - rm_ids_len < LASSO_MIN) // first test not passsed
                 {
                     end = end_copy;
                     continue;
@@ -7384,10 +6781,13 @@ int obcold_reconstruction_procedure
 
                 // update other parameters
                 end = k_new;
-                i_break = i_break - rm_ids_len;
-                rm_ids_len = 0;
+                i_break_tmp = i_break_tmp - rm_ids_len;
 
-                update_cft(i_break - 1 - last_break_i + 1, N_TIMES, MIN_NUM_C, MID_NUM_C, MAX_NUM_C,
+
+                /**************************************************/
+                /* Test 2:        COLD test analysis           */
+                /**************************************************/
+                update_cft(i_break_tmp - 1 - i_last_break + 1, N_TIMES, MIN_NUM_C, MID_NUM_C, MAX_NUM_C,
                           num_c, &update_num_c);
 
                 for (i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
@@ -7402,7 +6802,8 @@ int obcold_reconstruction_procedure
                         /**********************************************/
                         if (i_b == lasso_blist[b])
                         {
-                            status = auto_ts_fit_float(clrx_tmp, clry_tmp,  lasso_blist[b], lasso_blist[b], last_break_i, i_break - 1,
+                            status = auto_ts_fit_float(clrx_tmp, clry_tmp,  lasso_blist[b], lasso_blist[b], i_last_break,
+                                                       i_break_tmp - 1,
                                      update_num_c, fit_cft, &rmse[i_b], rec_v_dif);
                             if (status != SUCCESS)
                             {
@@ -7414,8 +6815,8 @@ int obcold_reconstruction_procedure
                     }
                 }
 
-
-                for (k = last_break_i; k < i_break; k++)//SY 09192018
+                rm_ids_len = 0;
+                for (k = i_last_break; k < i_break_tmp; k++)//SY 09192018
                 {
                     v_dif_norm = 0.0;
                     for (i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
@@ -7439,7 +6840,7 @@ int obcold_reconstruction_procedure
                      }
                  }
 
-                if(i_break - 1 - last_break_i + 1 - rm_ids_len < LASSO_MIN)
+                if(i_break_tmp - 1 - i_last_break + 1 - rm_ids_len < LASSO_MIN)
                 {
                     end = end_copy;
                     continue;
@@ -7461,20 +6862,25 @@ int obcold_reconstruction_procedure
                     k_new++;
                 }
 
-                // update end and i_break
+                // update end and i_break_tmp
                 end = k_new;
-                i_break = i_break - rm_ids_len;
            }
 
-           // the above is the ultimate test, if passed, we updated permanently clrx and clry
-           update_cft(i_break - 1 - last_break_i + 1, N_TIMES, MIN_NUM_C, MID_NUM_C, MAX_NUM_C,
+            // the above is the ultimate test, if passed, we think it is the 'final' break point
+            if (j == break_num) // last break, using last_obs + 1 as break
+                i_break = end;
+            else
+                i_break = find_index_clrx(clrx, end, break_list[j]);
+
+
+           update_cft(i_break - 1 - i_last_break + 1, N_TIMES, MIN_NUM_C, MID_NUM_C, MAX_NUM_C,
                       num_c, &update_num_c);
 
 
             /*final fitting*/
             for (i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
             {
-                status = auto_ts_fit_float(clrx, clry, i_b, i_b, last_break_i, i_break - 1, update_num_c,
+                status = auto_ts_fit_float(clrx, clry, i_b, i_b, i_last_break, i_break - 1, update_num_c,
                                  fit_cft, &rmse[i_b], rec_v_dif);
                 // printf("auto_ts_fit2 finished \n", i);
                 if (status != SUCCESS)
@@ -7484,19 +6890,19 @@ int obcold_reconstruction_procedure
                 }
             }
 
-            rec_cg[*num_fc].t_start = clrx[last_break_i];
+            rec_cg[*num_fc].t_start = clrx[i_last_break];
             rec_cg[*num_fc].t_end = clrx[i_break - 1];
 
             // rec_cg[*num_fc].t_confirmed = 0;
-            rec_cg[*num_fc].num_obs = i_break - last_break_i + 1;
+            rec_cg[*num_fc].num_obs = i_break - i_last_break + 1;
             rec_cg[*num_fc].category = 0 + update_num_c;
 
             /* note that each time we calculate change magnitude for the last curve, not current curve*/
 //                        if (*num_fc > 0){
 //                            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
 //                            {
-//                                auto_ts_predict(clrx, fit_cft, update_num_c, i_b, last_break_i, last_break_i, &ts_pred_temp);
-//                                auto_ts_predict(clrx, fit_cft_last, update_num_c, i_b, last_break_i, last_break_i, &ts_pred_temp_last);
+//                                auto_ts_predict(clrx, fit_cft, update_num_c, i_b, i_last_break, i_last_break, &ts_pred_temp);
+//                                auto_ts_predict(clrx, fit_cft_last, update_num_c, i_b, i_last_break, i_last_break, &ts_pred_temp_last);
 //                                rec_cg[*num_fc - 1].magnitude[i_b] = ts_pred_temp - ts_pred_temp_last;
 //                                rec_cg[*num_fc - 1].change_prob = 100;
 //                            }
@@ -7573,16 +6979,16 @@ int obcold_reconstruction_procedure
 
             *num_fc = *num_fc + 1;
 
-            // finally, change last_break_i; if the last segment, no need to update
+            // finally, change i_last_break; if the last segment, no need to update
             if(j < break_num){
-                last_break_i = i_break;
+                i_last_break = i_break;
             }
 
 
         } // end  for(j = 0; j < break_num; j++)
 
-        if(*num_fc == 0){ // apply inefficient procedure to guaranttee to have a model
-            result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6],
+        if(*num_fc == 0){ // apply inefficient procedure to force to have a model
+            result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
                                      fmask_buf, id_range,sn_pct,rec_cg, num_fc);
         }
     }
@@ -7600,7 +7006,7 @@ int obcold_reconstruction_procedure
 
     for(i = 0; i < *num_fc; i++)
     {
-        rec_cg[i].pos = num_samples * (row_pos - 1) + col_pos;
+        rec_cg[i].pos = 1;
     }
 
 

@@ -1,10 +1,10 @@
 # this script show how to run COLD from a csv file that store time series information
 import numpy as np
 import os
-from pycold import cold_detect
+from pycold import cold_detect, obcold_reconstruct
 # sys.path.append('/Users/coloury/Dropbox/Documents/pycold')
 # os.chdir('/Users/coloury/Dropbox/Documents/pycold')
-from shared import read_data
+from pycold.utils import read_data
 
 Landsat_bandname = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Thermal']
 t_c = -200  # the threshold used for get_breakcategory
@@ -36,7 +36,7 @@ def get_breakcategory(ccd_plot, i_curve):
         return 1
 
 
-def main():
+def test_cold_detect():
     # running COLD for a Landsat time series provided by a csv
     in_path = 'tests/resources/spectral_336_3980_obs.csv'
     data = read_data(in_path)
@@ -47,5 +47,14 @@ def main():
     assert cold_result[1]['t_end'] == 737352
 
 
-if __name__ == '__main__':
-    main()
+def test_obcold_reconstruct():
+    # running reconstructing for a Landsat time series provided by a csv
+    in_path = 'tests/resources/spectral_336_3980_obs.csv'
+    break_path = 'tests/resources/spectral_336_3980_breaks.csv'
+    data = read_data(in_path)
+    breaks = read_data(break_path)
+    dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, sensor = data.copy()  # exclude header
+    cold_result = obcold_reconstruct(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, breaks)
+    assert cold_result[0]['t_break'] == 735040
+    # assert cold_result[0]['num_obs'] == 139
+    # assert cold_result[1]['t_end'] == 737352

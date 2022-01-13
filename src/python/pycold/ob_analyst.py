@@ -13,8 +13,9 @@ from astropy.convolution import convolve
 from scipy import stats
 from scipy.stats import chi2
 from os.path import join, exists
-from pycold.utils import gdal_save_file_1band
+from pycold.utils import gdal_save_file_1band, get_block_x, get_block_y, read_blockdata, get_rowcol_intile
 from pycold.app import defaults, logging
+from pycold import obcold_reconstruct
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,6 @@ def cmdirectionname_fromdate(ordinal_date):
                                               str(pd.Timestamp.fromordinal(ordinal_date
                                                                            - 366).timetuple().tm_yday).zfill(3))
 
-
 def cmdatename_fromdate(ordinal_date):
     """
     get date file name from ordinate date
@@ -56,6 +56,21 @@ def cmdatename_fromdate(ordinal_date):
     return 'CM_date_maps_{}_{}{}'.format(str(ordinal_date), pd.Timestamp.fromordinal(ordinal_date - 366).year,
                                               str(pd.Timestamp.fromordinal(ordinal_date
                                                                            - 366).timetuple().tm_yday).zfill(3))
+
+
+def obiaresname_fromdate(ordinal_date):
+    """
+    get file name from ordinate date
+    Args:
+        ordinal_date: the inputted ordinate date
+    Returns:
+        CM file name
+    """
+    return 'obiaresult_{}_{}{}'.format(str(ordinal_date),
+                                    pd.Timestamp.fromordinal(ordinal_date - 366).year,
+                                    str(pd.Timestamp.fromordinal(ordinal_date - 366).timetuple().tm_yday).zfill(3))
+
+
 
 
 def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keyword, classification_map):
@@ -560,7 +575,7 @@ class ObjectAnalystHPC:
         #     gdal_save_file_1band(join(self.obia_path, filenm + '_OBIAresult.tif'), change_map,
         #                          gdal.GDT_Byte, trans, proj, defaults['n_cols'], defaults['n_rows'])
         # else:
-        filenm = cmname_fromdate(date)
+        filenm = obiaresname_fromdate(date)
         bytesize = 1
         result_blocks = np.lib.stride_tricks.as_strided(change_map,
                                                         shape=(self.config['n_block_y'], self.config['n_block_x'],
@@ -570,7 +585,7 @@ class ObjectAnalystHPC:
                                                                  self.config['n_cols'] * bytesize, bytesize))
         for i in range(self.config['n_block_y']):
             for j in range(self.config['n_block_x']):
-                np.save(join(self.obia_path, filenm + '_OBIAresult_x{}_y{}.npy'.format(j + 1, i + 1)),
+                np.save(join(self.obia_path, filenm + '_x{}_y{}.npy'.format(j + 1, i + 1)),
                         result_blocks[i][j])
 
     def is_finished_object_analysis(self, date_list):
@@ -584,3 +599,54 @@ class ObjectAnalystHPC:
                                                                       'OBIAresult_x{}_y{}.npy'.format(j + 1, i + 1)))):
                         return False
         return True
+
+    def get_allobiaresult_asarray(self, block_x, block_y):
+        obia_files = [f for f in os.listdir(self.obia_path) if f.startswith('obiaresult')
+                      and f.endswith('_x{}_y{}.npy'.format(block_x, block_y))]
+        # sort image files by dates
+        cm_dates = [int(f[f.find('obiaresult_') + len('obiaresult_'):
+                          f.find('obiaresult_') + len('obiaresult_')+6])
+                    for f in obia_files]
+
+        files_date_zip = sorted(zip(cm_dates, obia_files))
+        obia_tstack = [np.load(join(self.obia_path, f[1])).reshape(self.config['block_width']
+                                                                   * self.config['block_height']) * f[0]
+                       for f in files_date_zip]
+        return np.dstack(obia_tstack)
+
+    def reconstruct_reccg(self, block_id):
+        block_y = get_block_x(block_id, self.config['n_block_x']),
+        block_x = get_block_y(block_id, self.config['n_block_x'])
+        block_folder = join(self.stack_path, 'block_x{}_y{}'.format(block_x, block_y))
+        img_stack, img_dates_sorted = read_blockdata(block_folder, self.config['n_cols']*self.config['n_rows'],
+                                                       self.config['TOTAL_IMAGE_BANDS']+1)
+        obia_breaks = self.get_allobiaresult_asarray(block_x, block_y)
+        result_collect = []
+        for pos in range(self.config['block_width'] * self.config['block_height']):
+            original_row, original_col = get_rowcol_intile(pos, self.config['block_width'],
+                                                           self.config['block_height'], block_x, block_y)
+
+            try:
+                obcold_result = obcold_reconstruct(img_dates_sorted,
+                                                   img_stack[pos, 0, :].astype(np.int64),
+                                                   img_stack[pos, 1, :].astype(np.int64),
+                                                   img_stack[pos, 2, :].astype(np.int64),
+                                                   img_stack[pos, 3, :].astype(np.int64),
+                                                   img_stack[pos, 4, :].astype(np.int64),
+                                                   img_stack[pos, 5, :].astype(np.int64),
+                                                   img_stack[pos, 6, :].astype(np.int64),
+                                                   img_stack[pos, 7, :].astype(np.int64),
+                                                   obia_breaks[pos, :],
+                                                   conse=self.config['conse'],
+                                                   pos=self.config['n_cols'] * (original_row - 1) + original_col)
+            except RuntimeError:
+                logger.error("COLD fails at original_row {}, original_col {}".format(original_row, original_col))
+            else:
+                result_collect.append(obcold_result)
+        return result_collect
+
+    def save_obcoldresults(self, block_id, result_collect):
+        block_y = get_block_x(block_id, self.config['n_block_x']),
+        block_x = get_block_y(block_id, self.config['n_block_x'])
+        np.save(join(self.obcold_recg_path, 'record_change_x{}_y{}_cold.npy'.format(block_x, block_y)),
+                np.hstack(result_collect))

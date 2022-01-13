@@ -128,19 +128,24 @@ int tsalgorithm_executor(
 
 int obcold_reconstruction_procedure
 (
-    short int **buf,            /* I:  pixel-based time series  */
-    short int *fmask_buf,      /* I:  mask-based time series  */
-    int *valid_date_array,    /* I: valid date time series  */
-    int valid_num_scenes,             /* I:  number of scenes  */
+    long *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *fmask_buf,       /* I:  the time series of cfmask values. 0 - clear; 1 - water; 2 - shadow; 3 - snow; 4 - cloud  */
+    long *valid_date_array,      /* I:  valid date as matlab serial date form (counting from Jan 0, 0000). Note ordinal date in python is from (Jan 1th, 0001) */
+    int valid_num_scenes,       /* I: number of valid scenes  */
+    long *break_dates, /*an array of break dates with a fixed length of num_year, '0' means no breaks */
+    int break_date_len,       /*I: the number of focused years */
+    int pos,              /*I: the position of the pixel */
+    int conse,
     Output_t *rec_cg,    /* O: Initialize NUM of Functional Curves    */
-    int *num_fc,
-    int num_year,       /*I: the number of focused years */
-    int *break_dates, /*an array of break dates with a fixed length of num_year, '0' means no breaks */
-    int num_samples,            /* I: column number per scanline                    */
-    int col_pos,                /* I: column position of current processing pixel   */
-    int row_pos,
-    int conse
+    int *num_fc
 );
+
 
 double angle_decaying(
     double input,
@@ -148,40 +153,6 @@ double angle_decaying(
     double highbound
 );
 
-
-int ccd_scanline
-(
-    int row,                 /* I:   input row. The beginning number is 1, not 0!   */
-    char *in_path,           /* I:   Landsat ARD directory  */
-    char **scene_list,       /* I:   current scene name in list of sceneIDs       */
-    //char *mask_path,       /* I:   mask_path */
-    char *user_mask_path,     /* I:   the path of inputted mask       */
-    int  num_samples,        /* I:   number of image samples (X width)      */
-    int  num_scenes,         /* I:   current num. in list of scenes to read */
-    int *sdate,              /* I:   Original array of julian date values         */
-    char *out_path,
-    int method,
-    double probability_threshold,
-    int min_days_conse,
-    int n_focus_variable,
-    int n_total_variable,
-    int* focus_blist,
-    bool NDVI_INCLUDED,
-    bool NBR_INCLUDED,
-    bool RGI_INCLUDED,
-    bool TCTWETNESS_INCLUDED,
-    bool TCTGREENNESS_INCLUDED,
-    bool EVI_INCLUDED,
-    bool DI_INCLUDED,
-    bool NDMI_INCLUDED,
-//    BoosterHandle booster,
-    bool b_landspecific_mode,
-    char *auxiliary_var_path,
-    int conse,
-    bool b_outputCM,
-    bool b_outputCM_reconstruction,
-    int CM_OUTPUT_INTERVAL
-);
 
 int stand_procedure_fixeddays
 (

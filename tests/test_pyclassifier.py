@@ -1,9 +1,10 @@
 import yaml
 import os
 from pycold.pyclassifier import PyClassifierHPC
-import numpy as np
-from osgeo import gdal_array
 import shutil
+import numpy as np
+import joblib
+from osgeo import gdal_array
 
 with open('tests/resources/test_config_pyclassifier.yaml', 'r') as yaml_obj:
     test_config = yaml.safe_load(yaml_obj)
@@ -14,7 +15,7 @@ year_uppbound = 2020
 testing_folder = 'tests/resources/tmp'
 
 
-def test_workflow():
+def test_step1_4():
     pyclassifier = PyClassifierHPC(test_config, record_path='tests/resources', tmp_path=testing_folder,
                                    output_path=testing_folder,
                                    year_lowbound=year_lowbound,
@@ -59,8 +60,7 @@ def test_predict_features():
     assert np.shape(block_features) == (6, pyclassifier.config['block_width']*pyclassifier.config['block_height'],
                                         21)   # 6 years, 2500 pixels (50, 50), 21 features
 
-
-def test_produce_rf_model():
+def test_train_rf_model():
     pyclassifier = PyClassifierHPC(test_config, record_path='tests/resources', tmp_path='tests/resources/feature_maps',
                                      year_lowbound=year_lowbound,
                                      year_uppbound=year_uppbound,
@@ -73,13 +73,13 @@ def test_produce_rf_model():
     assert rf_model is not None
 
 
-def test_classification():
+def test_classification_block():
     pyclassifier = PyClassifierHPC(test_config, record_path='tests/resources', tmp_path='tests/resources/feature_maps',
                                    rf_path='tests/resources/feature_maps/rf.model',
                                    year_lowbound=year_lowbound,
                                    year_uppbound=year_uppbound)
-    rf_model = pyclassifier.get_rf_model()
-    tmp_feature_block = pyclassifier.get_features('tests/resources/feature_maps/tmp_feature_year2017_block1.npy')
+    rf_model = joblib.load('tests/resources/feature_maps/rf.model')
+    tmp_feature_block = np.load('tests/resources/feature_maps/tmp_feature_year2017_block1.npy')
     cmap = pyclassifier.classification_block(rf_model, tmp_feature_block)
     print(cmap.shape)
     assert cmap.shape == (50, 50)

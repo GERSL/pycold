@@ -203,8 +203,9 @@ void quick_sort_float(float arr[], int left, int right)
     }
 }
 
+
 /******************************************************************************
-MODULE:  quick_sort_float
+MODULE:  quick_sort_double
 
 PURPOSE:  sort the scene_list based on yeardoy string
 
@@ -228,6 +229,35 @@ void quick_sort_double(double arr[], int left, int right)
     if (index < right)
     {
         quick_sort_double (arr, index, right);
+    }
+}
+
+
+/******************************************************************************
+MODULE:  quick_sort_long
+
+PURPOSE:  sort the long data array based on yeardoy string
+
+RETURN VALUE: None
+
+HISTORY:
+Date        Programmer       Reason
+--------    ---------------  -------------------------------------
+01/10/2022   Su Ye        Original Development
+
+NOTES:
+******************************************************************************/
+void quick_sort_long(long arr[], int left, int right)
+{
+    int index = partition_long (arr, left, right);
+
+    if (left < index - 1)
+    {
+        quick_sort_long (arr, left, index - 1);
+    }
+    if (index < right)
+    {
+        quick_sort_long (arr, index, right);
     }
 }
 
@@ -569,6 +599,55 @@ int partition_double (double arr[], int left, int right)
 
     return i;
 }
+
+
+/******************************************************************************
+MODULE:  partition_long
+
+PURPOSE:  partition the sorted list
+
+RETURN VALUE:
+Type = int
+Value           Description
+-----           -----------
+i               partitioned value
+
+HISTORY:
+Date        Programmer       Reason
+--------    ---------------  -------------------------------------
+09/22/2019   Su Ye            Original Development
+
+NOTES:
+******************************************************************************/
+int partition_long (long arr[], int left, int right)
+{
+    int i = left, j = right;
+    long tmp;
+    long pivot = arr[(left + right) / 2];
+
+    while (i <= j)
+    {
+        while (arr[i] < pivot)
+    {
+            i++;
+    }
+        while (arr[j] > pivot)
+    {
+            j--;
+    }
+        if (i <= j)
+        {
+            tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+            i++;
+            j--;
+        }
+    }
+
+    return i;
+}
+
 
 
 /******************************************************************************
@@ -1130,8 +1209,7 @@ int get_coldparameters
     int *n_block_v,
     int *CM_OUTPUT_INTERVAL,
     float *probability_threshold,
-    int *conse,
-    char *var_path
+    int *conse
 )
 {
     char cwd[MAX_STR_LEN]; // current directory path
@@ -1139,8 +1217,9 @@ int get_coldparameters
     FILE *var_fp;
     char line[MAX_STR_LEN];
     char line1[MAX_STR_LEN];
+    char var_path[MAX_STR_LEN];
     char parameter_name[MAX_STR_LEN];
-    char errmsg[MAX_STR_LEN];      /* error message                         */
+    char errmsg[MAX_STR_LEN];      /* error message   */
     float val;
     char *token;
     const char deli[] = ":";
@@ -1155,9 +1234,9 @@ int get_coldparameters
     char s6[] = "probability_threshold";
     char s7[] = "conse";
 
-//    getcwd(cwd, sizeof(cwd));
-//    //printf("getvariable");
-//    sprintf(var_path, "%s/%s", cwd, "parameters.yaml");
+    getcwd(cwd, sizeof(cwd));
+    //printf("getvariable");
+    sprintf(var_path, "%s/%s", cwd, "parameters.yaml");
 
     var_fp = fopen(var_path, "r");
 

@@ -954,7 +954,7 @@ int main(int argc, char *argv[])
         //                       valid_scene_count_scanline[i_col], i_col, original_row, probability_threshold);
                     result = cold(tmp_buf_2d[0], tmp_buf_2d[1], tmp_buf_2d[2], tmp_buf_2d[3], tmp_buf_2d[4],
                                   tmp_buf_2d[5], tmp_buf_2d[6], fmask_buf_scanline[i_col], sdate,
-                                  num_scenes, n_cols, original_col, original_row, tcg, conse, b_outputCM,
+                                  num_scenes, pos, tcg, conse, b_outputCM,
                                   starting_date, rec_cg, &num_fc, CM_OUTPUT_INTERVAL, CM_outputs, CMdirection_outputs, CM_outputs_date);
 
                     // snprintf (msg_str, sizeof(msg_str), "pixel %d COLD calculation finished\n", i_col+1);

@@ -84,3 +84,24 @@ outdata.FlushCache()
 outdata = None
 
 np.save(full_feature_array)
+
+def getdate_from_obiaresult_fn(filename):
+    return int()
+
+import pandas as pd
+import os
+from os.path import join
+obiaresult_path = '/Users/coloury/Dropbox/Documents/OBIAresults'
+obia_files = [f for f in os.listdir(obiaresult_path) if f.startswith('obiaresult')]
+# sort image files by dates
+cm_dates = [int(f[f.find('obiaresult_') + len('obiaresult_'):
+                  f.find('obiaresult_') + len('obiaresult_')+6])
+            for f in obia_files]
+
+
+files_date_zip = sorted(zip(cm_dates, obia_files))
+obia_files_sorted = [x[1] for x in files_date_zip]
+obia_dates_sorted = np.asarray([x[0] for x in files_date_zip])
+obia_tstack = [np.load(join(obiaresult_path, f[1])).reshape(53 * 53) * f[0]
+               for f in files_date_zip]
+obia_tstack = np.dstack(obia_tstack)
