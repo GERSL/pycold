@@ -89,12 +89,20 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, k
     -------
 
     """
+    anchor_dates_list = None
     if keyword == 'CM':
         output_type = np.int16
     elif keyword == 'CM_date':
         output_type = np.int32
+        # cuz the date is produced as byte to squeeze the storage size, need to expand
+        anchor_dates_list_single = np.arange(start=starting_date,
+                                             stop=starting_date + config['CM_OUTPUT_INTERVAL'] * n_cm_maps,
+                                             step=config['CM_OUTPUT_INTERVAL'])
+        anchor_dates_list = np.tile(anchor_dates_list_single, config['block_width'] * config['block_height'])
+
     elif keyword == 'CM_direction':
         output_type = np.uint8
+
 
     cm_map_list = [np.full((config['n_rows'], config['n_cols']),
                            NAN_VAL, dtype=output_type) for x in range(n_cm_maps)]
@@ -102,10 +110,17 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, k
         current_block_y = int(np.floor(iblock / config['n_block_x'])) + 1
         current_block_x = iblock % config['n_block_y'] + 1
         try:
-            cm_block = np.load(join(result_path, '{}_x{}_y{}.npy'.format(keyword, current_block_x, current_block_y)))
+            cm_block = np.load(join(result_path, '{}_x{}_y{}.npy'.format(keyword, current_block_x,
+                                                                         current_block_y))).astype(output_type)
         except OSError as e:
             print('Reading CM files fails: {}'.format(e))
         #    continue
+
+        if keyword == 'CM_date':
+            cm_block_copy = cm_block.copy()
+            cm_block = cm_block + anchor_dates_list
+            # we assign an extremely large value to original NA value (255)
+            cm_block[cm_block_copy == 255] = -9999
 
         cm_block_reshape = np.reshape(cm_block, (config['block_width'] * config['block_height'],
                                                  n_cm_maps))

@@ -324,7 +324,7 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
     seed_labels = np.zeros((n_rows, n_cols))
     seed_labels[tuple(np.transpose(seed_index))] = 1
     if devel_mode:
-        gdal_save_file_1band(join(self.obiaresults_path, filenm + '_seed.tif'), seed_labels,
+        gdal_save_file_1band(join(out_path, filenm + '_seed.tif'), seed_labels,
                              gdal.GDT_Byte, trans, proj, n_cols, n_rows)
 
     mask_s1 = np.zeros((n_rows + 2, n_cols + 2)).astype(np.uint8)
@@ -434,7 +434,7 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
     return object_map_s1, object_map_s2, unq_s1, mean_list
 
 
-def object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list, classification_map,
+def object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list, classification_map=None,
                     uniform_threshold=None, uniform_sizeslope=None):
     # if classification_map is not None:
     #     assert classification_map.shape == object_map_s1.shape
@@ -495,6 +495,7 @@ class ObjectAnalystHPC:
             self.obcold_recg_path = join(result_path, 'obcold')
         else:
             self.obcold_recg_path = obcold_recg_path
+        self.stack_path = stack_path
         self.starting_date = starting_date
         self.year_lowbound = pd.Timestamp.fromordinal(starting_date - 366).year
 
@@ -566,8 +567,9 @@ class ObjectAnalystHPC:
 
             if self.thematic_path is not None:
                 classification_map = self.get_lastyear_cmap_fromdate(date)
-
-            change_map = object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list, classification_map)
+                change_map = object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list, classification_map)
+            else:
+                change_map = object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list)
         self.save_obiaresult(date, change_map)
 
     def save_obiaresult(self, date, change_map):
@@ -607,19 +609,28 @@ class ObjectAnalystHPC:
         cm_dates = [int(f[f.find('obiaresult_') + len('obiaresult_'):
                           f.find('obiaresult_') + len('obiaresult_')+6])
                     for f in obia_files]
-
         files_date_zip = sorted(zip(cm_dates, obia_files))
-        obia_tstack = [np.load(join(self.obia_path, f[1])).reshape(self.config['block_width']
-                                                                   * self.config['block_height']) * f[0]
-                       for f in files_date_zip]
-        return np.dstack(obia_tstack)
 
-    def reconstruct_reccg(self, block_id):
-        block_y = get_block_x(block_id, self.config['n_block_x']),
-        block_x = get_block_y(block_id, self.config['n_block_x'])
-        block_folder = join(self.stack_path, 'block_x{}_y{}'.format(block_x, block_y))
-        img_stack, img_dates_sorted = read_blockdata(block_folder, self.config['n_cols']*self.config['n_rows'],
-                                                       self.config['TOTAL_IMAGE_BANDS']+1)
+        # load date block
+        cm_date_block = np.dstack([np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy'))
+                                   for date in cm_dates])
+        cm_date_block = np.reshape(cm_date_block, (self.config['block_width'] * self.config['block_height'],
+                                                      cm_date_block.shape[2]))
+
+        assert cm_date_block.shape[1] == len(obia_files)
+        obia_tstack = [np.multiply(np.load(join(self.obia_path, f[1])).reshape(self.config['block_width']
+                                                                               * self.config['block_height']),
+                                   cm_date_block[:,count])
+                       for count, f in enumerate(files_date_zip)]
+        return np.vstack(obia_tstack)
+
+    def reconstruct_reccg(self, block_id, img_stack=None, img_dates_sorted=None):
+        block_y = get_block_y(block_id, self.config['n_block_x'])
+        block_x = get_block_x(block_id, self.config['n_block_x'])
+        if img_stack is None and img_dates_sorted is None:
+            block_folder = join(self.stack_path, 'block_x{}_y{}'.format(block_x, block_y))
+            img_stack, img_dates_sorted = read_blockdata(block_folder, self.config['n_cols']*self.config['n_rows'],
+                                                         defaults['TOTAL_IMAGE_BANDS']+1)
         obia_breaks = self.get_allobiaresult_asarray(block_x, block_y)
         result_collect = []
         for pos in range(self.config['block_width'] * self.config['block_height']):
@@ -636,7 +647,7 @@ class ObjectAnalystHPC:
                                                    img_stack[pos, 5, :].astype(np.int64),
                                                    img_stack[pos, 6, :].astype(np.int64),
                                                    img_stack[pos, 7, :].astype(np.int64),
-                                                   obia_breaks[pos, :],
+                                                   obia_breaks[:, pos].astype(np.int64),
                                                    conse=self.config['conse'],
                                                    pos=self.config['n_cols'] * (original_row - 1) + original_col)
             except RuntimeError:
@@ -646,7 +657,7 @@ class ObjectAnalystHPC:
         return result_collect
 
     def save_obcoldresults(self, block_id, result_collect):
-        block_y = get_block_x(block_id, self.config['n_block_x']),
-        block_x = get_block_y(block_id, self.config['n_block_x'])
-        np.save(join(self.obcold_recg_path, 'record_change_x{}_y{}_cold.npy'.format(block_x, block_y)),
+        block_x = get_block_x(block_id, self.config['n_block_x'])
+        block_y = get_block_y(block_id, self.config['n_block_x'])
+        np.save(join(self.obcold_recg_path, 'record_change_x{}_y{}_obcold.npy'.format(block_x, block_y)),
                 np.hstack(result_collect))

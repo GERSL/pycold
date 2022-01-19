@@ -7006,7 +7006,7 @@ int obcold_reconstruction_procedure
 
     for(i = 0; i < *num_fc; i++)
     {
-        rec_cg[i].pos = 1;
+        rec_cg[i].pos = pos;
     }
 
 

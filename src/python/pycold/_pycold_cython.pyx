@@ -168,7 +168,7 @@ def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64
     	ts_g: 1d array of shape(observation numbers), time series of green band
     	ts_r: 1d array of shape(observation numbers), time series of red band
     	ts_n: 1d array of shape(observation numbers), time series of nir band
-   	ts_s1: 1d array of shape(observation numbers), time series of swir1 band
+   	    ts_s1: 1d array of shape(observation numbers), time series of swir1 band
     	ts_s2: 1d array of shape(observation numbers), time series of swir2 band
     	ts_t: 1d array of shape(observation numbers), time series of thermal band
     	qas: 1d array, the QA cfmask bands. '0' - clear; '1' - water; '2' - shadow; '3' - snow; '4' - cloud
