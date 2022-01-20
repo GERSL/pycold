@@ -69,7 +69,7 @@ def get_row_index(pos, n_cols, current_block_y, block_height):
     return int((pos - 1) / n_cols) - (current_block_y - 1) * block_height
     
 
-def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, keyword):
+def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, prefix, clean=True):
     """
     this function reorganized block-based fix-interval CM intermediate files into map-based output (one map per interval)
     Parameters
@@ -84,15 +84,16 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, k
         the starting date of the dataset
     n_cm_maps: integer
         the number of change magnitude outputted per pixel
-    keyword: {'CM', 'CM_date', 'CM_direction'}
+    prefix: {'CM', 'CM_date', 'CM_direction'}
+    clean: True -> clean tmp files
     Returns
     -------
 
     """
     anchor_dates_list = None
-    if keyword == 'CM':
+    if prefix == 'CM':
         output_type = np.int16
-    elif keyword == 'CM_date':
+    elif prefix == 'CM_date':
         output_type = np.int32
         # cuz the date is produced as byte to squeeze the storage size, need to expand
         anchor_dates_list_single = np.arange(start=starting_date,
@@ -100,23 +101,21 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, k
                                              step=config['CM_OUTPUT_INTERVAL'])
         anchor_dates_list = np.tile(anchor_dates_list_single, config['block_width'] * config['block_height'])
 
-    elif keyword == 'CM_direction':
+    elif prefix == 'CM_direction':
         output_type = np.uint8
 
-
-    cm_map_list = [np.full((config['n_rows'], config['n_cols']),
-                           NAN_VAL, dtype=output_type) for x in range(n_cm_maps)]
+    cm_map_list = [np.full((config['n_rows'], config['n_cols']), NAN_VAL, dtype=output_type) for x in range(n_cm_maps)]
     for iblock in range(config['n_blocks']):
         current_block_y = int(np.floor(iblock / config['n_block_x'])) + 1
         current_block_x = iblock % config['n_block_y'] + 1
         try:
-            cm_block = np.load(join(result_path, '{}_x{}_y{}.npy'.format(keyword, current_block_x,
+            cm_block = np.load(join(result_path, '{}_x{}_y{}.npy'.format(prefix, current_block_x,
                                                                          current_block_y))).astype(output_type)
         except OSError as e:
             print('Reading CM files fails: {}'.format(e))
         #    continue
 
-        if keyword == 'CM_date':
+        if prefix == 'CM_date':
             cm_block_copy = cm_block.copy()
             cm_block = cm_block + anchor_dates_list
             # we assign an extremely large value to original NA value (255)
@@ -127,16 +126,22 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, k
         hori_profile = np.hsplit(cm_block_reshape, n_cm_maps)
         for count, maps in enumerate(cm_map_list):
             maps[(current_block_y - 1) * config['block_height']:current_block_y * config['block_height'],
-            (current_block_x - 1) * config['block_width']:current_block_x * config['block_width']] = \
+                (current_block_x - 1) * config['block_width']:current_block_x * config['block_width']] = \
                 hori_profile[count].reshape(config['block_height'], config['block_width'])
 
     # output cm images
     for count, cm_map in enumerate(cm_map_list):
         ordinal_date = starting_date + count * config['CM_OUTPUT_INTERVAL']
-        outfile = join(cmmap_path, '{}_maps_{}_{}{}.npy'.format(keyword, str(ordinal_date),
+        outfile = join(cmmap_path, '{}_maps_{}_{}{}.npy'.format(prefix, str(ordinal_date),
                                                                 pd.Timestamp.fromordinal(ordinal_date - 366).year,
                                                                 get_doy(ordinal_date)))
         np.save(outfile, cm_map)
+    
+    if clean is True:
+        tmp_filenames = [file for file in os.listdir(result_path)
+                         if file.startswith(prefix)]
+        for file in tmp_filenames:
+            os.remove(join(result_path, file))
 
 
 def get_rowcol_intile(pos, block_width, block_height, block_x, block_y):
