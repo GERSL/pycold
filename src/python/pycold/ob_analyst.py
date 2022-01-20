@@ -100,7 +100,7 @@ def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keywor
     log10_size = np.log10(int(stats_lut_row['npixels']))
     intercept = 1
     if classification_map is None:
-        if log10_size * defaults['default_sizeslope'] + intercept < 2:
+        if log10_size * ['default_sizeslope']defaults + intercept < 2:
             scale = log10_size * defaults['default_sizeslope'] + intercept
         else:
             scale = 2
@@ -373,7 +373,7 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
     #                                 Scale 2: change patch                              #
     #######################################################################################
 
-    # create a object-based change
+    # create an object-based change
     unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
     mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
     mean_list[unq_s1 == 0] = defaults['NAN_VAL']  # force mean of unchanged objects to be -9999
@@ -414,8 +414,8 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
         if remainder == 254:
             no = int(i / 255)
             mask_label_s2[(mask_label_s2 == 0) & (mask_s2 > 0)] = mask_s2[
-                                                                      (mask_label_s2 == 0) & (mask_s2 > 0)] \
-                                                                      .astype(int) + no * 255
+                                                                      (mask_label_s2 == 0) & (mask_s2 > 0)].\
+                                                                      astype(int) + no * 255
 
     if devel_mode:
         print("segmentation finished ")
@@ -476,8 +476,8 @@ def object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list, classificat
 
 
 class ObjectAnalystHPC:
-    def __init__(self, config, stack_path, result_path, starting_date, cmmap_path=None, obia_path=None, obcold_recg_path=None,
-                 thematic_path=None):
+    def __init__(self, config, stack_path, result_path, starting_date, cmmap_path=None, obia_path=None,
+                 obcold_recg_path=None, thematic_path=None):
         self.config = config
         self.config['block_width'] = int(self.config['n_cols'] / self.config['n_block_x'])
         self.config['block_height'] = int(self.config['n_rows'] / self.config['n_block_y'])
@@ -549,10 +549,10 @@ class ObjectAnalystHPC:
             raise e
         return classification_map
 
-    def obia_execute(self, date):
+    def obia_execute(self, date, floodfill_ratio=None, uniform_threshold=None, uniform_sizeslope=None):
         if date - self.config['CM_OUTPUT_INTERVAL'] < self.starting_date:
             change_map = np.full((self.config['n_rows'], self.config['n_cols']), 0,
-                           dtype=np.byte)
+                                  dtype=np.byte)
         else:
             [object_map_s1, object_map_s2, unq_s1, mean_list] \
                 = segmentation(np.load(join(self.cmmap_path, cmname_fromdate(date)+'.npy')),
@@ -567,9 +567,12 @@ class ObjectAnalystHPC:
 
             if self.thematic_path is not None:
                 classification_map = self.get_lastyear_cmap_fromdate(date)
-                change_map = object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list, classification_map)
+                change_map = object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list,
+                                             classification_map=classification_map,
+                                             uniform_threshold=uniform_threshold, uniform_sizeslope=uniform_sizeslope)
             else:
-                change_map = object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list)
+                change_map = object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list,
+                                             uniform_threshold=uniform_threshold, uniform_sizeslope=uniform_sizeslope)
         self.save_obiaresult(date, change_map)
 
     def save_obiaresult(self, date, change_map):
@@ -610,6 +613,7 @@ class ObjectAnalystHPC:
                           f.find('obiaresult_') + len('obiaresult_')+6])
                     for f in obia_files]
         files_date_zip = sorted(zip(cm_dates, obia_files))
+        cm_dates = [x[0] for x in files_date_zip]
 
         # load date block
         cm_date_block = np.dstack([np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy'))
@@ -620,7 +624,7 @@ class ObjectAnalystHPC:
         assert cm_date_block.shape[1] == len(obia_files)
         obia_tstack = [np.multiply(np.load(join(self.obia_path, f[1])).reshape(self.config['block_width']
                                                                                * self.config['block_height']),
-                                   cm_date_block[:,count])
+                                   cm_date_block[:, count])
                        for count, f in enumerate(files_date_zip)]
         return np.vstack(obia_tstack)
 
