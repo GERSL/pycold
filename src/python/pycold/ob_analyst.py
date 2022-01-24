@@ -100,7 +100,7 @@ def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keywor
     log10_size = np.log10(int(stats_lut_row['npixels']))
     intercept = 1
     if classification_map is None:
-        if log10_size * ['default_sizeslope']defaults + intercept < 2:
+        if log10_size * ['default_sizeslope'] + intercept < 2:
             scale = log10_size * defaults['default_sizeslope'] + intercept
         else:
             scale = 2
@@ -334,15 +334,16 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
     floodflags_base |= cv2.FLOODFILL_FIXED_RANGE
     no = 0
     i = 0
-    cm_stack = np.dstack([cm_array_gaussian_s1, cm_direction_array, cm_date_array]).astype(np.float32)
+    # cm_stack = np.dstack([cm_array_gaussian_s1, cm_direction_array, cm_date_array]).astype(np.float32)
+    cm_stack = np.dstack([cm_array_gaussian_s1, cm_direction_array, cm_direction_array]).astype(np.float32)
     for i in range(len(seed_index)):
         # print(i)
         remainder = i % 255
         floodflags = floodflags_base | ((remainder + 1) << 8)
         seedcm = cm_array_gaussian_s1[tuple(seed_index[i])]
         num, im, mask_s1, rect = floodFill(cm_stack, mask_s1, tuple(reversed(seed_index[i])), 0,
-                                           loDiff=[seedcm * floodfill_ratio, 0, cm_interval],
-                                           upDiff=[seedcm * floodfill_ratio, 0, cm_interval],
+                                           loDiff=[seedcm * floodfill_ratio, 0, 0],
+                                           upDiff=[seedcm * floodfill_ratio, 0, 0],
                                            flags=floodflags)
         # the opencv mask only supports 8-bit, so every 255 seed needs to update values in mask_label
         if remainder == 254:

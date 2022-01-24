@@ -139,7 +139,7 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
     
     if clean is True:
         tmp_filenames = [file for file in os.listdir(result_path)
-                         if file.startswith(prefix)]
+                         if file.startswith(prefix+'_x')]
         for file in tmp_filenames:
             os.remove(join(result_path, file))
 
