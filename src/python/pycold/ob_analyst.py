@@ -71,8 +71,6 @@ def obiaresname_fromdate(ordinal_date):
                                     str(pd.Timestamp.fromordinal(ordinal_date - 366).timetuple().tm_yday).zfill(3))
 
 
-
-
 def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keyword, classification_map):
     """
     parameters
@@ -266,8 +264,32 @@ def mode_median_by(input_array_mode, input_array_median, index_array):
 
 
 def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, cm_array_l1_direction=None,
-                 cm_array_l1_date=None, cm_interval=32, floodfill_ratio=None, devel_mode=False,
+                 cm_array_l1_date=None,  floodfill_ratio=None, devel_mode=False,
                  filenm=None, out_path=None, trans=None, proj=None):
+    """
+    hierachical segmentation based on floodfill
+    Parameters
+    ----------
+    cm_array: 2-d numpy array, change magnitude array
+    cm_direction_array: 2-d numpy array, change direction array
+    cm_date_array: 2-d numpy array, change date array
+    cm_array_l1: 2-d numpy array
+    cm_array_l1_direction: 2-d numpy array
+    cm_array_l1_date: 2-d numpy array
+    floodfill_ratio: float
+        the change magnitude ratio of the considered pixel over the seed pixel to be included into the cluster
+    devel_mode: boolean, True -> development mode to save maps for research use
+    filenm: prefix of file name to be saved, devel_mode only
+    out_path: devel_mode only
+    trans:devel_mode only
+    proj:devel_mode only
+
+    Returns
+    -------
+    [object_map_s1, object_map_s2, zipped_id_average]:
+        object map for superpixel, object map for object level, a zipped list of id and average
+        change magnitude for superpixel level
+    """
     cm_array = cm_array.astype(float) / defaults['cm_scale']
     cm_array_l1_date = cm_array_l1_date.astype(float) / defaults['cm_scale']
 
@@ -320,10 +342,9 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
     seed_index = peak_local_max(cm_array_gaussian_s1, threshold_abs=peak_threshold,
                                 exclude_border=False, min_distance=0)
     # seed_index = np.flip(seed_index, axis=0)
-
-    seed_labels = np.zeros((n_rows, n_cols))
-    seed_labels[tuple(np.transpose(seed_index))] = 1
     if devel_mode:
+        seed_labels = np.zeros((n_rows, n_cols))
+        seed_labels[tuple(np.transpose(seed_index))] = 1
         gdal_save_file_1band(join(out_path, filenm + '_seed.tif'), seed_labels,
                              gdal.GDT_Byte, trans, proj, n_cols, n_rows)
 
@@ -345,7 +366,7 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
                                            loDiff=[seedcm * floodfill_ratio, 0, 0],
                                            upDiff=[seedcm * floodfill_ratio, 0, 0],
                                            flags=floodflags)
-        # the opencv mask only supports 8-bit, so every 255 seed needs to update values in mask_label
+        # the opencv mask only supports 8-bit, we hack it by updating the label value for every 255 object
         if remainder == 254:
             no = int(i / 255)
             mask_label_s1[(mask_label_s1 == 0) & (mask_s1 > 0)] = mask_s1[
@@ -374,7 +395,7 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
     #                                 Scale 2: change patch                              #
     #######################################################################################
 
-    # create an object-based change
+    # superpixel-level object status
     unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
     mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
     mean_list[unq_s1 == 0] = defaults['NAN_VAL']  # force mean of unchanged objects to be -9999
@@ -432,13 +453,14 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
         gdal_save_file_1band(
             join(out_path,  '{}_floodfill_gaussian_{}_s2.tif'.format(filenm, bandwidth)),
             object_map_s2, gdal.GDT_Int32, trans, proj, n_rows, n_cols)
-    return object_map_s1, object_map_s2, unq_s1, mean_list
+    return object_map_s1, object_map_s2, zip(unq_s1.astype(np.int), mean_list)
 
 
-def object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list, classification_map=None,
+def object_analysis(object_map_s1, object_map_s2, zipped_id_average, classification_map=None,
                     uniform_threshold=None, uniform_sizeslope=None):
     # if classification_map is not None:
     #     assert classification_map.shape == object_map_s1.shape
+    unq_s1, mean_list = [np.asarray(t) for t in list(zip(*zipped_id_average))]
     [n_rows, n_cols] = object_map_s1.shape
     change_map = np.zeros((n_rows, n_cols)).astype(np.uint8)
 
@@ -555,7 +577,7 @@ class ObjectAnalystHPC:
             change_map = np.full((self.config['n_rows'], self.config['n_cols']), 0,
                                   dtype=np.byte)
         else:
-            [object_map_s1, object_map_s2, unq_s1, mean_list] \
+            [object_map_s1, object_map_s2, zipped_id_average] \
                 = segmentation(np.load(join(self.cmmap_path, cmname_fromdate(date)+'.npy')),
                                np.load(join(self.cmmap_path, cmdirectionname_fromdate(date)+'.npy')),
                                np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy')),
@@ -568,11 +590,11 @@ class ObjectAnalystHPC:
 
             if self.thematic_path is not None:
                 classification_map = self.get_lastyear_cmap_fromdate(date)
-                change_map = object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list,
+                change_map = object_analysis(object_map_s1, object_map_s2, zipped_id_average,
                                              classification_map=classification_map,
                                              uniform_threshold=uniform_threshold, uniform_sizeslope=uniform_sizeslope)
             else:
-                change_map = object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list,
+                change_map = object_analysis(object_map_s1, object_map_s2, zipped_id_average,
                                              uniform_threshold=uniform_threshold, uniform_sizeslope=uniform_sizeslope)
         self.save_obiaresult(date, change_map)
 
@@ -601,8 +623,8 @@ class ObjectAnalystHPC:
         for date in date_list:
             for i in range(self.config['n_block_y']):
                 for j in range(self.config['n_block_x']):
-                    if not exists(join(self.obia_path, '{}_{}'.format(cmname_fromdate(date),
-                                                                      'OBIAresult_x{}_y{}.npy'.format(j + 1, i + 1)))):
+                    if not exists(join(self.obia_path, '{}_{}'.format(obiaresname_fromdate(date),
+                                                                      'x{}_y{}.npy'.format(j + 1, i + 1)))):
                         return False
         return True
 
@@ -661,7 +683,7 @@ class ObjectAnalystHPC:
                 result_collect.append(obcold_result)
         return result_collect
 
-    def save_obcoldresults(self, block_id, result_collect):
+    def save_obcoldrecords(self, block_id, result_collect):
         block_x = get_block_x(block_id, self.config['n_block_x'])
         block_y = get_block_y(block_id, self.config['n_block_x'])
         np.save(join(self.obcold_recg_path, 'record_change_x{}_y{}_obcold.npy'.format(block_x, block_y)),

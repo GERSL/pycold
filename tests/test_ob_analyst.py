@@ -30,7 +30,7 @@ def test_workflow():
 
 
 def test_segmentation():
-    [object_map_s1, object_map_s2, unq_s1, mean_list] = segmentation(cm_array, cm_direction_array,
+    [object_map_s1, object_map_s2, zipped_id_average] = segmentation(cm_array, cm_direction_array,
                                                                      cm_date_array,
                                                                      cm_array_l1, cm_array_l1_direction,
                                                                      cm_array_l1_date)
@@ -39,11 +39,11 @@ def test_segmentation():
 
 
 def test_object_analysis():
-    [object_map_s1, object_map_s2, unq_s1, mean_list] = segmentation(cm_array, cm_direction_array,
+    [object_map_s1, object_map_s2, zipped_id_average] = segmentation(cm_array, cm_direction_array,
                                                                              cm_date_array, cm_array_l1,
                                                                              cm_array_l1_direction, cm_array_l1_date)
     classification_map = np.load('tests/resources/feature_maps/yearlyclassification_1999.npy')
-    change_map = object_analysis(object_map_s1, object_map_s2, unq_s1, mean_list, classification_map)
+    change_map = object_analysis(object_map_s1, object_map_s2, zipped_id_average, classification_map)
     # test_config = yaml.safe_load(yaml_obj)
     assert len(np.unique(change_map)) > 1
 
