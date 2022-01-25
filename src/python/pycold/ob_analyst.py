@@ -389,7 +389,6 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
             int) + no * 255
 
     object_map_s1 = mask_label_s1[1:n_rows + 1, 1:n_cols + 1].astype(np.int)
-
     if devel_mode:
         gdal_save_file_1band(
             os.path.join(out_path, filenm + '_floodfill_gaussian_{}_s1.tif'.format(bandwidth)),
@@ -400,8 +399,14 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
     #######################################################################################
 
     # superpixel-level object status
-    s1_info = pd.DataFrame(regionprops_table(object_map_s1, cm_array_gaussian_s1, cache=False,
-                                             properties=['label', 'mean_intensity']))
+    # s1_info = pd.DataFrame(regionprops_table(object_map_s1, cm_array_gaussian_s1, cache=False,
+    #                                          properties=['label', 'mean_intensity']))
+
+    # unique always returned sorted list
+    unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
+    mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
+    mean_list[unq_s1 == 0] = defaults['NAN_VAL']  # force mean of unchanged objects to be -9999
+    s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
     object_map_s2 = object_map_s1.copy()
     object_map_s2[object_map_s2 > 0] = 1
     object_map_s2 = sklabel(object_map_s2, background=0)
@@ -419,8 +424,8 @@ def normalize_clip(data, min, max):
 
 
 def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, cm_array_l1_direction=None,
-                      cm_array_l1_date=None,  devel_mode=False,
-                      filenm=None, out_path=None, trans=None, proj=None):
+                 cm_array_l1_date=None,  floodfill_ratio=None, devel_mode=False,
+                 filenm=None, out_path=None, trans=None, proj=None):
     """
     hierachical segmentation based on floodfill
     Parameters
@@ -493,15 +498,6 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
                              cm_array_gaussian_s1,
                              gdal.GDT_Float32, trans, proj, n_cols, n_rows)
 
-    seed_index = peak_local_max(cm_array_gaussian_s1, threshold_abs=peak_threshold,
-                                exclude_border=False, min_distance=0)
-    # seed_index = np.flip(seed_index, axis=0)
-    if devel_mode:
-        seed_labels = np.zeros((n_rows, n_cols))
-        seed_labels[tuple(np.transpose(seed_index))] = 1
-        gdal_save_file_1band(join(out_path, filenm + '_seed.tif'), seed_labels,
-                             gdal.GDT_Byte, trans, proj, n_cols, n_rows)
-
     mask = np.full_like(cm_array_gaussian_s1, fill_value=0)
     mask[cm_array_gaussian_s1 > low_bound] = 1
 
@@ -520,8 +516,12 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
             object_map_s1, gdal.GDT_Int32, trans, proj, n_rows, n_cols)
 
     # superpixel-level object status
-    s1_info = pd.DataFrame(regionprops_table(object_map_s1, cm_array_gaussian_s1, cache=False,
-                                             properties=['label', 'mean_intensity']))
+    # s1_info = pd.DataFrame(regionprops_table(object_map_s1, cm_array_gaussian_s1, cache=False,
+    #                                          properties=['label', 'mean_intensity']))
+    unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
+    mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
+    mean_list[unq_s1 == 0] = defaults['NAN_VAL']  # force mean of unchanged objects to be -9999
+    s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
     #######################################################################################
     #                                 Scale 2: change patch                              #
     #######################################################################################
@@ -544,16 +544,17 @@ def object_analysis(object_map_s1, object_map_s2, s1_info, classification_map=No
 
     # def pixelmode(regionmask):
     #     return stats.mode(regionmask)
-
+    class_labels = s1_info['label'].to_list()
     if classification_map is None:
         mode_list = [255] * len(s1_info)
     else:
         mode_list = modeby(classification_map.reshape(ids_s2.shape), object_map_s1.reshape(ids_s2.shape))
-        mode_list = mode_list[1:]
+
+        # mode_list = mode_list[1:]
         # mode_list = regionprops_table(object_map_s1, classification_map, extra_properties=(pixelmode))
     size_list = modeby(size_map.reshape(ids_s2.shape),
                        object_map_s1.reshape(ids_s2.shape))  # the mode of s1 objects in sizemap
-    size_list = size_list[1:]
+
     # mode_list = regionprops_table(object_map_s1, size_map, extra_properties=(pixelmode, ))
     # mode_list, median_list = mode_median_by(classification_map.reshape(ids_s2.shape),
     #                                         cm_array_gaussian_s1.reshape(ids_s2.shape),
@@ -568,7 +569,6 @@ def object_analysis(object_map_s1, object_map_s2, s1_info, classification_map=No
     # need to remove the first element represent 0
     stats_lut = s1_info.assign(mode=mode_list, npixels=size_list)
     change_group = []
-    class_labels = stats_lut['label'].to_list()
     if len(class_labels) > 0:  # if non-background change objects > 0
         for index in class_labels:
             stats_lut_row = stats_lut.loc[stats_lut['label'] == index]
@@ -653,21 +653,34 @@ class ObjectAnalystHPC:
             raise e
         return classification_map
 
-    def obia_execute(self, date, floodfill_ratio=None, uniform_threshold=None, uniform_sizeslope=None):
+    def obia_execute(self, date, floodfill_ratio=None, uniform_threshold=None, uniform_sizeslope=None,
+                     method='floodfill'):
         if date - self.config['CM_OUTPUT_INTERVAL'] < self.starting_date:
             change_map = np.full((self.config['n_rows'], self.config['n_cols']), 0,
                                   dtype=np.byte)
         else:
-            [object_map_s1, object_map_s2, s1_info] \
-                = segmentation(np.load(join(self.cmmap_path, cmname_fromdate(date)+'.npy')),
-                               np.load(join(self.cmmap_path, cmdirectionname_fromdate(date)+'.npy')),
-                               np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy')),
-                               np.load(join(self.cmmap_path, cmname_fromdate(date -
-                                                                             self.config['CM_OUTPUT_INTERVAL'])+'.npy')),
-                               np.load(join(self.cmmap_path, cmdirectionname_fromdate(date -
-                                                                                      self.config['CM_OUTPUT_INTERVAL'])+'.npy')),
-                               np.load(join(self.cmmap_path, cmdatename_fromdate(date -
-                                                                                 self.config['CM_OUTPUT_INTERVAL'])+'.npy')))
+            if method == 'floodfill':
+                [object_map_s1, object_map_s2, s1_info] \
+                    = segmentation(np.load(join(self.cmmap_path, cmname_fromdate(date)+'.npy')),
+                                   np.load(join(self.cmmap_path, cmdirectionname_fromdate(date)+'.npy')),
+                                   np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy')),
+                                   np.load(join(self.cmmap_path, cmname_fromdate(date -
+                                                                                 self.config['CM_OUTPUT_INTERVAL'])+'.npy')),
+                                   np.load(join(self.cmmap_path,
+                                                cmdirectionname_fromdate(date - self.config['CM_OUTPUT_INTERVAL'])+'.npy')),
+                                   np.load(join(self.cmmap_path,
+                                                cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL'])+'.npy')))
+            elif method == 'slic':
+                [object_map_s1, object_map_s2, s1_info] \
+                    = segmentation_slic(np.load(join(self.cmmap_path, cmname_fromdate(date)+'.npy')),
+                                        np.load(join(self.cmmap_path, cmdirectionname_fromdate(date)+'.npy')),
+                                        np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy')),
+                                        np.load(join(self.cmmap_path, cmname_fromdate(date -
+                                                                                 self.config['CM_OUTPUT_INTERVAL'])+'.npy')),
+                                        np.load(join(self.cmmap_path,
+                                                cmdirectionname_fromdate(date - self.config['CM_OUTPUT_INTERVAL'])+'.npy')),
+                                        np.load(join(self.cmmap_path,
+                                                cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL'])+'.npy')))
 
             if self.thematic_path is not None:
                 classification_map = self.get_lastyear_cmap_fromdate(date)
