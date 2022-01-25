@@ -16,6 +16,10 @@ from os.path import join, exists
 from pycold.utils import gdal_save_file_1band, get_block_x, get_block_y, read_blockdata, get_rowcol_intile
 from pycold.app import defaults, logging
 from pycold import obcold_reconstruct
+from skimage import measure
+from skimage.segmentation import slic
+from skimage.measure import regionprops_table, regionprops
+from skimage.measure import label as sklabel
 
 logger = logging.getLogger(__name__)
 
@@ -384,7 +388,7 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
         mask_label_s1[(mask_label_s1 == 0) & (mask_s1 > 0)] = mask_s1[(mask_label_s1 == 0) & (mask_s1 > 0)].astype(
             int) + no * 255
 
-    object_map_s1 = mask_label_s1[1:n_rows + 1, 1:n_cols + 1]
+    object_map_s1 = mask_label_s1[1:n_rows + 1, 1:n_cols + 1].astype(np.int)
 
     if devel_mode:
         gdal_save_file_1band(
@@ -396,105 +400,182 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
     #######################################################################################
 
     # superpixel-level object status
-    unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
-    mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
-    mean_list[unq_s1 == 0] = defaults['NAN_VAL']  # force mean of unchanged objects to be -9999
-    lut_dict_s1 = dict(zip(unq_s1, mean_list))
-    cm_array_s2 = np.vectorize(lut_dict_s1.get)(object_map_s1)
-
-    bandwidth = 1
-    # using gaussian kernel ( with 0.5 sigma value) to smooth images in hpc_preparation for floodfill
-    # cm_array_s2[cm_array_s2 == config['NAN_VAL']] = np.nan
-    # kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
-    # cm_array_gaussian_s2 = convolve(cm_array_s2, kernel, boundary='extend', preserve_nan=True)
-    # cm_array_gaussian_s2[np.isnan(cm_array_s2)] = config['NAN_VAL']
-
-    cm_array_gaussian_s2 = cm_array_s2  # not using gaussian
-    if devel_mode:
-        gdal_save_file_1band(join(out_path,  filenm + '_cm_array_gaussian_s2.tif'),
-                             cm_array_gaussian_s2,
-                             gdal.GDT_Float32, trans, proj, n_cols,
-                             n_rows)
-
-    mask_s2 = np.zeros((n_rows + 2, n_cols + 2)).astype(np.uint8)
-    mask_label_s2 = np.zeros((n_rows + 2, n_cols + 2))
-    floodflags_base = 8
-    floodflags_base |= cv2.FLOODFILL_MASK_ONLY
-    i = 0
-    cm_array_gaussian_s2 = cm_array_gaussian_s2.astype(np.float32)
-    # cm_stack = np.dstack([cm_array_gaussian_s2, cm_direction_array, cm_direction_array]).astype(np.float32)
-    for i in range(len(seed_index)):
-        # print(i)
-        remainder = i % 255
-        floodflags = floodflags_base | ((remainder + 1) << 8)
-        num, im, mask_s2, rect = floodFill(cm_array_gaussian_s2, mask_s2, tuple(reversed(seed_index[i])), 0,
-                                           loDiff=[1000],
-                                           upDiff=[1000],
-                                           flags=floodflags)  # assign an extremely large value
-        # to connect any polygon adjacent to each other
-        # the opencv mask only supports 8-bit, so every 255 seed needs to update values in mask_label
-        if remainder == 254:
-            no = int(i / 255)
-            mask_label_s2[(mask_label_s2 == 0) & (mask_s2 > 0)] = mask_s2[
-                                                                      (mask_label_s2 == 0) & (mask_s2 > 0)].\
-                                                                      astype(int) + no * 255
-
-    if devel_mode:
-        print("segmentation finished ")
-
-    if len(seed_index) > 0:
-        # processing the rest that hasn't be recorded into mask_label
-        no = int(i / 255)
-        mask_label_s2[(mask_label_s2 == 0) & (mask_s2 > 0)] = mask_s2[(mask_label_s2 == 0) & (mask_s2 > 0)].astype(
-            int) + no * 255
-
-    object_map_s2 = mask_label_s2[1:n_rows + 1, 1:n_cols + 1]
+    s1_info = pd.DataFrame(regionprops_table(object_map_s1, cm_array_gaussian_s1, cache=False,
+                                             properties=['label', 'mean_intensity']))
+    object_map_s2 = object_map_s1.copy()
+    object_map_s2[object_map_s2 > 0] = 1
+    object_map_s2 = sklabel(object_map_s2, background=0)
     if devel_mode:
         gdal_save_file_1band(
             join(out_path,  '{}_floodfill_gaussian_{}_s2.tif'.format(filenm, bandwidth)),
             object_map_s2, gdal.GDT_Int32, trans, proj, n_rows, n_cols)
-    return object_map_s1, object_map_s2, zip(unq_s1.astype(np.int), mean_list)
+    return object_map_s1, object_map_s2, s1_info
 
 
-def object_analysis(object_map_s1, object_map_s2, zipped_id_average, classification_map=None,
+def normalize_clip(data, min, max):
+    tmp = (data - min) / (max - min)
+    np.clip(tmp, 0, 1, out=tmp)
+    return tmp
+
+
+def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, cm_array_l1_direction=None,
+                      cm_array_l1_date=None,  devel_mode=False,
+                      filenm=None, out_path=None, trans=None, proj=None):
+    """
+    hierachical segmentation based on floodfill
+    Parameters
+    ----------
+    cm_array: 2-d numpy array, change magnitude array
+    cm_direction_array: 2-d numpy array, change direction array
+    cm_date_array: 2-d numpy array, change date array
+    cm_array_l1: 2-d numpy array
+    cm_array_l1_direction: 2-d numpy array
+    cm_array_l1_date: 2-d numpy array
+    floodfill_ratio: float
+        the change magnitude ratio of the considered pixel over the seed pixel to be included into the cluster
+    devel_mode: boolean, True -> development mode to save maps for research use
+    filenm: prefix of file name to be saved, devel_mode only
+    out_path: devel_mode only
+    trans:devel_mode only
+    proj:devel_mode only
+
+    Returns
+    -------
+    [object_map_s1, object_map_s2, s1_info]:
+        object map for superpixel, object map for object level, a zipped list of id and average
+        change magnitude for superpixel level
+    """
+    cm_array = cm_array.astype(float) / defaults['cm_scale']
+    cm_array_l1_date = cm_array_l1_date.astype(float) / defaults['cm_scale']
+
+    low_bound = chi2.ppf(0.7, 5)
+    upp_bound = chi2.ppf(0.99999, 5)
+    [n_rows, n_cols] = cm_array.shape
+    if filenm is None:
+        filenm = 'test'
+    if cm_array_l1 is None:
+        cm_array_l1 = np.full((n_rows, n_cols), defaults['NAN_VAL'], dtype=np.int16)
+    if cm_array_l1_direction is None:
+        cm_array_l1_direction = np.full((n_rows, n_cols), defaults['NAN_VAL_UINT8'], dtype=np.uint8)
+    if cm_array_l1_date is None:
+        cm_array_l1_date = np.full((n_rows, n_cols), defaults['NAN_VAL'], dtype=np.int32)
+
+    # assign valid CM values in the stack into current cm array where NA values are
+    cm_array[cm_array == defaults['NAN_VAL']] = cm_array_l1[cm_array == defaults['NAN_VAL']]
+
+    # defaults['NAN_VAL_UINT8'], i.e., 255, is also the NA value of direction.
+    cm_direction_array[cm_direction_array == defaults['NAN_VAL_UINT8']] = \
+        cm_array_l1_direction[cm_direction_array == defaults['NAN_VAL_UINT8']]
+
+    cm_date_array[cm_date_array == defaults['NAN_VAL']] = \
+        cm_array_l1_date[cm_date_array == defaults['NAN_VAL']]
+
+    if devel_mode is True:
+        gdal_save_file_1band(join(out_path, filenm + '_cm_array.tif'), cm_array,
+                             gdal.GDT_Float32, trans, proj, n_cols, n_rows)
+        gdal_save_file_1band(join(out_path, filenm + '_cm_direction_array.tif'), cm_direction_array,
+                             gdal.GDT_Byte, trans, proj, n_cols, n_rows)
+
+    #######################################################################################
+    #                               Scale 1: change superpixel                            #
+    #######################################################################################
+    cm_array[cm_array < low_bound] = np.nan
+    bandwidth = 1
+
+    # using gaussian kernel ( with 1 sigma value) to smooth images in hpc_preparation for floodfill
+    kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
+    cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary='extend', preserve_nan=True)
+    cm_array_gaussian_s1[np.isnan(cm_array)] = defaults['NAN_VAL']
+
+    # cm_array_gaussian_s1 = cm_array  # try not using gaussian
+    if devel_mode is True:
+        gdal_save_file_1band(join(out_path, filenm + '_cm_array_gaussian_s1.tif'),
+                             cm_array_gaussian_s1,
+                             gdal.GDT_Float32, trans, proj, n_cols, n_rows)
+
+    seed_index = peak_local_max(cm_array_gaussian_s1, threshold_abs=peak_threshold,
+                                exclude_border=False, min_distance=0)
+    # seed_index = np.flip(seed_index, axis=0)
+    if devel_mode:
+        seed_labels = np.zeros((n_rows, n_cols))
+        seed_labels[tuple(np.transpose(seed_index))] = 1
+        gdal_save_file_1band(join(out_path, filenm + '_seed.tif'), seed_labels,
+                             gdal.GDT_Byte, trans, proj, n_cols, n_rows)
+
+    mask = np.full_like(cm_array_gaussian_s1, fill_value=0)
+    mask[cm_array_gaussian_s1 > low_bound] = 1
+
+    cm_stack = np.dstack([normalize_clip(cm_array_gaussian_s1, low_bound, upp_bound) * 2,
+                          normalize_clip(cm_direction_array, 0, 31),
+                          normalize_clip(cm_date_array, np.min(cm_date_array),
+                                         np.max(cm_date_array))])
+
+    n_segments = len(np.unique(measure.label(mask))) * 2
+    object_map_s1 = slic(cm_stack, mask=mask, n_segments=n_segments, compactness=0.1,
+                         min_size_factor=n_segments/cm_stack.shape[0]/cm_stack.shape[1]/cm_stack.shape[2])
+
+    if devel_mode:
+        gdal_save_file_1band(
+            os.path.join(out_path, filenm + '_slic_gaussian_{}_s1.tif'.format(bandwidth)),
+            object_map_s1, gdal.GDT_Int32, trans, proj, n_rows, n_cols)
+
+    # superpixel-level object status
+    s1_info = pd.DataFrame(regionprops_table(object_map_s1, cm_array_gaussian_s1, cache=False,
+                                             properties=['label', 'mean_intensity']))
+    #######################################################################################
+    #                                 Scale 2: change patch                              #
+    #######################################################################################
+    object_map_s2 = object_map_s1.copy()
+    object_map_s2[object_map_s2 > 0] = 1
+    object_map_s2 = sklabel(object_map_s2, background=0)
+    return object_map_s1, object_map_s2, s1_info
+
+
+def object_analysis(object_map_s1, object_map_s2, s1_info, classification_map=None,
                     uniform_threshold=None, uniform_sizeslope=None):
     # if classification_map is not None:
     #     assert classification_map.shape == object_map_s1.shape
-    unq_s1, mean_list = [np.asarray(t) for t in list(zip(*zipped_id_average))]
     [n_rows, n_cols] = object_map_s1.shape
     change_map = np.zeros((n_rows, n_cols)).astype(np.uint8)
 
     unq_s2, ids_s2, count_s2 = np.unique(object_map_s2, return_inverse=True, return_counts=True)
     lut_dict_s2 = dict(zip(unq_s2, count_s2))
     size_map = np.vectorize(lut_dict_s2.get)(object_map_s2)  # we use size of scale 2 to represent object szie
-    size_map[object_map_s2 == 0] = 0
+
+    # def pixelmode(regionmask):
+    #     return stats.mode(regionmask)
 
     if classification_map is None:
-        mode_list = [0] * len(unq_s1)
+        mode_list = [255] * len(s1_info)
     else:
         mode_list = modeby(classification_map.reshape(ids_s2.shape), object_map_s1.reshape(ids_s2.shape))
+        mode_list = mode_list[1:]
+        # mode_list = regionprops_table(object_map_s1, classification_map, extra_properties=(pixelmode))
     size_list = modeby(size_map.reshape(ids_s2.shape),
                        object_map_s1.reshape(ids_s2.shape))  # the mode of s1 objects in sizemap
+    size_list = size_list[1:]
+    # mode_list = regionprops_table(object_map_s1, size_map, extra_properties=(pixelmode, ))
     # mode_list, median_list = mode_median_by(classification_map.reshape(ids_s2.shape),
     #                                         cm_array_gaussian_s1.reshape(ids_s2.shape),
     #                                         object_map_s1.reshape(ids_s2.shape))
 
     # Use the tags/IDs to perform ID based summation of array2 elems and
     # thus divide by the ID counts to get ID based average values
-    stats_lut = pd.DataFrame(np.column_stack((unq_s1, mean_list,
-                                              mode_list, size_list)),
-                             columns=['id', 'cm_average', 'mode', 'npixels'])
+    # stats_lut = pd.DataFrame(np.column_stack((unq_s1, mean_list,
+    #                                           mode_list, size_list)),
+    #                          columns=['id', 'cm_average', 'mode', 'npixels'])
 
-    class_labels = unq_s1[unq_s1 > 0]
+    # need to remove the first element represent 0
+    stats_lut = s1_info.assign(mode=mode_list, npixels=size_list)
     change_group = []
-    if len(class_labels) > 0:  # if has valid change objects to output
+    class_labels = stats_lut['label'].to_list()
+    if len(class_labels) > 0:  # if non-background change objects > 0
         for index in class_labels:
-            stats_lut_row = stats_lut.loc[stats_lut['id'] == index]
+            stats_lut_row = stats_lut.loc[stats_lut['label'] == index]
             if is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope,
-                                'cm_average', classification_map):
+                                'mean_intensity', classification_map):
                 change_group.append(index)
         change_map[np.isin(object_map_s1, change_group)] = 1
-
     return change_map
 
 
@@ -577,7 +658,7 @@ class ObjectAnalystHPC:
             change_map = np.full((self.config['n_rows'], self.config['n_cols']), 0,
                                   dtype=np.byte)
         else:
-            [object_map_s1, object_map_s2, zipped_id_average] \
+            [object_map_s1, object_map_s2, s1_info] \
                 = segmentation(np.load(join(self.cmmap_path, cmname_fromdate(date)+'.npy')),
                                np.load(join(self.cmmap_path, cmdirectionname_fromdate(date)+'.npy')),
                                np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy')),
@@ -590,11 +671,11 @@ class ObjectAnalystHPC:
 
             if self.thematic_path is not None:
                 classification_map = self.get_lastyear_cmap_fromdate(date)
-                change_map = object_analysis(object_map_s1, object_map_s2, zipped_id_average,
+                change_map = object_analysis(object_map_s1, object_map_s2, s1_info,
                                              classification_map=classification_map,
                                              uniform_threshold=uniform_threshold, uniform_sizeslope=uniform_sizeslope)
             else:
-                change_map = object_analysis(object_map_s1, object_map_s2, zipped_id_average,
+                change_map = object_analysis(object_map_s1, object_map_s2, s1_info,
                                              uniform_threshold=uniform_threshold, uniform_sizeslope=uniform_sizeslope)
         self.save_obiaresult(date, change_map)
 

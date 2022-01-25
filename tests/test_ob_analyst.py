@@ -30,7 +30,7 @@ def test_workflow():
 
 
 def test_segmentation():
-    [object_map_s1, object_map_s2, zipped_id_average] = segmentation(cm_array, cm_direction_array,
+    [object_map_s1, object_map_s2, s1_info] = segmentation(cm_array, cm_direction_array,
                                                                      cm_date_array,
                                                                      cm_array_l1, cm_array_l1_direction,
                                                                      cm_array_l1_date)
@@ -39,7 +39,7 @@ def test_segmentation():
 
 
 def test_object_analysis():
-    [object_map_s1, object_map_s2, zipped_id_average] = segmentation(cm_array, cm_direction_array,
+    [object_map_s1, object_map_s2, s1_info] = segmentation(cm_array, cm_direction_array,
                                                                              cm_date_array, cm_array_l1,
                                                                              cm_array_l1_direction, cm_array_l1_date)
     classification_map = np.load('tests/resources/feature_maps/yearlyclassification_1999.npy')
@@ -49,7 +49,7 @@ def test_object_analysis():
 
     # import matplotlib
     # from random import random
-    # import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
     # colors = [(1,1,1)] + [(random(),random(),random()) for i in range(255)]
     # new_map = matplotlib.colors.LinearSegmentedColormap.from_list('new_map', colors, N=256)
     # plt.imshow(object_map_s1, cmap=new_map)
