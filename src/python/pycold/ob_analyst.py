@@ -409,7 +409,7 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
     s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
     object_map_s2 = object_map_s1.copy()
     object_map_s2[object_map_s2 > 0] = 1
-    object_map_s2 = sklabel(object_map_s2, background=0)
+    object_map_s2 = sklabel(object_map_s2, connectivity=2, background=0)
     if devel_mode:
         gdal_save_file_1band(
             join(out_path,  '{}_floodfill_gaussian_{}_s2.tif'.format(filenm, bandwidth)),
@@ -418,8 +418,11 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
 
 
 def normalize_clip(data, min, max):
-    tmp = (data - min) / (max - min)
-    np.clip(tmp, 0, 1, out=tmp)
+    if max == min:
+        tmp = np.full_like(data, fill_value=0.5)
+    else:
+        tmp = (data - min) / (max - min)
+        np.clip(tmp, 0, 1, out=tmp)
     return tmp
 
 
@@ -506,9 +509,14 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
                           normalize_clip(cm_date_array, np.min(cm_date_array),
                                          np.max(cm_date_array))])
 
-    n_segments = len(np.unique(measure.label(mask))) * 2
-    object_map_s1 = slic(cm_stack, mask=mask, n_segments=n_segments, compactness=0.1,
-                         min_size_factor=n_segments/cm_stack.shape[0]/cm_stack.shape[1]/cm_stack.shape[2])
+    l = np.unique(sklabel(mask))
+
+    n_segments = len(l) * 2
+    if len(l) == 1 and l[0] == 0:
+        object_map_s1 = np.full_like(mask, 0)
+    else:
+        object_map_s1 = slic(cm_stack, mask=mask, n_segments=n_segments, compactness=0.1,
+                             min_size_factor=n_segments/cm_stack.shape[0]/cm_stack.shape[1]/cm_stack.shape[2])
 
     if devel_mode:
         gdal_save_file_1band(
@@ -527,7 +535,7 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
     #######################################################################################
     object_map_s2 = object_map_s1.copy()
     object_map_s2[object_map_s2 > 0] = 1
-    object_map_s2 = sklabel(object_map_s2, background=0)
+    object_map_s2 = sklabel(object_map_s2, connectivity=2, background=0)
     return object_map_s1, object_map_s2, s1_info
 
 
