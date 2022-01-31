@@ -16,9 +16,7 @@ from os.path import join, exists
 from pycold.utils import gdal_save_file_1band, get_block_x, get_block_y, read_blockdata, get_rowcol_intile
 from pycold.app import defaults, logging
 from pycold import obcold_reconstruct
-from skimage import measure
 from skimage.segmentation import slic
-from skimage.measure import regionprops_table, regionprops
 from skimage.measure import label as sklabel
 
 logger = logging.getLogger(__name__)
@@ -414,12 +412,12 @@ def segmentation(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, 
         gdal_save_file_1band(
             join(out_path,  '{}_floodfill_gaussian_{}_s2.tif'.format(filenm, bandwidth)),
             object_map_s2, gdal.GDT_Int32, trans, proj, n_rows, n_cols)
-    return object_map_s1, object_map_s2, s1_info
+    return object_map_s1, cm_date_array, object_map_s2, s1_info
 
 
 def normalize_clip(data, min, max):
     if max == min:
-        tmp = np.full_like(data, fill_value=0.5)
+        tmp = np.full_like(data, fill_value=0)
     else:
         tmp = (data - min) / (max - min)
         np.clip(tmp, 0, 1, out=tmp)
@@ -427,7 +425,7 @@ def normalize_clip(data, min, max):
 
 
 def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=None, cm_array_l1_direction=None,
-                 cm_array_l1_date=None,  floodfill_ratio=None, devel_mode=False,
+                 cm_array_l1_date=None,  low_bound=None, devel_mode=False,
                  filenm=None, out_path=None, trans=None, proj=None):
     """
     hierachical segmentation based on floodfill
@@ -439,7 +437,7 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
     cm_array_l1: 2-d numpy array
     cm_array_l1_direction: 2-d numpy array
     cm_array_l1_date: 2-d numpy array
-    floodfill_ratio: float
+    low_bound: float
         the change magnitude ratio of the considered pixel over the seed pixel to be included into the cluster
     devel_mode: boolean, True -> development mode to save maps for research use
     filenm: prefix of file name to be saved, devel_mode only
@@ -456,7 +454,10 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
     cm_array = cm_array.astype(float) / defaults['cm_scale']
     cm_array_l1_date = cm_array_l1_date.astype(float) / defaults['cm_scale']
 
-    low_bound = chi2.ppf(0.7, 5)
+    if low_bound is None:
+        low_bound = chi2.ppf(0.7, 5)
+    else:
+        low_bound = low_bound
     upp_bound = chi2.ppf(0.99999, 5)
     [n_rows, n_cols] = cm_array.shape
     if filenm is None:
@@ -504,19 +505,31 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
     mask = np.full_like(cm_array_gaussian_s1, fill_value=0)
     mask[cm_array_gaussian_s1 > low_bound] = 1
 
-    cm_stack = np.dstack([normalize_clip(cm_array_gaussian_s1, low_bound, upp_bound) * 2,
-                          normalize_clip(cm_direction_array, 0, 31),
-                          normalize_clip(cm_date_array, np.min(cm_date_array),
-                                         np.max(cm_date_array))])
+    cm_date_selected = cm_date_array[cm_date_array > 0]
+    # if len(cm_date_selected) > 0:
+    #     cm_date_min = np.min(cm_date_selected)
+    #     cm_date_max = np.max(cm_date_selected)
+    # else:
+    #     cm_date_min = defaults['NAN_VAL']
+    #     cm_date_max = defaults['NAN_VAL']
+    #cm_stack = np.dstack([normalize_clip(cm_array_gaussian_s1, low_bound, upp_bound),
+    #                      normalize_clip(cm_array_gaussian_s1, low_bound, upp_bound),
+    #                      normalize_clip(cm_direction_array, 0, 31)])
+    cm_stack = np.dstack([cm_array_gaussian_s1, cm_array_gaussian_s1, cm_direction_array])
+    # cm_stack = np.dstack([normalize_clip(cm_array_gaussian_s1, low_bound, upp_bound),
+    #                         normalize_clip(cm_array_gaussian_s1, low_bound, upp_bound),
+    #                         normalize_clip(cm_direction_array, 0, 31)])
 
+    n_segments = int(np.ceil(len(mask[mask == 1])/64))
     l = np.unique(sklabel(mask))
-
-    n_segments = len(l) * 2
+    # n_segments = len(l) * 2
+    #if n_segments == 0:
+    #    object_map_s1 = np.full_like(mask, 0)
     if len(l) == 1 and l[0] == 0:
         object_map_s1 = np.full_like(mask, 0)
     else:
-        object_map_s1 = slic(cm_stack, mask=mask, n_segments=n_segments, compactness=0.1,
-                             min_size_factor=n_segments/cm_stack.shape[0]/cm_stack.shape[1]/cm_stack.shape[2])
+        object_map_s1 = slic(cm_stack, mask=mask, n_segments=n_segments, compactness=0.01,
+                             min_size_factor=n_segments/cm_stack.shape[0]/cm_stack.shape[1])
 
     if devel_mode:
         gdal_save_file_1band(
@@ -536,7 +549,39 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
     object_map_s2 = object_map_s1.copy()
     object_map_s2[object_map_s2 > 0] = 1
     object_map_s2 = sklabel(object_map_s2, connectivity=2, background=0)
-    return object_map_s1, object_map_s2, s1_info
+    # seed_index = peak_local_max(cm_array_gaussian_s1, threshold_abs=11.07,
+    #                             exclude_border=False, min_distance=0)
+    # lut_dict_s1 = dict(zip(unq_s1, mean_list))
+    # cm_array_s2 = np.vectorize(lut_dict_s1.get)(object_map_s1).astype(np.float32)
+    # bandwidth = 1
+    # mask_s2 = np.zeros((n_rows + 2, n_cols + 2)).astype(np.uint8)
+    # mask_label_s2 = np.zeros((n_rows + 2, n_cols + 2))
+    # floodflags_base = 8
+    # floodflags_base |= cv2.FLOODFILL_MASK_ONLY
+    # for i in range(len(seed_index)):
+    #     # print(i)
+    #    remainder = i % 255
+    #     floodflags = floodflags_base | ((remainder + 1) << 8)
+    #    num, im, mask_s2, rect = floodFill(cm_array_gaussian_s2, mask_s2, tuple(reversed(seed_index[i])), 0,
+    #                                       loDiff=[10],
+    #                                       upDiff=[10],
+    #                                       flags=floodflags)  # assign an extremely large value
+        # to connect any polygon adjacent to each other
+        # the opencv mask only supports 8-bit, so every 255 seed needs to update values in mask_label
+    #    if remainder == 254:
+    #        no = int(i / 255)
+    #        mask_label_s2[(mask_label_s2 == 0) & (mask_s2 > 0)] = mask_s2[
+    #                                                                  (mask_label_s2 == 0) & (mask_s2 > 0)].\
+    #                                                                  astype(int) + no * 255
+    
+    # if len(seed_index) > 0:
+        # processing the rest that hasn't be recorded into mask_label
+    #    no = int(i / 255)
+    #    mask_label_s2[(mask_label_s2 == 0) & (mask_s2 > 0)] = mask_s2[(mask_label_s2 == 0) & (mask_s2 > 0)].astype(
+    #        int) + no * 255
+    # object_map_s2 = mask_label_s2[1:n_rows + 1, 1:n_cols + 1]
+
+    return object_map_s1, cm_date_array, object_map_s2, s1_info
 
 
 def object_analysis(object_map_s1, object_map_s2, s1_info, classification_map=None,
@@ -666,9 +711,11 @@ class ObjectAnalystHPC:
         if date - self.config['CM_OUTPUT_INTERVAL'] < self.starting_date:
             change_map = np.full((self.config['n_rows'], self.config['n_cols']), 0,
                                   dtype=np.byte)
+            cm_date_array_updated = np.full((self.config['n_rows'], self.config['n_cols']), 0,
+                                            dtype=np.int32)
         else:
             if method == 'floodfill':
-                [object_map_s1, object_map_s2, s1_info] \
+                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] \
                     = segmentation(np.load(join(self.cmmap_path, cmname_fromdate(date)+'.npy')),
                                    np.load(join(self.cmmap_path, cmdirectionname_fromdate(date)+'.npy')),
                                    np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy')),
@@ -679,7 +726,7 @@ class ObjectAnalystHPC:
                                    np.load(join(self.cmmap_path,
                                                 cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL'])+'.npy')))
             elif method == 'slic':
-                [object_map_s1, object_map_s2, s1_info] \
+                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] \
                     = segmentation_slic(np.load(join(self.cmmap_path, cmname_fromdate(date)+'.npy')),
                                         np.load(join(self.cmmap_path, cmdirectionname_fromdate(date)+'.npy')),
                                         np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy')),
@@ -698,16 +745,17 @@ class ObjectAnalystHPC:
             else:
                 change_map = object_analysis(object_map_s1, object_map_s2, s1_info,
                                              uniform_threshold=uniform_threshold, uniform_sizeslope=uniform_sizeslope)
-        self.save_obiaresult(date, change_map)
+        self.save_obiaresult(date, change_map, cm_date_array_updated)
 
-    def save_obiaresult(self, date, change_map):
-        # if outputformat == 'tiff':
-        #     gdal_save_file_1band(join(self.obia_path, filenm + '_OBIAresult.tif'), change_map,
-        #                          gdal.GDT_Byte, trans, proj, defaults['n_cols'], defaults['n_rows'])
-        # else:
+    def save_obiaresult(self, date, change_map, cm_date_array_updated):
         filenm = obiaresname_fromdate(date)
-        bytesize = 1
-        result_blocks = np.lib.stride_tricks.as_strided(change_map,
+        bytesize = 4
+
+        # prevent -9999 * date
+        cm_date_array_updated[cm_date_array_updated < 0] = 0
+        # need yo load date snapshot
+        # cm_date_snapshot = np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy'))
+        result_blocks = np.lib.stride_tricks.as_strided(np.multiply(change_map, cm_date_array_updated).astype(np.int32),
                                                         shape=(self.config['n_block_y'], self.config['n_block_x'],
                                                                self.config['block_height'], self.config['block_width']),
                                                         strides=(self.config['n_cols'] * self.config['block_height'] * bytesize,
@@ -738,18 +786,9 @@ class ObjectAnalystHPC:
                           f.find('obiaresult_') + len('obiaresult_')+6])
                     for f in obia_files]
         files_date_zip = sorted(zip(cm_dates, obia_files))
-        cm_dates = [x[0] for x in files_date_zip]
 
-        # load date block
-        cm_date_block = np.dstack([np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy'))
-                                   for date in cm_dates])
-        cm_date_block = np.reshape(cm_date_block, (self.config['block_width'] * self.config['block_height'],
-                                                      cm_date_block.shape[2]))
-
-        assert cm_date_block.shape[1] == len(obia_files)
-        obia_tstack = [np.multiply(np.load(join(self.obia_path, f[1])).reshape(self.config['block_width']
-                                                                               * self.config['block_height']),
-                                   cm_date_block[:, count])
+        obia_tstack = [np.load(join(self.obia_path, f[1])).reshape(self.config['block_width'] *
+                                                                   self.config['block_height'])
                        for count, f in enumerate(files_date_zip)]
         return np.vstack(obia_tstack)
 

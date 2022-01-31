@@ -30,7 +30,7 @@ def test_workflow():
 
 
 def test_segmentation():
-    [object_map_s1, object_map_s2, s1_info] = segmentation(cm_array, cm_direction_array,
+    [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation(cm_array, cm_direction_array,
                                                                      cm_date_array,
                                                                      cm_array_l1, cm_array_l1_direction,
                                                                      cm_array_l1_date)
@@ -39,13 +39,13 @@ def test_segmentation():
 
 
 def test_object_analysis():
-    [object_map_s1, object_map_s2, s1_info] = segmentation_slic(cm_array, cm_direction_array,
+    [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation_slic(cm_array, cm_direction_array,
                                                                              cm_date_array, cm_array_l1,
                                                                              cm_array_l1_direction, cm_array_l1_date)
     classification_map = np.load('tests/resources/feature_maps/yearlyclassification_1999.npy')
     change_map = object_analysis(object_map_s1, object_map_s2, s1_info, classification_map)
-    import matplotlib.pyplot as plt
-    plt.imshow(change_map)
+    # import matplotlib.pyplot as plt
+    # plt.imshow(change_map)
     # test_config = yaml.safe_load(yaml_obj)
     assert len(np.unique(change_map)) > 1
 
