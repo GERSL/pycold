@@ -3,7 +3,7 @@ NAN_VAL: -9999
 NAN_VAL_UINT8: 255
 cm_scale: 100
 gate_thres: 7.289
-floodfill_thres: 0.5
+floodfill_thres: 0.4
 TOTAL_IMAGE_BANDS: 7
 min_category_samples: 600
 max_category_samples: 8000

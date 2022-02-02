@@ -1,5 +1,5 @@
 import numpy as np
-from pycold.ob_analyst import segmentation, segmentation_slic
+from pycold.ob_analyst import segmentation_floodfill, segmentation_slic
 from pycold.ob_analyst import object_analysis
 from pycold.ob_analyst import ObjectAnalystHPC
 import yaml
@@ -30,7 +30,7 @@ def test_workflow():
 
 
 def test_segmentation():
-    [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation(cm_array, cm_direction_array,
+    [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation_floodfill(cm_array, cm_direction_array,
                                                                      cm_date_array,
                                                                      cm_array_l1, cm_array_l1_direction,
                                                                      cm_array_l1_date)
