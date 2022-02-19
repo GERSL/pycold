@@ -1102,7 +1102,7 @@ int preprocessing
             (buf_s1[i] > 0) && (buf_s1[i] < 10000) &&
             (buf_s2[i] > 0) && (buf_s2[i] < 10000) &&
             (buf_t[i] > -9320) && (buf_t[i] < 7070) &&
-                (fmask_buf[i] < FILL_VALUE))
+               (fmask_buf[i] < FILL_VALUE))
          {
             id_range[i] = 1;
          }
@@ -1191,6 +1191,10 @@ int cold
     int i;
     char FUNC_NAME[] = "cold";
     int result;
+
+    if(valid_num_scenes == 0){
+        return (SUCCESS);
+    }
 
     id_range = (int*)calloc(valid_num_scenes, sizeof(int));
 
@@ -6561,7 +6565,10 @@ int obcold_reconstruction_procedure
     int adj_conse = conse;
     float **v_dif_mag;
     int last_break_record = 0;  // used to record the year of the last break
-
+    
+    if(valid_num_scenes == 0){
+        return (SUCCESS);
+    }
     id_range = (int*)calloc(valid_num_scenes, sizeof(int));
 
     for (k = 0; k < TOTAL_IMAGE_BANDS; k++)

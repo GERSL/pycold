@@ -103,7 +103,7 @@ def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keywor
     log10_size = np.log10(int(stats_lut_row['npixels']))
     intercept = 1
     if classification_map is None:
-        if log10_size * ['default_sizeslope'] + intercept < 2:
+        if log10_size * defaults['default_sizeslope'] + intercept < 2:
             scale = log10_size * defaults['default_sizeslope'] + intercept
         else:
             scale = 2
@@ -1069,6 +1069,8 @@ class ObjectAnalystHPC:
                                                    pos=self.config['n_cols'] * (original_row - 1) + original_col)
             except RuntimeError:
                 logger.error("COLD fails at original_row {}, original_col {}".format(original_row, original_col))
+            except Exception as e:  # pass exception
+                pass
             else:
                 result_collect.append(obcold_result)
         return result_collect
