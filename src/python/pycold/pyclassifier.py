@@ -350,10 +350,9 @@ class PyClassifierHPC(PyClassifier):
                     block_features[i, :, :])
 
     def _is_finished_step1_predict_features(self):
-        for block in range(self.config['n_blocks']):
-            for year in range(self.year_lowbound, self.year_uppbound+1):
-                if not exists(join(self.tmp_path, 'tmp_feature_year{}_block{}.npy').format(year, block + 1)):
-                    return False
+        for iblock in range(self.config['n_blocks']):
+            if not exists(join(self.tmp_path, 'tmp_step1_predict_{}_finished.txt'.format(iblock+1))):
+                return False
         return True
 
     @staticmethod
@@ -375,9 +374,8 @@ class PyClassifierHPC(PyClassifier):
         :return: True or false
         """
         for iblock in range(self.config['n_blocks']):
-            for year in range(self.year_lowbound, self.year_uppbound + 1):
-                if not exists(join(self.tmp_path, 'tmp_yearlyclassification{}_block{}.npy'.format(year, iblock + 1))):
-                    return False
+            if not exists(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(iblock + 1))):
+                return False
         return True
     
     def _save_covermaps(self, full_yearlyclass_array, year):
@@ -437,6 +435,8 @@ class PyClassifierHPC(PyClassifier):
                              get_block_y(block_id, self.config['n_block_x'])))
         block_features = self.predict_features(block_id, cold_block, self.year_lowbound, self.year_uppbound)
         self._save_features(block_id, block_features)
+        with open(join(self.tmp_path, 'tmp_step1_predict_{}_finished.txt'.format(block_id)), 'w') as fp:
+            pass
 
     def step2_train_rf(self, ref_year=None):
         while not self._is_finished_step1_predict_features():
@@ -463,6 +463,8 @@ class PyClassifierHPC(PyClassifier):
                                                                                                         block_id)))
             cmap = self.classification_block(rf_model, tmp_feature_block)
             self._save_yearlyclassification_maps(block_id, year, cmap)
+        with open(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(block_id)), 'w') as fp:
+            pass
 
     def step4_assemble(self):
         while not self._is_finished_step3_classification():

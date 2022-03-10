@@ -7,7 +7,6 @@ import gdal
 # import datetime
 from cv2 import floodFill
 import cv2 as cv2
-from skimage.feature import peak_local_max
 from astropy.convolution import Gaussian2DKernel
 from astropy.convolution import convolve
 from scipy import stats
@@ -65,7 +64,7 @@ def cmdatename_fromdate(ordinal_date):
 
 def obiaresname_fromdate(ordinal_date):
     """
-    get file name from ordinate date
+    get OBIA result file name from ordinate date
     Args:
         ordinal_date: the inputted ordinate date
     Returns:
@@ -291,12 +290,14 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
 
     Returns
     -------
-    [object_map_s1, object_map_s2, zipped_id_average]:
-        object map for superpixel, object map for object level, a zipped list of id and average
-        change magnitude for superpixel level
+    [object_map_s1, cm_date_array, object_map_s2, s1_info]:
+        object_map_s1: object map for superpixel,
+        cm_date_array: change date maps which is updated by filling na values from the previous change date map,
+                       it is generated as an input for saving out the new break date map (we need to know the date for
+                       the new break to generate the new temporal segments and harmonic coefficients)
+        object_map_s2: object map for object level
+        s1_info: a zipped list of id and average change magnitude in the superpixel level
     """
-    cm_array = cm_array.astype(float) / defaults['cm_scale']
-    cm_array_l1_date = cm_array_l1_date.astype(float) / defaults['cm_scale']
 
     peak_threshold = chi2.ppf(0.90, 5)
     [n_rows, n_cols] = cm_array.shape
@@ -313,6 +314,7 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
 
     # assign valid CM values in the stack into current cm array where NA values are
     cm_array[cm_array == defaults['NAN_VAL']] = cm_array_l1[cm_array == defaults['NAN_VAL']]
+    cm_array = cm_array.astype(float) / defaults['cm_scale']
 
     # defaults['NAN_VAL_UINT8'], i.e., 255, is also the NA value of direction.
     cm_direction_array[cm_direction_array == defaults['NAN_VAL_UINT8']] = \
@@ -413,6 +415,7 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
     object_map_s2 = object_map_s1.copy()
     object_map_s2[object_map_s2 > 0] = 1
     object_map_s2 = sklabel(np.multiply(object_map_s2, cm_direction_array+1), connectivity=2, background=0)
+    # object_map_s2 = sklabel(object_map_s2, connectivity=2, background=0)
     if devel_mode:
         gdal_save_file_1band(
             join(out_path,  '{}_floodfill_gaussian_{}_s2.tif'.format(filenm, bandwidth)),
@@ -454,12 +457,14 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
 
     Returns
     -------
-    [object_map_s1, object_map_s2, s1_info]:
-        object map for superpixel, object map for object level, a zipped list of id and average
-        change magnitude for superpixel level
+    [object_map_s1, cm_date_array, object_map_s2, s1_info]:
+        object_map_s1: object map for superpixel,
+        cm_date_array: change date maps which is updated by filling na values from the previous change date map,
+                       it is generated as an input for saving out the new break date map (we need to know the date for
+                       the new break to generate the new temporal segments and harmonic coefficients)
+        object_map_s2: object map for object level
+        s1_info: a zipped list of id and average change magnitude in the superpixel level
     """
-    cm_array = cm_array.astype(float) / defaults['cm_scale']
-    cm_array_l1_date = cm_array_l1_date.astype(float) / defaults['cm_scale']
 
     if low_bound is None:
         low_bound = chi2.ppf(0.7, 5)
@@ -478,6 +483,7 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
 
     # assign valid CM values in the stack into current cm array where NA values are
     cm_array[cm_array == defaults['NAN_VAL']] = cm_array_l1[cm_array == defaults['NAN_VAL']]
+    cm_array = cm_array.astype(float) / defaults['cm_scale']
 
     # defaults['NAN_VAL_UINT8'], i.e., 255, is also the NA value of direction.
     cm_direction_array[cm_direction_array == defaults['NAN_VAL_UINT8']] = \
@@ -485,6 +491,7 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
 
     cm_date_array[cm_date_array == defaults['NAN_VAL']] = \
         cm_array_l1_date[cm_date_array == defaults['NAN_VAL']]
+    
 
     if devel_mode is True:
         gdal_save_file_1band(join(out_path, filenm + '_cm_array.tif'), cm_array,
@@ -614,12 +621,14 @@ def segmentation_quickshift(cm_array, cm_direction_array, cm_date_array, cm_arra
 
     Returns
     -------
-    [object_map_s1, object_map_s2, s1_info]:
-        object map for superpixel, object map for object level, a zipped list of id and average
-        change magnitude for superpixel level
+    [object_map_s1, cm_date_array, object_map_s2, s1_info]:
+        object_map_s1: object map for superpixel,
+        cm_date_array: change date maps which is updated by filling na values from the previous change date map,
+                       it is generated as an input for saving out the new break date map (we need to know the date for
+                       the new break to generate the new temporal segments and harmonic coefficients)
+        object_map_s2: object map for object level
+        s1_info: a zipped list of id and average change magnitude in the superpixel level
     """
-    cm_array = cm_array.astype(float) / defaults['cm_scale']
-    cm_array_l1_date = cm_array_l1_date.astype(float) / defaults['cm_scale']
 
     if low_bound is None:
         low_bound = chi2.ppf(0.7, 5)
@@ -638,6 +647,7 @@ def segmentation_quickshift(cm_array, cm_direction_array, cm_date_array, cm_arra
 
     # assign valid CM values in the stack into current cm array where NA values are
     cm_array[cm_array == defaults['NAN_VAL']] = cm_array_l1[cm_array == defaults['NAN_VAL']]
+    cm_array = cm_array.astype(float) / defaults['cm_scale']
 
     # defaults['NAN_VAL_UINT8'], i.e., 255, is also the NA value of direction.
     cm_direction_array[cm_direction_array == defaults['NAN_VAL_UINT8']] = \
@@ -732,12 +742,14 @@ def segmentation_watershed(cm_array, cm_direction_array, cm_date_array, cm_array
 
     Returns
     -------
-    [object_map_s1, object_map_s2, s1_info]:
-        object map for superpixel, object map for object level, a zipped list of id and average
-        change magnitude for superpixel level
+    [object_map_s1, cm_date_array, object_map_s2, s1_info]:
+        object_map_s1: object map for superpixel,
+        cm_date_array: change date maps which is updated by filling na values from the previous change date map,
+                       it is generated as an input for saving out the new break date map (we need to know the date for
+                       the new break to generate the new temporal segments and harmonic coefficients)
+        object_map_s2: object map for object level
+        s1_info: a zipped list of id and average change magnitude in the superpixel level
     """
-    cm_array = cm_array.astype(float) / defaults['cm_scale']
-    cm_array_l1_date = cm_array_l1_date.astype(float) / defaults['cm_scale']
 
     if low_bound is None:
         low_bound = chi2.ppf(0.7, 5)
@@ -756,6 +768,7 @@ def segmentation_watershed(cm_array, cm_direction_array, cm_date_array, cm_array
 
     # assign valid CM values in the stack into current cm array where NA values are
     cm_array[cm_array == defaults['NAN_VAL']] = cm_array_l1[cm_array == defaults['NAN_VAL']]
+    cm_array = cm_array.astype(float) / defaults['cm_scale']
 
     # defaults['NAN_VAL_UINT8'], i.e., 255, is also the NA value of direction.
     cm_direction_array[cm_direction_array == defaults['NAN_VAL_UINT8']] = \
@@ -812,6 +825,19 @@ def segmentation_watershed(cm_array, cm_direction_array, cm_date_array, cm_array
 
 def object_analysis(object_map_s1, object_map_s2, s1_info, classification_map=None,
                     uniform_threshold=None, uniform_sizeslope=None):
+    """
+    Args:
+        object_map_s1: 2-d array, object map for superpixel
+        object_map_s2: 2-d array, object map for patch level
+        s1_info: a zipped list, the first element is id and the second element is average
+        classification_map: 2-d array, the classification map which is one year prior to object_map_s1
+        uniform_threshold: double, if not none, using a uniform change probability for all land categories, only used
+                          for parameter testing
+        uniform_sizeslope: double, if not none, using a uniform size factor for all land categories, only used
+                          for parameter testing
+    Returns:
+
+    """
     # if classification_map is not None:
     #     assert classification_map.shape == object_map_s1.shape
     [n_rows, n_cols] = object_map_s1.shape
@@ -861,6 +887,17 @@ def object_analysis(object_map_s1, object_map_s2, s1_info, classification_map=No
 class ObjectAnalystHPC:
     def __init__(self, config, stack_path, result_path, starting_date, cmmap_path=None, obia_path=None,
                  obcold_recg_path=None, thematic_path=None):
+        """
+        Args:
+            config: pycold configuration file
+            stack_path: the path of stack dataset
+            result_path: the path of COLD rec_cg result
+            starting_date: the starting date of the dataset to be processed
+            cmmap_path: the path of change magnitude, direction and dates files, the default is 'result_path/cm_maps'
+            obia_path: the path of OBIA results, the default is 'result_path/OBIAresults'
+            obcold_recg_path: the path of obcold change records, the default is 'result_path/obcold'
+            thematic_path: : the path of classification maps, None represents no thematic maps were used for procedure
+        """
         self.config = config
         self.config['block_width'] = int(self.config['n_cols'] / self.config['n_block_x'])
         self.config['block_height'] = int(self.config['n_rows'] / self.config['n_block_y'])
@@ -903,6 +940,9 @@ class ObjectAnalystHPC:
             raise FileExistsError('No such directory: {}'.format(result_path))
 
     def hpc_preparation(self):
+        """
+        prepare folders for saving intermediate files
+        """
         if exists(self.cmmap_path) is False:
             try:
                 os.mkdir(self.cmmap_path)
@@ -934,6 +974,22 @@ class ObjectAnalystHPC:
 
     def obia_execute(self, date, floodfill_ratio=None, uniform_threshold=None, uniform_sizeslope=None,
                      method='floodfill'):
+        """
+        a function for executing OBIA pipeline
+        Args:
+            date: the date as an index of the temporal snapshot to be processed
+            floodfill_ratio: the ratio of 𝚕𝚘𝙳𝚒𝚏𝚏/𝚞𝚙𝙳𝚒𝚏𝚏 raltive to the seed pixel value as the fixed range for connecting
+                             neighborhood in the floodfill algorithm
+                             (https://docs.opencv.org/3.4/d7/d1b/group__imgproc__misc.html#gaf1f55a048f8a45bc3383586e80b1f0d0)
+            uniform_threshold: double, if not none, using a uniform change probability for all land categories, only used
+                              for parameter testing
+            uniform_sizeslope: double, if not none, using a uniform size factor for all land categories, only used
+                              for parameter testing
+            method: 'floodfill', 'slic', 'quickshift', 'watershed'
+
+        Returns:
+
+        """
         if date - self.config['CM_OUTPUT_INTERVAL'] < self.starting_date:
             change_map = np.full((self.config['n_rows'], self.config['n_cols']), 0,
                                   dtype=np.byte)
@@ -997,6 +1053,15 @@ class ObjectAnalystHPC:
         self.save_obiaresult(date, change_map, cm_date_array_updated)
 
     def save_obiaresult(self, date, change_map, cm_date_array_updated):
+        """
+        save OBIA array as a list of block-based subarrays which are either 0 or new break dates
+        Args:
+            date: int, the date as an index of the temporal snapshot to be processed
+            change_map: array, the resultant change map to be saved out
+            cm_date_array_updated: the change date map which was updated by filling NA values from the previous cm date maps
+        Returns:
+
+        """
         filenm = obiaresname_fromdate(date)
         bytesize = 4
 
@@ -1015,19 +1080,31 @@ class ObjectAnalystHPC:
                 np.save(join(self.obia_path, filenm + '_x{}_y{}.npy'.format(j + 1, i + 1)),
                         result_blocks[i][j])
 
+        with open(join(self.obia_path, 'tmp_OBIA_{}_finished.txt'.format(date)), 'w') as fp:
+            pass
+
     def is_finished_object_analysis(self, date_list):
         """
-        :return:
+        Args:
+            date_list: a list of dates for the whole period of the dataset 
+
+        Returns:
+            True -> finished; False -> not finished
         """
         for date in date_list:
-            for i in range(self.config['n_block_y']):
-                for j in range(self.config['n_block_x']):
-                    if not exists(join(self.obia_path, '{}_{}'.format(obiaresname_fromdate(date),
-                                                                      'x{}_y{}.npy'.format(j + 1, i + 1)))):
-                        return False
+            if not exists(join(self.obia_path, 'tmp_OBIA_{}_finished.txt'.format(date))):
+                return False
         return True
 
     def get_allobiaresult_asarray(self, block_x, block_y):
+        """
+        Args:
+            block_x: the x id of the block
+            block_y: the y id of the block
+
+        Returns:
+            block-specific obia results which are formatted as 0 or break dates
+        """
         obia_files = [f for f in os.listdir(self.obia_path) if f.startswith('obiaresult')
                       and f.endswith('_x{}_y{}.npy'.format(block_x, block_y))]
         # sort image files by dates
@@ -1042,6 +1119,15 @@ class ObjectAnalystHPC:
         return np.vstack(obia_tstack)
 
     def reconstruct_reccg(self, block_id, img_stack=None, img_dates_sorted=None):
+        """
+        the third step of OBCOLD, it reconstructs the new temporal segment based on the new spatially adjusted break
+        Args:
+            block_id: the block id to be processed
+            img_stack: time series block-based dataset
+            img_dates_sorted: the new break dates from obiaresult_{}.npy
+        Returns:
+            change records
+        """
         block_y = get_block_y(block_id, self.config['n_block_x'])
         block_x = get_block_x(block_id, self.config['n_block_x'])
         if img_stack is None and img_dates_sorted is None:
