@@ -311,8 +311,9 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
         cm_array_l1_direction = np.full((n_rows, n_cols), defaults['NAN_VAL_UINT8'], dtype=np.uint8)
     if cm_array_l1_date is None:
         cm_array_l1_date = np.full((n_rows, n_cols), defaults['NAN_VAL'], dtype=np.int32)
-
+    
     # assign valid CM values in the stack into current cm array where NA values are
+    cm_array_l1[cm_array_l1 < (chi2.ppf(0.99, 5)*defaults['cm_scale'])] = defaults['NAN_VAL']
     cm_array[cm_array == defaults['NAN_VAL']] = cm_array_l1[cm_array == defaults['NAN_VAL']]
     cm_array = cm_array.astype(float) / defaults['cm_scale']
 
@@ -333,6 +334,7 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
     #                               Scale 1: change superpixel                            #
     #######################################################################################
     cm_array[cm_array < peak_threshold * (1 - floodfill_ratio)] = np.nan
+    # cm_array[cm_array < chi2.ppf(0.7, 5)] = np.nan
     bandwidth = 1
 
     # using gaussian kernel ( with 1 sigma value) to smooth images in hpc_preparation for floodfill
