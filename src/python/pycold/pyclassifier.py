@@ -60,8 +60,12 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, n_features_perb
                             if n == 0:
                                 features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
                                                      ordinal_day / defaults['SLOPE_SCALE']
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
                             else:
                                 features[n][index] = cold_curve['coefs'][band][n]
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
                         break
 
             else:
@@ -81,8 +85,12 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, n_features_perb
                                 # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
                                 features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
                                                      ordinal_day / defaults['SLOPE_SCALE']
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
                             else:
                                 features[n][index] = cold_curve['coefs'][band][n+1]  # n + 1 is because won't need slope as output
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
                         break
     return features
 
@@ -101,7 +109,7 @@ def generate_sample_num(label, sample_parameters):
                                                         return_counts=True)
     counts_category = np.array([0] * sample_parameters['total_landcover_category'])
     for x in range(len(unique_counts_category)):
-        counts_category[unique_category[x]-1] = unique_counts_category[x]
+        counts_category[int(unique_category[x]-1)] = unique_counts_category[x]
     percate_samples = np.array([round(x * sample_parameters['total_samples'] / sum(counts_category)) for x in
                                 counts_category])
     percate_samples[percate_samples > sample_parameters['max_category_samples']] = \
@@ -217,7 +225,7 @@ class PyClassifier:
             label_list.append(np.array([i + 1] * len(index_sample)))
         index_list = np.vstack(index_list)
         label_list = np.hstack(label_list)
-        feature_extraction = np.array([full_feature_array[tuple(x)] for x in index_list])
+        feature_extraction = np.array([full_feature_array[tuple(x)] for x in index_list]).astype(np.float32)
         rf_model = RandomForestClassifier(random_state=42)
         rf_model.fit(feature_extraction, label_list)
         return rf_model
@@ -392,7 +400,7 @@ class PyClassifierHPC(PyClassifier):
                                      if file.startswith('tmp_yearlyclassification{}'.format(year))]
 
         # sort to guarantee order follows low to high rows
-        tmp_yearlyclass_filenames.sort(key=lambda t: t[t.find('block'): t.find('.npy')])
+        tmp_yearlyclass_filenames.sort(key=lambda t: int(t[t.find('block')+5: t.find('.npy')]))
         return [np.load(join(self.tmp_path, file)).reshape(self.config['block_height'],
                                                                         self.config['block_width'], 1)
                 for file in tmp_yearlyclass_filenames]
@@ -405,7 +413,7 @@ class PyClassifierHPC(PyClassifier):
                            format(self.config['n_blocks'], len(tmp_feature_filenames)))
 
         tmp_feature_filenames.sort(
-            key=lambda t: t[t.find('block'): t.find('.npy')])  # sorted by row number
+            key=lambda t: int(t[t.find('block')+5: t.find('.npy')]))  # sorted by row number
 
         return [np.load(join(self.tmp_path, file)).reshape(self.config['block_height'], self.config['block_width'],
                 self.n_features) for file in tmp_feature_filenames]

@@ -100,7 +100,7 @@ def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keywor
     # barren: 8
 
     log10_size = np.log10(int(stats_lut_row['npixels']))
-    intercept = 1
+    intercept = 0.95
     if classification_map is None:
         if log10_size * defaults['default_sizeslope'] + intercept < 2:
             scale = log10_size * defaults['default_sizeslope'] + intercept
@@ -416,8 +416,8 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
     s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
     object_map_s2 = object_map_s1.copy()
     object_map_s2[object_map_s2 > 0] = 1
-    object_map_s2 = sklabel(np.multiply(object_map_s2, cm_direction_array+1), connectivity=2, background=0)
-    # object_map_s2 = sklabel(object_map_s2, connectivity=2, background=0)
+    # object_map_s2 = sklabel(np.multiply(object_map_s2, cm_direction_array+1), connectivity=2, background=0)
+    object_map_s2 = sklabel(object_map_s2, connectivity=2, background=0)
     if devel_mode:
         gdal_save_file_1band(
             join(out_path,  '{}_floodfill_gaussian_{}_s2.tif'.format(filenm, bandwidth)),
