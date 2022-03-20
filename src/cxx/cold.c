@@ -5129,6 +5129,7 @@ int stand_procedure
                 else // update frequency
                 {
                     if((i - pre_end >= UPDATE_FREQ) && (i - pre_end) > (int)(i_span_skip * SKIP_PERCENTAGE))
+                    // if ((float)(clrx[i-1] - clrx[i_start-1]) >= (1.33*(float)i_count))
                     {
                         /******************************************/
                         /*                                        */

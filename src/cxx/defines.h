@@ -88,7 +88,7 @@
 #define SIMPLE 1
 #define CONSE_END 6
 
-#define UPDATE_FREQ 3
+#define UPDATE_FREQ 1
 // #define CONSE 6           /* No. of CONSEquential pixels 4 bldg. model*/
 #define LASSO_MIN 6           /* No. of CONSEquential pixels 4 bldg. model*/
 

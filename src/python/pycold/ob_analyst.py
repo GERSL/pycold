@@ -323,6 +323,11 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
 
     cm_date_array[cm_date_array == defaults['NAN_VAL']] = \
         cm_array_l1_date[cm_date_array == defaults['NAN_VAL']]
+    
+    # free memory
+    cm_array_l1 = None
+    cm_array_l1_direction = None
+    cm_array_l1_date = None
 
     if devel_mode is True:
         gdal_save_file_1band(join(out_path, filenm + '_cm_array.tif'), cm_array,
@@ -341,6 +346,7 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
     kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
     cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary='extend', preserve_nan=True)
     cm_array_gaussian_s1[np.isnan(cm_array)] = defaults['NAN_VAL']
+    cm_array = None
 
     # cm_array_gaussian_s1 = cm_array  # try not using gaussian
     if devel_mode is True:
@@ -374,8 +380,8 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
         floodflags = floodflags_base | ((remainder + 1) << 8)
         seedcm = cm_array_gaussian_s1[tuple(seed_index[i])]
         num, im, mask_s1, rect = floodFill(cm_stack, mask_s1, tuple(reversed(seed_index[i])), 0,
-                                           loDiff=[seedcm * floodfill_ratio, 0, 48],
-                                           upDiff=[seedcm * floodfill_ratio, 0, 48],
+                                           loDiff=[seedcm * floodfill_ratio, 0, 60],
+                                           upDiff=[seedcm * floodfill_ratio, 0, 60],
                                            flags=floodflags)
         # the opencv mask only supports 8-bit, we hack it by updating the label value for every 255 object
         if remainder == 254:
@@ -396,6 +402,11 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
             int) + no * 255
 
     object_map_s1 = mask_label_s1[1:n_rows + 1, 1:n_cols + 1].astype(np.int)
+    
+    # free memory
+    cm_stack = None
+    mask_label_s1 = None
+    mask_s1 = None
     if devel_mode:
         gdal_save_file_1band(
             os.path.join(out_path, filenm + '_floodfill_gaussian_{}_s1.tif'.format(bandwidth)),
