@@ -378,6 +378,7 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
         # print(i)
         remainder = i % 255
         floodflags = floodflags_base | ((remainder + 1) << 8)
+        # seedcm = np.min([cm_array_gaussian_s1[tuple(seed_index[i])], peak_threshold])
         seedcm = cm_array_gaussian_s1[tuple(seed_index[i])]
         num, im, mask_s1, rect = floodFill(cm_stack, mask_s1, tuple(reversed(seed_index[i])), 0,
                                            loDiff=[seedcm * floodfill_ratio, 0, 60],
@@ -401,7 +402,7 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
         mask_label_s1[(mask_label_s1 == 0) & (mask_s1 > 0)] = mask_s1[(mask_label_s1 == 0) & (mask_s1 > 0)].astype(
             int) + no * 255
 
-    object_map_s1 = mask_label_s1[1:n_rows + 1, 1:n_cols + 1].astype(np.int)
+    object_map_s1 = mask_label_s1[1:n_rows + 1, 1:n_cols + 1].astype(np.int32)
     
     # free memory
     cm_stack = None
