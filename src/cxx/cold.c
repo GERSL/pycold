@@ -6842,7 +6842,7 @@ int obcold_reconstruction_procedure
                             }
                         }
                      }
-                     if (v_dif_norm > T_MAX_CG){
+                     if (v_dif_norm > T_MAX_CG_reconstruct){
                         rm_ids[rm_ids_len] = k;
                         rm_ids_len++;
                      }

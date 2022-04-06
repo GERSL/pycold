@@ -378,11 +378,12 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
         # print(i)
         remainder = i % 255
         floodflags = floodflags_base | ((remainder + 1) << 8)
-        # seedcm = np.min([cm_array_gaussian_s1[tuple(seed_index[i])], peak_threshold])
         seedcm = cm_array_gaussian_s1[tuple(seed_index[i])]
+        # gradiant = np.max([seedcm*floodfill_ratio, (seedcm-peak_threshold)])
+        gradiant = seedcm * floodfill_ratio
         num, im, mask_s1, rect = floodFill(cm_stack, mask_s1, tuple(reversed(seed_index[i])), 0,
-                                           loDiff=[seedcm * floodfill_ratio, 0, 60],
-                                           upDiff=[seedcm * floodfill_ratio, 0, 60],
+                                           loDiff=[gradiant, 0, 60],
+                                           upDiff=[gradiant, 0, 60],
                                            flags=floodflags)
         # the opencv mask only supports 8-bit, we hack it by updating the label value for every 255 object
         if remainder == 254:
@@ -424,6 +425,7 @@ def segmentation_floodfill(cm_array, cm_direction_array, cm_date_array, cm_array
     # unique always returned sorted list
     unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
     mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
+    # mean_list = np.sqrt(np.bincount(ids_s1.astype(int), weights=np.square(cm_array_gaussian_s1.astype(np.int64)).reshape(ids_s1.shape)) / count_s1)
     mean_list[unq_s1 == 0] = defaults['NAN_VAL']  # force mean of unchanged objects to be -9999
     s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
     object_map_s2 = object_map_s1.copy()
@@ -569,6 +571,7 @@ def segmentation_slic(cm_array, cm_direction_array, cm_date_array, cm_array_l1=N
     #                                          properties=['label', 'mean_intensity']))
     unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
     mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
+    # mean_list = np.sqrt(np.bincount(ids_s1.astype(int), weights=np.square(cm_array_gaussian_s1.astype(np.int64)).reshape(ids_s1.shape)) / count_s1)
     mean_list[unq_s1 == 0] = defaults['NAN_VAL']  # force mean of unchanged objects to be -9999
     s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
     #######################################################################################

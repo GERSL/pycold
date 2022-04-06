@@ -20,6 +20,7 @@
 #define MIN_YEARS 1       /* minimum year for model intialization     */
 #define T_SN 0.75         /* no change detection for permanent snow pixels */
 #define T_CLR 0.25        /* Fmask fails threshold                    */
+#define T_MAX_CG_reconstruct 15.0863
 #define T_MAX_CG 30.8562  /* chi-square inversed T_max_cg (1e-5) for    */
                           /* last step noise removal                    */
                           /*  SY 11/19/2018: change from 35.8882 to 30.8562)                  */
