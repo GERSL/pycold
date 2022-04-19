@@ -78,23 +78,23 @@ int get_variables
     bool *b_outputCSV
 );
 
-int get_args
-(
-    int argc,              /* I: number of cmd-line args                    */
-    char *argv[],          /* I: string of cmd-line args                    */
-    int *mode,             /* O: 1 - pixel-based; 2 - scanline-based; 3 - wholescene; 4-validation */
-    char *in_path,         /* O: directory locaiton for input data          */
-    char *out_path,        /* O: directory location for output files        */
-    int *n_cores,          /* O: the number of cores                        */
-    int *row,              /* O: row number for the pixel                   */
-    int *col,              /* O: col number for the pixel                   */
-    int *method,
-    char *user_mask_path,
-    double *probability_threshold,
-    int *min_days_conse,
-    bool *b_fastmode,
-    bool *b_outputCSV
-);
+//int get_args
+//(
+//    int argc,              /* I: number of cmd-line args                    */
+//    char *argv[],          /* I: string of cmd-line args                    */
+//    int *mode,             /* O: 1 - pixel-based; 2 - scanline-based; 3 - wholescene; 4-validation */
+//    char *in_path,         /* O: directory locaiton for input data          */
+//    char *out_path,        /* O: directory location for output files        */
+//    int *n_cores,          /* O: the number of cores                        */
+//    int *row,              /* O: row number for the pixel                   */
+//    int *col,              /* O: col number for the pixel                   */
+//    int *method,
+//    char *user_mask_path,
+//    double *probability_threshold,
+//    int *min_days_conse,
+//    bool *b_fastmode,
+//    bool *b_outputCSV
+//);
 
 int get_classificationconfig
 (
@@ -114,13 +114,35 @@ int get_coldparameters
 (
     int *n_rows,
     int *n_cols,
-    int *n_block_h,
-    int *n_block_v,
+    int *n_block_x,
+    int *n_block_y,
     int *CM_OUTPUT_INTERVAL,
     float *probability_threshold,
     int *conse
 );
 
 int usage_message ();
+
+
+int preprocessing
+(
+    long *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *fmask_buf,        /* I:   mask time series  */
+    int *valid_num_scenes, /* I/O: * number of scenes after cfmask counts and  */
+    int *id_range,
+    int *clear_sum,      /* I/O: Total number of clear cfmask pixels          */
+    int *water_sum,      /* I/O: counter for cfmask water pixels.             */
+    int *shadow_sum,     /* I/O: counter for cfmask shadow pixels.            */
+    int *sn_sum,         /* I/O: Total number of snow cfmask pixels           */
+    int *cloud_sum,      /* I/O: counter for cfmask cloud pixels.             */
+    bool b_c2
+);
+
 
 #endif /* UTILITIES_H */

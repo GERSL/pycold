@@ -3,334 +3,121 @@
 
 #endif // CCD_STOCHASTIC_H
 #include "KFAS.h"
+#include "output.h"
+
 
 int sccd
 (
-    short int **buf,            /* I/O:  pixel-based time series           */
-    short int *fmask_buf,       /* I:  mask-based time series              */
-    int *valid_date_array,      /* I: valid date time series               */
+    long *buf_b,
+        /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *fmask_buf,       /* I:  mask-based time series              */
+    long *valid_date_array,      /* I: valid date time series               */
     int valid_num_scenes,       /* I: number of valid scenes under cfmask fill counts  */
-    Output_t_sccd *rec_cg,           /* O: outputted structure for CCDC results    */
+    double tcg,                /* I: the change threshold  */
     int *num_fc,                /* O: number of fitting curves                       */
-    int num_samples,            /* I: column number per scanline                    */
-    int col_pos,                /* I: column position of current processing pixel   */
-    int row_pos,                 /* I: raw position of current processing pixel  */
-    bool b_fastmode,
-    char* states_output_dir,
-    double probability_threshold,
-    int min_days_conse,
-    int training_type, /* for training process*/
-    int monitorwindow_lowerlin,
-    int monitorwindow_upperlim,
-    short int *sensor_buf,
-    int n_focus_variable,
-    int total_variable,
-    int* focus_blist,
-    bool NDVI_INCLUDED,
-    bool NBR_INCLUDED,
-    bool RGI_INCLUDED,
-    bool TCTWETNESS_INCLUDED,
-    bool TCTGREENNESS_INCLUDED,
-    bool EVI_INCLUDED,
-    bool DI_INCLUDED,
-    bool NDMI_INCLUDED,
-//    BoosterHandle booster,
-    bool b_landspecific,
-    short int auxval,
-    int conse
+    int *nrt_mode,           /* O: 0 - void; 1 - monitor mode for standard; 2 - queue mode for standard; 3 - monitor mode for snow; 4 - queue mode for snow */
+    Output_sccd *rec_cg,           /* O: outputted structure for CCDC results    */
+    output_nrtmodel *rec_nrt,
+    int *num_obs_queue,             /* O: the number of multispectral observations    */
+    output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
+    short int *min_rmse         /* O: adjusted rmse for the pixel    */
 );
 
 
-int sccd_stand_procedure
-(
-    int valid_num_scenes,             /* I:  number of scenes  */
-    int *valid_date_array,           /* I: valid date time series  */
-    short int *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    short int *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    short int *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    short int *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    short int *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    short int *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    short int *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    short int *fmask_buf,           /* I:  mask-based time series  */
-    int *id_range,
-    Output_t_sccd *rec_cg,
-    int *num_curve,                 /* Intialize NUM of Functional Curves    */
-    char *states_output_dir,
-    bool b_fastmode,
-    double user_probability_threshold,
-    int min_days_conse,
-    int training_type, /* for training process*/
-    int distdays_lowerlim,  /* for training process*/
-    int distdays_upperlim,  /* for training process*/
-    short int *sensor_buf,
-    int user_n_focus_variable,
-    int user_n_total_variable,
-    int* user_focus_blist,
-    bool NDVI_INCLUDED,
-    bool NBR_INCLUDED,
-    bool RGI_INCLUDED,
-    bool TCTWETNESS_INCLUDED,
-    bool TCTGREENNESS_INCLUDED,
-    bool EVI_INCLUDED,
-    bool DI_INCLUDED,
-    bool NDMI_INCLUDED,
-//    BoosterHandle booster,
-    bool b_landspecific,
-    short int auxval,
-    int conse
-);
-
-int sccd_inefficientobs_procedure
-(
-    int valid_num_scenes,             /* I:  number of scenes  */
-    int *valid_date_array,    /* I: valid date time series  */
-    short int **buf,            /* I:  pixel-based time series  */
-    short int *fmask_buf,      /* I:  mask-based time series  */
-    int *id_range,
-    double sn_pct,
-    Output_t_sccd *rec_cg,
-    int *num_curve
-);
-
-int step1_ccd_initialize
+int step1_cold_initialize
 (
     int conse,              /* I: adjusted consecutive observation number               */
-    float* adj_rmse,           /* I: the adjusted RMS                        */
-    int n_clr,                 /* I: number of clear observations                         */
-    double reg_TCG,               /* I: the record of fitting curve                        */
+    short int* min_rmse,           /* I: the adjusted RMS                        */
+    int* n_clr,                 /* I: number of clear observations                         */
+    double tcg,               /* I: the threshold of change magnitude                       */
     int* i_dense,               /* I: used to count i for dense time point check          */
     int* num_curve,            /* I/O: the number of fitting curve                        */
     int *clrx,                  /* I/O: clear pixel curve in X direction (date)             */
     float **clry,               /* I/O: clear pixel curve in Y direction (spectralbands)    */
     int* cur_i,                /* I/O: the current number of monitoring observation          */
     int* i_start,              /* I/O: the start number of current curve                   */
-    int* i_start_copy,
-    int* end,                  /* I/O: the end of remaining observations.               */
-    double **fit_cft,           /* I/O: Fitted coefficients 2-D array.                   */
-    Output_t_sccd *rec_cg,            /* I/O: records of change points info                    */
-    int i_span_min,                /* I: the minimum value for i_span                    */
+    Output_sccd *rec_cg,            /* I/O: records of change points info                    */
+    int i_span_min,                 /* I: the minimum value for i_span                    */
     int* prev_i_break,              /*I : the i_break of the last curve                    */
-    double *rmse,                     /* O: Root Mean Squared Error array.        */
-    int n_focus_variable,
-    int n_total_variable,
-    int* focus_blist,
-    int min_days_conse
+    float *rmse                     /* I/O: Root Mean Squared Error array used for initialized kalman filter model */
 );
 
-int step1_update_cft
+
+int step1_ssm_initialize
 (
-    int adj_conse,              /* I: adjusted consecutive observation number               */
-    float* adj_rmse,           /* I: the adjusted RMS                        */
-    int n_clr,                 /* I: number of clear observations                         */
-    double reg_TCG,               /* I: the record of fitting curve                        */
-    int *clrx,                  /* I/O: clear pixel curve in X direction (date)             */
-    float **clry,               /* I/O: clear pixel curve in Y direction (spectralbands)    */
-    int cur_i,                /* I/O: the current number of monitoring observation          */
-    int i_start,              /* I/O: the start number of current curve                   */
-    double **fit_cft,           /* I/O: Fitted coefficients 2-D array.                   */
-    Output_t_sccd *rec_cg,            /* I/O: records of change points info                    */
-    double *rmse,                     /* O: Root Mean Squared Error array.        */
-    int *num_curve,
-    int end,
-    int *prev_i_break,
-    int n_focus_variable,
-    int n_total_variable,
-    int* focus_blist,
-    double t_cg_outelier
-);
-
-int step1_ssm_initialize(
-    ssmodel* instance,          /* I/O: the outputted initial SS model                */
+    ssmodel_constants *instance,          /* I/O: the outputted initial SSM model, we will assign H     */
     int *clrx,                  /* I: clear pixel curve in X direction (date)             */
     float *clry,                /* I: clear pixel curve in Y direction (spectralbands)    */
     int stable_start,           /* I:  the start of the stable stage  */
     int stable_end,             /* I:  the start of the stable stage  */
-    gsl_vector *next_a,               /* I:  initial a1  */
-    gsl_matrix *next_P,          /* I:  initial P1  */
-    int i_b,
-    double **level_state_records,
-    double **annual_state_records,
-    double **semi_state_records,
-    double **third_state_records,
-    double **rmse_records,
-    int starting_date,
-    int prev_break_date,             /*I: the i_break of the previous curve*/
-    int num_curve,
-    Output_t_sccd *rec_cg,
-    double rmse,
-    double adjust_rmse,
-    bool b_fastmode,
-    double *fit_cft,
-    int* valid_count,
-    double *sum_square_smooth_Q,
-    double *sum_square_smooth_H,
-    double *sum_smooth_Q,
-    double *sum_smooth_H,
-    double *sum_square_vt,
-    double *sum_vt,
-    double *sum_kalman_coef,
-    double **temporal_rmse_square_sum,
-    double **temporal_rmse_sum,
-    int *temporal_rmse_count
+    float **fit_cft,                 /*I: the lasso coefficientis */
+    gsl_matrix *cov_p,          /* I/O:  initial P1  */
+    int i_b,                     /* I:  the band order */
+    unsigned int *sum_square_vt,              /* I/O:  the sum of predicted square of residuals  */
+    int n_clr
 );
+
 
 int step2_KF_ChangeDetection
 (
-    ssmodel* instance,
-    gsl_matrix** vec_next_P,
-    gsl_vector** vec_next_a,
-    int *clrx,
-    float **clry,
-    int cur_i,
-    double **level_state_records,
-    double **annual_state_records,
-    double **semi_state_records,
-    double **third_state_records,
-    double **rmse_records,
-    Output_t_sccd* rec_cg,
-    int *num_curve,
-    int *end,
-    int conse,
-    int starting_date,
-    int i_start,
-    int *prev_i_break,             /*I: the i_break of the last curve*/
-    bool b_fastmode,
-    double** fit_cft1,
-    double** fit_cft2,
-    double** fit_cft3,
-    double** fit_cft4,
-    int *clrx_record1,
-    int *clrx_record2,
-    int *clrx_record3,
-    int *clrx_record4,
-    int *valid_count,
-    double *sum_square_smooth_Q,
-    double *sum_square_smooth_H,
-    double *sum_smooth_Q,
-    double *sum_smooth_H,
-    double *sum_square_vt,
-    double *sum_vt,
-    double *sum_kalman_coef,
-    int* i_count,
-    float* adj_rmse,
-    double t_cg_adjust,
-    double t_cg_min,
-    double t_cg_gradual,
-    double **temporal_rmse_square_sum,
-    double **temporal_rmse_sum,
-    int *temporal_rmse_count,
-    double **yearly_temporal_rmse_square_sum,
-    double **yearly_temporal_rmse_sum,
-    int *yearly_temporal_rmse_count,
-    double probability_threshold,
-    double *change_magnitude, /* for training process*/
-    int training_type, /* for training process*/
-    int n_focus_variable,
-    int n_total_variable,
-    int* focus_blist
+    ssmodel_constants* instance,   /* I: ssm constant structure */
+    int *clrx,                     /* I: dates   */
+    float **clry,                  /* I: observations   */
+    int cur_i,                     /* I: the ith of observation to be processed   */
+    int *num_curve,                /* I: the number of curves   */
+    int conse,                     /* I: the consecutive number of observations   */
+    short int *min_rmse,               /* I: adjusted RMSE   */
+    float tcg,                    /* I: the change threshold  */
+    int *n_clr,               /* I: the total observation of current observation queue  */
+    gsl_matrix** cov_p,       /* I/O: covariance matrix */
+    float** fit_cft,       /* I/O: state variables  */
+    Output_sccd* rec_cg,           /* I/O: the outputted S-CCD result structure   */
+    unsigned int *sum_square_vt,              /* I/O:  the sum of predicted square of residuals  */
+    int *count_cur_obs             /* I/O:  the number of current non-noise observations being processed */
 );
 
-int step2_chow_test
-(
-    int *clrx,
-    float **clry,
-    int first_seg_start,
-    int first_seg_end,
-    int second_seg_start,
-    int second_seg_end,
-    double f_prob,
-    int n_focus_variable,
-    int n_total_variable,
-    int* focus_blist
-);
 
 int KF_ts_predict_conse
 (
-    ssmodel *instance,         /* i: the inputted ssm instance   */
+    ssmodel_constants *instance,         /* i: the inputted ssm instance   */
     int *clrx,               /* i: the inputted dates   */
     gsl_matrix* P_ini,         /* i: a m x m matrix of the covariance matrix for pred_start */
-    gsl_vector* at_ini,        /* i: a m vector of a for pred_start */
+    float** fit_cft,        /* i: a m vector of a for pred_start */
     int pred_start, /* i: close, included for prediction */
     int pred_end,   /* i: close, included for prediction */
-    double *pred_y,   /* O: the predicted obs values */
-    double *pred_y_f,  /*O: the predicted f (RMSE) values */
-    bool b_fastmode,
-    double *fit_cft,
+    int i_b,
+    int cur_i,
+    float *pred_y,   /* O: the predicted obs values */
+    float *pred_y_f,  /*O: the predicted f (RMSE) values */
     bool b_foutput
-);
-
-
-
-int KF_ts_predict_single_conse
-(
-    ssmodel *instance,         /* i: the inputted ssm instance   */
-    int clrx,
-    gsl_matrix* P_ini,         /* i: a m x m matrix of the covariance matrix for pred_start */
-    gsl_vector* at_ini,        /* i: a m vector of a for pred_start */
-    double *pred_y,   /* O: the predicted obs values */
-    double *pred_y_f,  /*O: the predicted f (RMSE) values */
-    bool b_fastmode,
-    double *fit_cft
 );
 
 int KF_ts_filter_falsechange
 (
-    ssmodel *instance,         /* i: the inputted ssm instance   */
+    ssmodel_constants *instance,         /* i: the inputted ssm instance   */
     int *clrx,               /* i: the inputted dates   */
-    gsl_matrix* P_ini,         /* i/O: a m x m matrix of the covariance matrix for pred_start */
-    gsl_vector* at_ini,        /* i/O: a m vector of a for pred_start */
-    int cur_i,
-    int i_band,                /* i: the band number */
-    double **level_state_records,
-    double **annual_state_records,
-    double **semi_state_records,
-    double **third_state_records,
-    int starting_date,
-    bool b_fastmode
+    gsl_matrix* cov_p,         /* i/O: a m x m matrix of the covariance matrix for pred_start */
+    int cur_i
 );
+
 
 int KF_ts_filter_regular
 (
-    ssmodel *instance,         /* i: the inputted ssm instance   */
-    int *clrx,               /* i: the inputted dates   */
-    float *clry,               /* i: the inputted observations   */
-    gsl_matrix* P_ini,         /* i/O: a m x m matrix of the covariance matrix for pred_start */
-    gsl_vector* at_ini,        /* i/O: a m vector of a for pred_start */
-    int cur_i,
-    int i_b,                /* i: the band number */
-    double **rmse_records,   /* O: the predicted obs values */
-    double **level_state_records,
-    double **annual_state_records,
-    double **semi_state_records,
-    double **third_state_records,
-    int starting_date,   /* starting_date is used to compute record index based on clrx*/
-    bool b_fastmode,
-    double *fit_cft,
-    int *valid_count,
-    double *sum_square_smooth_Q,
-    double *sum_square_smooth_H,
-    double *sum_smooth_Q,
-    double *sum_smooth_H,
-    double *sum_square_vt,
-    double *sum_vt,
-    double *sum_kalman_coef,
-    bool b_start,
-    double **temporal_rmse_square_sum,
-    double **temporal_rmse_sum,
-    int *temporal_rmse_count
-);
-
-int KF_ts_filter_norecord
-(
-    ssmodel *instance,         /* i: the inputted ssm instance   */
-    int *clrx,               /* i: the inputted dates   */
-    double *clry,               /* i: the inputted observations   */
-    gsl_matrix* P_ini,         /* i/O: a m x m matrix of the covariance matrix for pred_start */
-    gsl_vector* at_ini,        /* i/O: a m vector of a for pred_start */
-    int cur_i,
-    int i_band,                /* i: the band number */
-    int starting_date   /* starting_date is used to compute record index based on clrx*/
+    ssmodel_constants *instance,         /* i: the inputted ssm instance   */
+    int *clrx,                   /* i: the inputted dates   */
+    float *clry,                /* i: the inputted observations   */
+    gsl_matrix* cov_p,         /* i/O: m x m matrix of the covariance matrix for pred_start */
+    float** fit_cft,        /* i/O: m vector of a for pred_start */
+    int cur_i,                 /* i: the current i */
+    int i_b,                   /* i: the band number */
+    double *vt,                /* I/O: predicted residuals */
+    bool steady
 );
 
 /************************************************************************
@@ -343,88 +130,66 @@ Type = int (SUCCESS OR FAILURE)
 
 Programmer: Su Ye
 **************************************************************************/
-int step3_processingend
+int step3_processing_end
 (
-    ssmodel* instance,
-    gsl_matrix** vec_next_P,
-    gsl_vector** vec_next_a,
+    ssmodel_constants* instance,
+    gsl_matrix** cov_p,
+    float** fit_cft,
     int *clrx,
     float **clry,
     int cur_i,
-    double **level_state_records,
-    double **annual_state_records,
-    double **semi_state_records,
-    double **third_state_records,
-    double **rmse_records,
-    Output_t_sccd* rec_cg,
-    int *num_curve,
-    int *end,
-    int conse,
-    int starting_date,
-    int bl_train_complete,
+    int *n_clr,
+    int bl_train,
     int i_start,
-    int prev_i_break,             /*I: the i_break of the last curve*/
-    float* adj_rmse,           /* I: the adjusted RMS                        */
-    bool b_fastmode,
-    double **fit_cft1,
-    double **fit_cft2,
-    double **fit_cft3,
-    double **fit_cft4,
-    int *clrx_record1,
-    int *clrx_record2,
-    int *clrx_record3,
-    int *clrx_record4,
-    double probability_threshold,
-    int* valid_count,
-    double *sum_square_smooth_Q,
-    double *sum_square_smooth_H,
-    double *sum_smooth_Q,
-    double *sum_smooth_H,
-    double *sum_square_vt,
-    double *sum_vt,
-    double *sum_kalman_coef,
-    double **temporal_rmse_square_sum,
-    double **temporal_rmse_sum,
-    int *temporal_rmse_count,
-    int n_focus_variable,
-    int n_total_variable,
-    int* focus_blist,
-    int min_days_conse
+    int prev_i_break,             /* I: the i_break of the last curve*/
+    output_nrtmodel *nrt_model,         /* I/O: the NRT change records */
+    int *num_obs_queue,             /* O: the number of multispectral observations    */
+    output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
+    unsigned *sum_square_vt,              /* I/O:  the sum of predicted square of residuals  */
+    int num_obs_processed,
+    int t_start
 );
 
-int grid_searching
+
+
+int sccd_snow
 (
-     ssmodel *instance,
-     double rmse,
-     double adj_rmse,
-     double mean_y,
-     double *best_h,
-     double *best_q,
-     double interval,
-     int actual_m,
-     double ini_a,
-     double *best_p
+    int *clrx,                  /* I: clear pixel curve in X direction (date)             */
+    float **clry,               /* I: clear pixel curve in Y direction (spectralbands)    */
+    int n_clr,
+    Output_sccd *rec_cg,     /* O: offline change records */
+    int *num_fc,               /* O: intialize NUM of Functional Curves    */
+    int *nrt_status,             /* O: 1 - monitor mode; 2 - queue mode    */
+    output_nrtmodel *rec_nrt,       /* O: nrt records    */
+    int *num_obs_queue,             /* O: the number of multispectral observations    */
+    output_nrtqueue *obs_queue       /* O: multispectral observations in queue    */
 );
 
-int Jazwinski_searching
+
+int sccd_standard
 (
-     ssmodel *instance,
-     double rmse,
-     double mean_y,
-     double *best_h,
-     double *best_q,
-     double interval,
-     int actual_m
+    int *clrx,                  /* I: clear pixel curve in X direction (date)             */
+    float **clry,               /* O: clear pixel curve in Y direction (spectralbands)    */
+    int n_clr,
+    double tcg,              /* I:  threshold of change magnitude   */
+    Output_sccd *rec_cg,    /* O: offline change records */
+    int *num_fc,            /* O: intialize NUM of Functional Curves    */
+    int *nrt_mode,             /* O: 1 - monitor mode; 2 - queue mode    */
+    output_nrtmodel *rec_nrt,     /* O: nrt records    */
+    int *num_obs_queue,             /* O: the number of multispectral observations    */
+    output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
+    short int *min_rmse       /* O: adjusted rmse for the pixel    */
 );
+
 
 int getcategorycurve_old
 (
-    Output_t_sccd* t,
+    Output_sccd* t,
     int num_curve
 );
 
 int getcategorycurve
 (
-    Output_t_sccd* t,
+    Output_sccd* t,
     int num_curve
 );

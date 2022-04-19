@@ -10,11 +10,11 @@
 #define MIN_NUM_C 4       /* Minimum number of coefficients           */
 #define MID_NUM_C 6       /* Mid-point number of coefficients         */
 #define SCCD_MAX_NUM_C 6   /* Maximum number of coefficients           */
-#define SCCD_NUM_C 5       /* Mid-point number of coefficients         */
+#define SCCD_NUM_C 6       /* Mid-point number of coefficients         */
 #define MAX_NUM_C 8       /* Maximum number of coefficients           */
 #define N_TIMES 3         /* number of clear observations/coefficients*/
 #define NUM_YEARS 365.25  /* average number of days per year          */
-#define NUM_FC 40       /* Values change with number of pixels run  */
+#define NUM_FC 40       /*  the maximum number of fitting curve to be outputted */
 #define T_CONST 4.42      /* Threshold for cloud, shadow, and snow detection */
                           /* Old T_CONST = 4.89 SY 11/14/2018         */
 #define MIN_YEARS 1       /* minimum year for model intialization     */
@@ -24,6 +24,8 @@
 #define T_MAX_CG 30.8562  /* chi-square inversed T_max_cg (1e-5) for    */
                           /* last step noise removal                    */
                           /*  SY 11/19/2018: change from 35.8882 to 30.8562)                  */
+#define T_MAX_CG_SCCD 25.7448
+// #define T_MAX_CG_SCCD 20.515
 
 /* threshold (degree) of mean included angle                          */
 #define NSIGN 45
@@ -96,106 +98,54 @@
 #define INITIAL_P_RATIO 0.05
 #define SCCD_T_CONST 4.42
 
-#define DEFAULT_S_TCG 11.0705      /* chi-square inversed T_cg (0.95)  */
+#define DEFAULT_N_STATE 6
 #define NUM_LASSO_BANDS 5 /* Number of bands for Least Absolute Shrinkage */
                           /* and Selection Operator LASSO regressions */
 #define DEFAULT_COLD_TCG 15.0863
 
-//#define DEFAULT_M 5
-#define SMOOTH_FACTOR 0
-/* variable number to be optimized in State space model */
-#define SSM_OPTIMVAR 2
 
-#define S_TCG_single 0
-
-
-#define INI_Q00 0
-
-#define INI_Q 1
-#define INI_Q11 5
-#define INI_Q22 5
-#define INI_P 1000
-#define INI_H 0
-
-
-#define Q00_LOWER 1E-2
-#define Q11_LOWER 1E-2
-#define Q22_LOWER 1E-2
-#define H_LOWER 900
-#define H_LOWER_B6 1000
-
-#define Q00_UPPER 400
-#define Q11_UPPER 400
-#define Q22_UPPER 400
-#define H_UPPER 90000
-#define H_UPPER_B6 120000
-
-#define KFAS_LIK_C 0.5 * log(8.0 * atan(1.0))
-#define KFAS_TOL 1E-14
-
-#define T_MAX_CG 30.8562  // prob = 1-1e-5
-#define T_MAX_CG_RECONSTRUCT 25.745 // prob = 1-1e-4
-#define S_T_MAX_CG_PROB 0.9999
-
+#define INI_Q00 0.1   /* MATLAB default */
+#define INI_P 10000
 
 /* from ccd.c detection method*/
 //#define CCD 1
 #define COLD 1
 #define SCCD 2
-// #define EXTRACTION 3 // PIDS legacy
 #define OBCOLD 3 // COLD with outputting CM magnitudes
 #define OBCOLD_RECONSTRUCT 4
+#define SCCDONLINE 5
 
 
-#define MIN_DAYS_CONSE 80
 #define SKIP_PERCENTAGE 0.03
 
-// #define WINDOW_SIZE
-#define WEIGHT1 0.1
-#define WEIGHT2 0.2
-#define WEIGHT3 0.3
-#define WEIGHT4 0.4
-
-#define LANDSAT45_TM 1
-#define LANDSAT7_ETM 2
-#define LANDSAT8_OLI 3
-
-# define DIST_TYPE_DIST 1 // abrupt disturbance
-# define DIST_TYPE_RESTOR 2 // reforestation/afforestation
-# define DIST_TYPE_REGROW 3 // regrowth
-# define DIST_TYPE_NOISE 4 // noise
-
-# define TEMPORAL_RMSE_BIN 6
-# define TEMPORAL_RMSE_BIN_NUM 61 // i.e, 366/6
-
-#define NDVI_INDEX        7
-#define NBR_INDEX       8
-#define RGI_INDEX       9
-#define TCTWETNESS_INDEX      10
-#define TCTGREENNESS_INDEX        11
-#define EVI_INDEX       12
-#define DI_INDEX       13
-#define NDMI_INDEX 14
 
 #define TIFF_FORMAT 1
 #define ENVI_FORMAT 2
 
-#define TRAINING_TYPE_REGULAR 0
-#define TRAINING_TYPE_PARAMETER 1
-#define TRAINING_TYPE_CLASSIFICATION 2
-
 #define NA_VALUE -9999
 
-#define DEFAULT_N_FOCUS_VARIABLE 5
-#define DEFAULT_TOTAL_VARIABLE 8
-
-#define TARGETED_LABEL 2
 #define N_FEATURE 7
 #define DEFAULT_PROBABILITY 0.99
 #define DEFAULT_CONSE 6
 
 #define ORDINALDAY_19710101 719528
 #define JULY1ST_DOY 183
-
 #define SLOPE_SCALE 10000 // the parameter to guarantee the precision for converting scale double slope to float slope
+
+
+/* pixel status for NRT */
+#define NRT_VOID 0
+#define NRT_MONITOR_STANDARD 1
+#define NRT_QUEUE_STANDARD 2
+#define NRT_MONITOR_SNOW 3
+#define NRT_QUEUE_SNOW 4
+
+#define LANDSAT45_TM 4
+#define LANDSAT7_ETM 5
+#define LANDSAT8_OLI 8
+
+#define KFAS_TOL 1E-14
+#define KFAS_LIK_C 0.5 * log(8.0 * atan(1.0))
+#define SLOPE_SS_SCALE 1000000
+#define MAX_OBS_QUEUE 300 /* the maximum number of observations in queue (for NRT) */
 

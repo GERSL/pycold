@@ -4,26 +4,6 @@
 #include "output.h"
 // #include <xgboost/c_api.h>
 
-int preprocessing
-(
-    long *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    long *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    long *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    long *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    long *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    long *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    long *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
-    long *fmask_buf,        /* I:   mask time series  */
-    int *valid_num_scenes, /* I/O: * number of scenes after cfmask counts and  */
-    int *id_range,
-    int *clear_sum,      /* I/O: Total number of clear cfmask pixels          */
-    int *water_sum,      /* I/O: counter for cfmask water pixels.             */
-    int *shadow_sum,     /* I/O: counter for cfmask shadow pixels.            */
-    int *sn_sum,         /* I/O: Total number of snow cfmask pixels           */
-    int *cloud_sum      /* I/O: counter for cfmask cloud pixels.             */
-);
-
-
 int cold
 (
     long *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
@@ -93,38 +73,7 @@ int inefficientobs_procedure
     int *num_fc
 );
 
-const char *check_parameter(
-        int mode,
-        char* in_path,
-        char* out_path,
-        int n_cores,
-        int row,
-        int col,
-        int task,
-        char* mask_path,
-        double probability_threshold,
-        int conse,
-        int min_days_conse,
-        int output_mode,
-        int verbose
-);
 
-
-int tsalgorithm_executor(
-    int mode,
-    char* in_path,
-    char* out_path,
-    int n_cores,
-    int row,
-    int col,
-    int task,
-    char* mask_path,
-    float probability_threshold,
-    int conse,
-    int min_days_conse,
-    int output_mode,
-    int verbose
-);
 
 int obcold_reconstruction_procedure
 (

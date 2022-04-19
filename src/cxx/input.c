@@ -212,11 +212,11 @@ int sort_scene_based_on_year_doy_row
             year = atoi(temp_string2);
 
             strncpy(temp_string5, scene_list[i] + 19, 2);
-            temp_string5[3] = '\0';
+            temp_string5[2] = '\0';
             month = atoi(temp_string5);
 
             strncpy(temp_string5, scene_list[i] + 21, 2);
-            temp_string5[3] = '\0';
+            temp_string5[2] = '\0';
             day= atoi(temp_string5);
             doy =yearmonth2doy(year, month, day);
             yeardoy[i] = year * 1000 + doy;
@@ -496,7 +496,6 @@ int save_scene_list
     char** scene_list
 )
 {
-    DIR *dirp;
     FILE *fd;                 /* file descriptor for scene list file        */
     char FUNC_NAME[] = "create_scene_list"; /* function name for messages   */
     int i;
@@ -876,140 +875,6 @@ int read_bip
     return (SUCCESS);
 }
 
-
-int read_bip_auxval
-(
-    char *auxvar_path,       /* I: Landsat ARD directory  */
-    int  row,                 /* I:   the row (Y) location within img/grid   */
-    int  col,                 /* I:   the col (X) location within img/grid   */
-    int num_samples,
-    short int *auxval
-)
-{
-
-    int  k;                     /* band loop counter.                   */
-    char filename[MAX_STR_LEN]; /* file name constructed from sceneID   */
-    char errmsg[MAX_STR_LEN];   /* for printing error text to the log.  */
-    short int* val;           /* qa value*/
-    bool debug = FALSE;          /* for debug printing                   */
-    char FUNC_NAME[] = "read_bip_auxvar"; /* function name */
-    FILE* fp;
-
-    fp = open_raw_binary(auxvar_path,"rb");
-    if (fp == NULL)
-    {
-        sprintf(errmsg,  "Opening auxillary file fails \n");
-        RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
-    }
-
-
-
-    /******************************************************************/
-    /*                                                                */
-    /* Read the image bands for this scene.                           */
-    /*                                                                */
-    /******************************************************************/
-
-     /* read quality band, and check if the pixel is valid */
-    fseek(fp, ((row - 1) * num_samples + col - 1) * sizeof(short int), SEEK_SET);
-
-    read_raw_binary(fp, 1, 1, sizeof(short int), auxval);
-
-
-    close_raw_binary(fp);
-
-    return (val);
-}
-
-
-int read_bip_breakdates
-(
-    char *breakdate_path,       /* I: Landsat ARD directory  */
-    int  row,                 /* I:   the row (Y) location within img/grid   */
-    int  col,                 /* I:   the col (X) location within img/grid   */
-    int num_samples,
-    int *breakdate
-)
-{
-
-    int  k;                     /* band loop counter.                   */
-    char filename[MAX_STR_LEN]; /* file name constructed from sceneID   */
-    char errmsg[MAX_STR_LEN];   /* for printing error text to the log.  */
-    short int* val;           /* qa value*/
-    bool debug = FALSE;          /* for debug printing                   */
-    char FUNC_NAME[] = "read_bip_breakdates"; /* function name */
-    FILE* fp;
-
-    fp = open_raw_binary(breakdate_path,"rb");
-    if (fp == NULL)
-    {
-        sprintf(errmsg,  "Opening auxillary file fails \n");
-        RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
-    }
-
-
-
-    /******************************************************************/
-    /*                                                                */
-    /* Read the image bands for this scene.                           */
-    /*                                                                */
-    /******************************************************************/
-
-     /* read quality band, and check if the pixel is valid */
-    fseek(fp, ((row - 1) * num_samples + col - 1) * sizeof(int), SEEK_SET);
-
-    read_raw_binary(fp, 1, 1, sizeof(int), breakdate);
-
-
-    close_raw_binary(fp);
-
-    return (val);
-}
-
-int read_bip_maskval
-(
-    char *mask_path,       /* I: Landsat ARD directory  */
-    int  row,                 /* I:   the row (Y) location within img/grid   */
-    int  col,                 /* I:   the col (X) location within img/grid   */
-    int num_samples,
-    char *maskval
-)
-{
-
-//    int  k;                     /* band loop counter.                   */
-//    char filename[MAX_STR_LEN]; /* file name constructed from sceneID   */
-    char errmsg[MAX_STR_LEN];   /* for printing error text to the log.  */
-    short int* val;           /* qa value*/
-//    bool debug = FALSE;          /* for debug printing                   */
-    char FUNC_NAME[] = "read_bip_auxvar"; /* function name */
-    FILE* fp;
-
-    fp = open_raw_binary(mask_path,"rb");
-    if (fp == NULL)
-    {
-        sprintf(errmsg,  "Opening auxillary file fails \n");
-        RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
-    }
-
-
-
-    /******************************************************************/
-    /*                                                                */
-    /* Read the image bands for this scene.                           */
-    /*                                                                */
-    /******************************************************************/
-
-     /* read quality band, and check if the pixel is valid */
-    fseek(fp, ((row - 1) * num_samples + col - 1) * sizeof(char), SEEK_SET);
-
-    val = malloc(sizeof(short int));
-    read_raw_binary(fp, 1, 1, sizeof(char), maskval);
-    free(val);
-
-    close_raw_binary(fp);
-
-    return (val);
-}
 //int read_tif
 //(
 //    char *in_path,       /* I: Landsat ARD directory  */

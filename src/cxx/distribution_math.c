@@ -167,10 +167,12 @@ long double xBeta_Distribution(double xx, double aa, double bb)
            /* Both shape parameters are strictly greater than 1. */
 
    if ( aa > 1.0 && bb > 1.0 )
-      if ( x <= (a - 1.0L) / ( a + b - 2.0L ) )
+      if ( x <= (a - 1.0L) / ( a + b - 2.0L ) ){
          return Beta_Continued_Fraction(x, a, b);
-      else
+      }
+      else{
          return 1.0L - Beta_Continued_Fraction( 1.0L - x, b, a );
+      }
 
              /* Both shape parameters are strictly less than 1. */
 
@@ -1184,7 +1186,6 @@ long double Duplication_Formula( long double two_x )
 {
    long double x = 0.5L * two_x;
    long double g;
-   double two_n = 1.0;
    int n = (int) two_x - 1;
 
    g = powl(2.0L, two_x - 1.0L - (long double) n);

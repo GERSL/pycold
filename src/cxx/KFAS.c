@@ -5,268 +5,6 @@
 #include "const.h"
 #include "defines.h"
 
-/* diffuse filtering for single time point */
-void dfilter1step
-(
-    int cur_monitor_date,
-    int next_valid_date, /*I/O*/
-    int* valid_count,
-    double yt,
-    gsl_vector* zt,
-    double ht,
-    gsl_matrix* tt,
-    gsl_matrix* rqr,
-    gsl_vector* at,    /*I/O*/
-    gsl_matrix* pt,    /*I/O*/
-    double* vt,     /*I/O*/
-    double* ft,    /*I/O*/
-    gsl_vector* kt,    /*I/O*/
-    gsl_matrix* pinf,  /*I/O*/
-    double* finf,    /*I/O*/
-    gsl_vector* kinf,  /*I/O*/
-    int* rankp,        /*I/O*/
-    double* lik,       /*I/O*/
-    int m,
-    bool fast_mode,
-    double* fit_cft,
-    int structure
-)
-{
-
-    double finv, tmp;
-
-    gsl_vector* ahelp;
-    gsl_matrix* mm;
-    ahelp = gsl_vector_alloc(m);
-    mm = gsl_matrix_alloc(m, m);
-    //memcpy(zt_sub, &zt[1], 2*sizeof(*a));
-
-    /*kt = pt*zt*/
-    gsl_blas_dsymv(CblasUpper, 1.0, pt,
-                   zt, 0.0, kt);
-
-    /*ft = kt *ztt + ht*/
-    gsl_blas_ddot(zt, kt, ft);
-    *ft = *ft +ht;
-
-    if (next_valid_date == cur_monitor_date)
-    {
-        if(TRUE == fast_mode)
-            fit_cft2vec_a(fit_cft, at, cur_monitor_date, m, structure);
-        /*finf = zt*pinf*zt'*/
-        gsl_blas_dsymv(CblasUpper, 1.0, pinf,
-                       zt, 0.0, kinf);
-        gsl_blas_ddot(zt, kinf, finf);
-
-        /*vt = yt - zt*at*/
-        gsl_blas_ddot(zt, at, &tmp);
-        *vt = yt - tmp;
-
-        if(*finf > KFAS_TOL)
-        {
-            finv = 1.0 / *finf;
-            gsl_blas_daxpy((*vt) * finv, kinf, at);
-
-            gsl_blas_dsyr(CblasUpper, *ft * pow(finv, 2),
-                          kinf, pt);
-            gsl_blas_dsyr2(CblasUpper, -finv, kt, kinf, pt);
-            gsl_blas_dsyr(CblasUpper, -finv, kinf, pinf);
-
-            *lik = *lik - 0.5 * log(*finf);
-
-            *rankp = *rankp - 1;
-
-        }
-        else
-        {
-            *finf = 0.0;
-            if(*ft > KFAS_TOL)
-            {
-                finv = 1.0 / *ft;
-                gsl_blas_daxpy((*vt) * finv, kt, at);
-                gsl_blas_dsyr(CblasUpper, -finv, kt, pt);
-                *lik = *lik - KFAS_LIK_C - 0.5 * (log(*ft) + pow(*vt, 2) * finv);
-            }
-        }
-
-        if(*ft < KFAS_TOL)
-            *ft = 0.0;
-        if(rankp == 0)
-            return;
-
-
-        (*valid_count) ++;
-    }
-
-    if(FALSE == fast_mode)
-    {
-        /* ahelp = 1.0 * tt* at */
-        gsl_blas_dgemv(CblasNoTrans,1.0, tt, at, 0.0, ahelp);
-
-        gsl_vector_memcpy(at, ahelp);
-    }
-
-
-
-
-    /* mm = pt*tt */
-    gsl_blas_dsymm(CblasRight, CblasUpper, 1.0, pt, tt, 0.0, mm);
-
-    /* pt = mm * tt^T */
-    gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, mm, tt, 0.0, pt);
-
-    gsl_matrix_add(pt, rqr);
-
-    /* mm = pinf*tt */
-    gsl_blas_dsymm(CblasRight, CblasUpper, 1.0, pinf, tt, 0.0, mm);
-
-    /* pinf = mm * tt^T */
-    gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, mm, tt, 0.0, pinf);
-
-    gsl_vector_free(ahelp);
-    gsl_matrix_free(mm);
-
-    return;
-
-}
-
-/* non-diffuse filtering for single time point */
-void filter1step
-(
-    int cur_monitor_date,  /*I */
-    int next_valid_date,  /*I */
-    int* valid_count,
-    double yt,             /*I */
-    gsl_vector* zt,        /*I */
-    double ht,             /*I */
-    gsl_matrix* tt,        /*I */
-    gsl_matrix* rqr,     /*I */
-    gsl_vector* at,    /*I/O*/
-    gsl_matrix* pt,    /*I/O*/
-    double* vt,     /*I/O*/
-    double* ft,    /*O*/
-    gsl_vector* kt,    /*O*/
-    double* lik,       /*I/O*/
-    int m,
-    bool fast_mode,
-    double* fit_cft,
-    int structure
-)
-{
-    double finv;
-    double tmp;
-    gsl_vector* ahelp;
-    gsl_matrix* mm;
-
-    ahelp = gsl_vector_alloc(m);
-    mm = gsl_matrix_alloc(m, m);
-    //memcpy(zt_sub, &zt[1], 2*sizeof(*a));
-
-
-
-    if (next_valid_date == cur_monitor_date)
-    {
-        if(TRUE == fast_mode)
-            fit_cft2vec_a(fit_cft, at, cur_monitor_date, m, structure);
-        //printf("i = %d: %f, %f, %f\n", cur_monitor_date, gsl_vector_get(at, 0), gsl_vector_get(at, 1), gsl_vector_get(at, 3));
-        /*kt = zt*pt*/
-        gsl_blas_dsymv(CblasUpper, 1.0, pt,
-                       zt, 0.0, kt);
-
-        /*ft = kt *ztt + ht*/
-        gsl_blas_ddot(zt, kt, ft);
-        *ft = *ft + ht;
-
-        /*vt = yt - zt*at*/
-//        for(i = 0; i < m; i++)
-//        {
-//                printf("%.10g\n", gsl_vector_get(at, i));
-
-//        }
-        gsl_blas_ddot(zt, at, &tmp);
-        *vt = yt - tmp;
-
-        if(*ft > KFAS_TOL)
-        {
-            finv = 1.0 / *ft;
-
-            //at = at + (*vt) * finv * kt;
-            gsl_blas_daxpy((*vt) * finv, kt, at);
-
-            //pt = pt + kt * -finv * kt;
-            gsl_blas_dsyr(CblasUpper, -finv,
-                          kt, pt);
-
-            *lik = *lik - KFAS_LIK_C - 0.5 * (log(*ft) + pow(*vt, 2) * finv);
-
-        }
-        else
-        {
-            *ft = 0.0;
-        }
-        (*valid_count) ++;
-
-        /* update fit_cft */
-        if(TRUE == fast_mode)
-            vec_a2fit_cft(at, fit_cft, cur_monitor_date, m, structure);
-
-    }
-
-    if(FALSE == fast_mode)
-    {
-        /* ahelp = 1.0 * tt* at */
-        gsl_blas_dgemv(CblasNoTrans,1.0, tt, at, 0.0, ahelp);
-
-        gsl_vector_memcpy(at, ahelp);
-    }
-
-
-
-    /* mm = tt*pt*/
-    gsl_blas_dsymm(CblasRight, CblasUpper, 1.0, pt, tt, 0.0, mm);
-
-//    for(i = 0; i < m; i++)
-//    {
-//        for( j = 0; j < m; j ++)
-//        {
-//            printf("%.10g ", gsl_matrix_get(pt, i, j));
-//            if(j == m - 1)
-//                printf("\n");
-//        }
-//     }
-
-
-
-    /* pt = mm * tt^T */
-    gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, mm, tt, 0.0, pt);
-
-//    for(i = 0; i < m; i++)
-//    {
-//        for( j = 0; j < m; j ++)
-//        {
-//            printf("%.10g ", gsl_matrix_get(pt, i, j));
-//            if(j == m - 1)
-//                printf("\n");
-//        }
-//     }
-
-    gsl_matrix_add(pt, rqr);
-
-//    for(i = 0; i < m; i++)
-//    {
-//        for( j = 0; j < m; j ++)
-//        {
-//            printf("%.10g ", gsl_matrix_get(pt, i, j));
-//            if(j == m - 1)
-//                printf("\n");
-//        }
-//     }
-
-    gsl_vector_free(ahelp);
-    gsl_matrix_free(mm);
-    return;
-
-}
 
 /* non-diffuse filtering for prediction */
 void filter1step_missingobs
@@ -275,94 +13,44 @@ void filter1step_missingobs
     double ht,             /*I */
     gsl_matrix* tt,        /*I */
     gsl_matrix* rqr,     /*I */
-    gsl_vector* at,    /*I/O: */
     double* ft,         /*O*/
     gsl_matrix* pt,    /*I/O*/
     gsl_vector* kt,    /*I/O*/
-    int m,              /*I*/
-    bool fast_mode
+    int m             /*I*/
 )
 {
-    gsl_vector* ahelp;
     gsl_matrix* mm;
 
-    ahelp = gsl_vector_alloc(m);
-    mm = gsl_matrix_alloc(m, m);
+
     //memcpy(zt_sub, &zt[1], 2*sizeof(*a));
-
-    if (fast_mode == FALSE)
-    {
-        /* at = 1.0 * tt* at */
-        gsl_blas_dgemv(CblasNoTrans,1.0, tt, at, 0.0, ahelp);
-
-        gsl_vector_memcpy(at, ahelp);
-    }
-
-
-
+    mm = gsl_matrix_alloc(m, m);
     /* mm = tt*pt*/
     gsl_blas_dsymm(CblasRight, CblasUpper, 1.0, pt, tt, 0.0, mm);
 
     /* pt = mm * tt^T */
     gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, mm, tt, 0.0, pt);
-
     gsl_matrix_add(pt, rqr);
 
-
-    gsl_vector_free(ahelp);
     gsl_matrix_free(mm);
+
+    /* force negative to be zero */
+//    for(k1 = 0; k1 < m; k1++){
+//        for(k2 = 0; k2 < m; k2++){
+//            if (gsl_matrix_get(pt, k1, k2) < 0){
+//                gsl_matrix_set(pt, k1, k2, 0.0);
+//            }
+//        }
+//    }
     return;
 
 }
 
-void filter1step_missingobs_noq
-(
-    gsl_vector* zt,        /*I */
-    double ht,             /*I */
-    gsl_matrix* tt,        /*I */
-    gsl_matrix* rqr,     /*I */
-    gsl_vector* at,    /*I/O: */
-    double* ft,         /*O*/
-    gsl_matrix* pt,    /*I/O*/
-    gsl_vector* kt,    /*I/O*/
-    int m,              /*I*/
-    bool fast_mode
-)
-{
-    gsl_vector* ahelp;
-    gsl_matrix* mm;
-
-    ahelp = gsl_vector_alloc(m);
-    mm = gsl_matrix_alloc(m, m);
-    //memcpy(zt_sub, &zt[1], 2*sizeof(*a));
-
-    if (fast_mode == FALSE)
-    {
-        /* at = 1.0 * tt* at */
-        gsl_blas_dgemv(CblasNoTrans,1.0, tt, at, 0.0, ahelp);
-
-        gsl_vector_memcpy(at, ahelp);
-    }
-
-
-
-    /* mm = tt*pt*/
-    gsl_blas_dsymm(CblasRight, CblasUpper, 1.0, pt, tt, 0.0, mm);
-
-    /* pt = mm * tt^T */
-    gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, mm, tt, 0.0, pt);
-
-    gsl_vector_free(ahelp);
-    gsl_matrix_free(mm);
-    return;
-
-}
 
 void filter1step_validobs
 (
-    double yt,             /*I */
+    float yt,             /*I */
     gsl_vector* zt,        /*I */
-    double *ht,             /*I */
+    float *ht,             /*I */
     gsl_matrix* tt,        /*I */
     gsl_matrix* rqr,     /*I */
     gsl_vector* at,    /*I/O*/
@@ -371,8 +59,6 @@ void filter1step_validobs
     double* ft,    /*I/O*/
     gsl_vector* kt,    /*I/O*/
     int m,
-    bool fast_mode,
-    bool update_H,
     gsl_vector* att
 )
 {
@@ -401,10 +87,6 @@ void filter1step_validobs
     {
         finv = 1.0 / *ft;
         gsl_blas_daxpy((*vt) * finv, kt, at);
-
-        //at = at + (*vt) * finv * kt;
-
-        // pt = pt - kt * ktt * Finv
         gsl_blas_dsyr(CblasUpper, -finv,
                       kt, pt);
         // Joseph's form covariance update
@@ -416,33 +98,28 @@ void filter1step_validobs
     }
 
     gsl_vector_memcpy(att, at);
-//    if(fast_mode == FALSE)
-//    {
-        /* ahelp = 1.0 * tt* at */
-        gsl_blas_dgemv(CblasNoTrans,1.0, tt, at, 0.0, ahelp);
 
-        gsl_vector_memcpy(at, ahelp);
-//    }
+    gsl_blas_dgemv(CblasNoTrans,1.0, tt, at, 0.0, ahelp);
 
-    if(update_H == TRUE)
-    {
-        //gsl_blas_ddot(zt, at, &tmp);
-        //tmp_h = yt - tmp;
-        if((*vt) * (*vt) > p)
-            *ht = (1 - SMOOTH_FACTOR) * (*ht) + SMOOTH_FACTOR * ((*vt) * (*vt) - p);
-//        *ht = (1 - SMOOTH_FACTOR) * (*ht) + SMOOTH_FACTOR * tmp_h * tmp_h;
-    }
+    gsl_vector_memcpy(at, ahelp);
 
-////    /* mm = tt*pt*/
+
+    /* mm = tt*pt*/
     gsl_blas_dsymm(CblasRight, CblasUpper, 1.0, pt, tt, 0.0, mm);
-
     /* pt = mm * tt^T */
     gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, mm, tt, 0.0, pt);
 
 
     gsl_matrix_add(pt, rqr);
 
-
+//     // force to be non negative
+//    for(k1 = 0; k1 < m; k1++){
+//        for(k2 = 0; k2 < m; k2++){
+//            if (gsl_matrix_get(pt, k1, k2) < 0){
+//                gsl_matrix_set(pt, k1, k2, 0.0);
+//            }
+//        }
+//    }
     gsl_vector_free(ahelp);
     gsl_matrix_free(mm);
 
@@ -603,1017 +280,26 @@ void dfilter1step_missingobs
 
 }
 
-lbfgsfloatval_t evaluate
-(
-    ssmodel *instance,
-    const lbfgsfloatval_t *x,
-    lbfgsfloatval_t *g,
-    const int n,
-    const lbfgsfloatval_t step
-)
-{
-    int i, j;
-    lbfgsfloatval_t ndeps = 1e-3;
-    lbfgsfloatval_t *x_g1; // for finite gradient 1
-    lbfgsfloatval_t *x_g2; // for finite gradient 2
-    lbfgsfloatval_t lik;
 
-    lik = ssmloglik(instance, x);
-
-    x_g1 =  lbfgs_malloc(SSM_OPTIMVAR);;
-
-    x_g2 =  lbfgs_malloc(SSM_OPTIMVAR);;
-
-    for (i = 0; i < SSM_OPTIMVAR; i++)
-    {
-        for(j = 0; j < SSM_OPTIMVAR; j++)
-        {
-            if(i == j)
-            {
-                x_g1[j] = x[j] - ndeps;
-                x_g2[j] = x[j] + ndeps;
-            }
-            else
-            {
-                x_g1[j] = x[j];
-                x_g2[j] = x[j];
-            }
-
-        }
-
-        g[i] = (ssmloglik(instance, x_g2) -
-                ssmloglik(instance, x_g1))/(2 * ndeps);
-        //printf("x[%i]=%f, g[%i] = %f\n", i, x[i], i , g[i]);
-    }
-
-
-
-    lbfgs_free(x_g1);
-    lbfgs_free(x_g2);
-
-    return lik;
-
-}
-
-lbfgsfloatval_t evaluate_bounds
-(
-    ssmodel *instance,
-    const lbfgsfloatval_t *x,
-    lbfgsfloatval_t *g,
-    const int n,
-    const lbfgsfloatval_t step
-)
-{
-    int i, j;
-    lbfgsfloatval_t ndeps = 1e-3;
-    lbfgsfloatval_t *x_g1; // for finite gradient 1
-    lbfgsfloatval_t *x_g2; // for finite gradient 2
-    lbfgsfloatval_t lik;
-
-    lik = ssmloglik(instance, x);
-
-    x_g1 =  lbfgs_malloc(SSM_OPTIMVAR);;
-
-    x_g2 =  lbfgs_malloc(SSM_OPTIMVAR);;
-
-    for (i = 0; i < SSM_OPTIMVAR; i++)
-    {
-        for(j = 0; j < SSM_OPTIMVAR; j++)
-        {
-            if(i == j)
-            {
-                x_g1[j] = x[j] - ndeps;
-                x_g2[j] = x[j] + ndeps;
-            }
-            else
-            {
-                x_g1[j] = x[j];
-                x_g2[j] = x[j];
-            }
-
-        }
-
-        g[i] = (ssmloglik_bounds(instance, x_g2, instance->q_lower, instance->q_upper) -
-                ssmloglik_bounds(instance, x_g1, instance->q_lower, instance->q_upper))/(2 * ndeps);
-        //printf("x[%i]=%f, g[%i] = %f\n", i, x[i], i , g[i]);
-    }
-
-
-
-    lbfgs_free(x_g1);
-    lbfgs_free(x_g2);
-
-    return lik;
-
-}
-
-
-lbfgsfloatval_t evaluate_2bounds
-(
-    ssmodel *instance,
-    const lbfgsfloatval_t *x,
-    lbfgsfloatval_t *g,
-    const int n,
-    const lbfgsfloatval_t step
-)
-{
-    int i, j;
-    lbfgsfloatval_t ndeps = 1e-3;
-    lbfgsfloatval_t *x_g1; // for finite gradient 1
-    lbfgsfloatval_t *x_g2; // for finite gradient 2
-    lbfgsfloatval_t lik;
-
-    lik = ssmloglik(instance, x);
-
-    x_g1 =  lbfgs_malloc(SSM_OPTIMVAR);;
-
-    x_g2 =  lbfgs_malloc(SSM_OPTIMVAR);;
-
-    for (i = 0; i < SSM_OPTIMVAR; i++)
-    {
-        for(j = 0; j < SSM_OPTIMVAR; j++)
-        {
-            if(i == j)
-            {
-                x_g1[j] = x[j] - ndeps * fabs(x[j]);
-                x_g2[j] = x[j] + ndeps * fabs(x[j]);
-            }
-            else
-            {
-                x_g1[j] = x[j];
-                x_g2[j] = x[j];
-            }
-
-        }
-
-        g[i] = (ssmloglik_2bounds(instance, x_g2, instance->q_lower, instance->q_upper, instance->h_lower, instance->h_upper) -
-                ssmloglik_2bounds(instance, x_g1, instance->q_lower, instance->q_upper, instance->h_lower, instance->h_upper))/(2 * ndeps);
-        //printf("x[%i]=%f, g[%i] = %f\n", i, x[i], i , g[i]);
-    }
-
-
-
-    lbfgs_free(x_g1);
-    lbfgs_free(x_g2);
-
-    return lik;
-
-}
-
-lbfgsfloatval_t evaluate_b6
-(
-    ssmodel *instance,
-    const lbfgsfloatval_t *x,
-    lbfgsfloatval_t *g,
-    const int n,
-    const lbfgsfloatval_t step
-)
-{
-    int i, j;
-    lbfgsfloatval_t ndeps = 1e-3;
-    lbfgsfloatval_t *x_g1; // for finite gradient 1
-    lbfgsfloatval_t *x_g2; // for finite gradient 2
-    lbfgsfloatval_t lik;
-
-    lik = ssmloglik(instance, x);
-
-    x_g1 =  lbfgs_malloc(SSM_OPTIMVAR);;
-
-    x_g2 =  lbfgs_malloc(SSM_OPTIMVAR);;
-
-    for (i = 0; i < SSM_OPTIMVAR; i++)
-    {
-        for(j = 0; j < SSM_OPTIMVAR; j++)
-        {
-            if(i == j)
-            {
-                x_g1[j] = x[j] - ndeps;
-                x_g2[j] = x[j] + ndeps;
-            }
-            else
-            {
-                x_g1[j] = x[j];
-                x_g2[j] = x[j];
-            }
-
-        }
-
-        g[i] = (ssmloglik(instance, x_g2) -
-                ssmloglik(instance, x_g1))/(2 * ndeps);
-        //printf("x[%i]=%f, g[%i] = %f\n", i, x[i], i , g[i]);
-    }
-
-
-
-    lbfgs_free(x_g1);
-    lbfgs_free(x_g2);
-
-    return lik;
-
-}
-
-
-lbfgsfloatval_t ssmloglik(
-    ssmodel *instance,
-    const lbfgsfloatval_t *x
-)
-{
-    int i, k;
-    lbfgsfloatval_t lik = 0.0;
-    int d = 0;
-    int rankp = 0;
-    int valid_date_count = 0;
-
-    double* vt;
-    double* ft;
-    double* finf;
-    int initial_date;
-    gsl_vector* at;
-    gsl_matrix* pinf;
-    gsl_matrix* pt;
-    gsl_vector* kinf;
-    gsl_vector* kt;
-    gsl_matrix* Q;
-    double* fit_cft;
-    fit_cft = (double*) malloc((instance->m + 1) * sizeof(float));
-    /* initialize fit_cft*/
-    vec_a2fit_cft(instance->a1, fit_cft, instance->clear_date_array[0], instance->m, instance->structure);
-
-    /* alloc memory  */
-    vt = malloc(sizeof(double));
-    ft = malloc(sizeof(double));
-    finf =  malloc(sizeof(double));
-    at = gsl_vector_alloc(instance->m);
-    kinf = gsl_vector_alloc(instance->m);
-    kt = gsl_vector_alloc(instance->m);
-    pinf = gsl_matrix_alloc(instance->m, instance->m);
-    pt = gsl_matrix_alloc(instance->m, instance->m);
-    Q = gsl_matrix_calloc(instance->m, instance->m);
-
-    /* initialize parameter  */
-    gsl_matrix_memcpy(pt, instance->P1);
-    gsl_vector_memcpy(at, instance->a1);
-    gsl_matrix_memcpy(pinf, instance->P1inf);
-
-    for (i = 0; i < (int)instance->P1inf->size1; i++)
-        for(k = 0; k < (int)instance->P1inf->size2; k++)
-            rankp = rankp + (int)(*gsl_matrix_ptr(instance->P1inf, i, k));
-
-
-    /*option 1*/
-//    gsl_matrix_set(Q, 1, 1, pow(exp(x[0]/2),2));
-//    gsl_matrix_set(Q, 2, 2, pow(exp(x[1]/2),2));
-//    gsl_matrix_set(Q, 3, 3, pow(exp(x[2]/2),2));
-//    gsl_matrix_set(Q, 4, 4, pow(exp(x[3]/2),2));
-//    gsl_matrix_set(Q, 5, 5, pow(exp(x[4]/2),2));
-
-    /*option 3*/
-    gsl_matrix_set(Q, 0, 0, (double)(Q00_UPPER + Q00_LOWER)/2 + x[0] * (double)(Q00_UPPER - Q00_LOWER)*0.5/pow(1 + x[0]*x[0],0.5));
-    gsl_matrix_set(Q, 1, 1, (double)(Q11_UPPER + Q11_LOWER)/2 + x[1] * (double)(Q11_UPPER - Q11_LOWER)*0.5/pow(1 + x[1]*x[1],0.5));
-    gsl_matrix_set(Q, 2, 2, (double)(Q11_UPPER + Q11_LOWER)/2 + x[1] * (double)(Q11_UPPER - Q11_LOWER)*0.5/pow(1 + x[1]*x[1],0.5));
-    gsl_matrix_set(Q, 3, 3, (double)(Q22_UPPER + Q22_LOWER)/2 + x[2] * (double)(Q22_UPPER - Q22_LOWER)*0.5/pow(1 + x[2]*x[2],0.5));
-    gsl_matrix_set(Q, 4, 4, (double)(Q22_UPPER + Q22_LOWER)/2 + x[2] * (double)(Q22_UPPER - Q22_LOWER)*0.5/pow(1 + x[2]*x[2],0.5));
-
-
-
-
-    //H = pow(exp(x[5]/2),2);
-    // H = (q_upper + q_lower)/2 + x[3] * (double)(q_upper - q_lower)*0.5/pow(1 + x[3]*x[3],0.5);
-
-
-    initial_date = instance->clear_date_array[0];
-    /* diffuse initialization */
-    if(rankp > 0)
-    {
-         while((d < instance->n)&&(rankp > 0))
-         {
-             dfilter1step(d + initial_date, instance->clear_date_array[valid_date_count], &valid_date_count,
-                          (double)instance->yt[valid_date_count], instance->Z,
-                          instance->H, instance->T, Q,
-                          at, pt, vt, ft, kt, pinf, finf, kinf,
-                          &rankp, &lik, instance->m, TRUE, fit_cft, instance->structure);
-             d = d + 1;
-
-         }
-
-    }
-
-   int t = 0;
-    /* non-diffuse filtering continues from i=d */
-    for( i = d; i < instance->n; i++)
-    {
-        if(i == 32)
-        {
-           t = t + 1;
-        }
-        filter1step(i + initial_date, instance->clear_date_array[valid_date_count], &valid_date_count,
-                    (double)instance->yt[valid_date_count], instance->Z,
-                     instance->H, instance->T, Q, at, pt, vt, ft, kt, &lik, instance->m, TRUE, fit_cft, instance->structure);
-    }
-
-
-    free(vt);
-    free(ft);
-    free(finf);
-    free(fit_cft);
-    gsl_vector_free(at);
-    gsl_vector_free(kinf);
-    gsl_vector_free(kt);
-    gsl_matrix_free(pinf);
-    gsl_matrix_free(pt);
-    gsl_matrix_free(Q);
-
-    return -lik;
-}
-
-
-lbfgsfloatval_t ssmloglik_bounds(
-    ssmodel *instance,
-    const lbfgsfloatval_t *x,
-    double q_lower,
-    double q_upper
-)
-{
-    int i, k;
-    lbfgsfloatval_t lik = 0.0;
-    int d = 0;
-    int rankp = 0;
-    int valid_date_count = 0;
-    double tmp;
-    double* fit_cft;
-    double* vt;
-    double* ft;
-    double* finf;
-    int initial_date;
-    gsl_vector* at;
-    gsl_matrix* pinf;
-    gsl_matrix* pt;
-    gsl_vector* kinf;
-    gsl_vector* kt;
-    gsl_matrix* Q;
-
-
-    fit_cft = (double*) malloc((instance->m + 1) * sizeof(double));
-    /* initialize fit_cft*/
-    vec_a2fit_cft(instance->a1, fit_cft, instance->clear_date_array[0], instance->m, instance->structure);
-
-    /* alloc memory  */
-    vt = malloc(sizeof(double));
-    ft = malloc(sizeof(double));
-    finf =  malloc(sizeof(double));
-    at = gsl_vector_alloc(instance->m);
-    kinf = gsl_vector_alloc(instance->m);
-    kt = gsl_vector_alloc(instance->m);
-    pinf = gsl_matrix_alloc(instance->m, instance->m);
-    pt = gsl_matrix_alloc(instance->m, instance->m);
-    Q = gsl_matrix_calloc(instance->m, instance->m);
-
-    /* initialize parameter  */
-    gsl_matrix_memcpy(pt, instance->P1);
-    gsl_vector_memcpy(at, instance->a1);
-    gsl_matrix_memcpy(pinf, instance->P1inf);
-
-    for (i = 0; i < (int)instance->P1inf->size1; i++)
-        for(k = 0; k < (int)instance->P1inf->size2; k++)
-            rankp = rankp + (int)(*gsl_matrix_ptr(instance->P1inf, i, k));
-
-
-    /*option 1*/
-//    gsl_matrix_set(Q, 1, 1, pow(exp(x[0]/2),2));
-//    gsl_matrix_set(Q, 2, 2, pow(exp(x[1]/2),2));
-//    gsl_matrix_set(Q, 3, 3, pow(exp(x[2]/2),2));
-//    gsl_matrix_set(Q, 4, 4, pow(exp(x[3]/2),2));
-//    gsl_matrix_set(Q, 5, 5, pow(exp(x[4]/2),2));
-
-    /*option 3*/
-    tmp = (double)(q_upper + q_lower)/2 + x[0] * (double)(q_upper - q_lower)*0.5/pow(1 + x[0]*x[0], 0.5);
-    gsl_matrix_set(instance->Q, 0, 0, tmp);
-    gsl_matrix_set(instance->Q, 1, 1, tmp);
-    gsl_matrix_set(instance->Q, 2, 2, tmp);
-    gsl_matrix_set(instance->Q, 3, 3, tmp);
-    gsl_matrix_set(instance->Q, 4, 4, tmp);
-
-
-
-
-    //H = pow(exp(x[5]/2),2);
-    // H = (q_upper + q_lower)/2 + x[3] * (double)(q_upper - q_lower)*0.5/pow(1 + x[3]*x[3],0.5);
-
-
-    initial_date = instance->clear_date_array[0];
-    /* diffuse initialization */
-    if(rankp > 0)
-    {
-         while((d < instance->n)&&(rankp > 0))
-         {
-             dfilter1step(d + initial_date, instance->clear_date_array[valid_date_count], &valid_date_count,
-                          (double)instance->yt[valid_date_count], instance->Z,
-                          instance->H, instance->T, Q,
-                          at, pt, vt, ft, kt, pinf, finf, kinf,
-                          &rankp, &lik, instance->m, TRUE, fit_cft, instance->structure);
-             d = d + 1;
-
-         }
-
-    }
-
-   int t = 0;
-    /* non-diffuse filtering continues from i=d */
-    for( i = d; i < instance->n; i++)
-    {
-        if(i == 32)
-        {
-           t = t + 1;
-        }
-        filter1step(i + initial_date, instance->clear_date_array[valid_date_count], &valid_date_count,
-                    (double)instance->yt[valid_date_count], instance->Z,
-                     instance->H, instance->T, Q, at, pt, vt, ft, kt, &lik, instance->m, TRUE, fit_cft, instance->structure);
-    }
-
-
-    free(vt);
-    free(ft);
-    free(finf);
-    free(fit_cft);
-    gsl_vector_free(at);
-    gsl_vector_free(kinf);
-    gsl_vector_free(kt);
-    gsl_matrix_free(pinf);
-    gsl_matrix_free(pt);
-    gsl_matrix_free(Q);
-
-    return -lik;
-}
-
-
-lbfgsfloatval_t ssmloglik_2bounds(
-    ssmodel *instance,
-    const lbfgsfloatval_t *x,
-    double q_lower,
-    double q_upper,
-    double h_lower,
-    double h_upper
-)
-{
-    int i, k;
-    // double c = 0.5 * log(8.0 * atan(1.0));
-    lbfgsfloatval_t lik = 0.0;
-    int d = 0;
-    int valid_date_count = 0;
-    double H;
-    double tmp;
-    double* fit_cft;
-    double* vt;
-    double* ft;
-    int initial_date;
-    gsl_vector* at;
-    gsl_matrix* pt;
-    gsl_vector* kt;
-    gsl_matrix* Q;
-
-    fit_cft = (double*) malloc((instance->m + 1) * sizeof(double));
-    /* initialize fit_cft*/
-    vec_a2fit_cft(instance->a1, fit_cft, instance->clear_date_array[0], instance->m, instance->structure);
-
-    /* alloc memory  */
-    vt = malloc(sizeof(double));
-    ft = malloc(sizeof(double));
-    at = gsl_vector_alloc(instance->m);
-    kt = gsl_vector_alloc(instance->m);;
-    pt = gsl_matrix_alloc(instance->m, instance->m);
-    Q = gsl_matrix_calloc(instance->m, instance->m);
-
-    /* initialize parameter  */
-    gsl_matrix_memcpy(pt, instance->P1);
-    gsl_vector_memcpy(at, instance->a1);
-
-
-//    for (i = 0; i < (int)instance->P1inf->size1; i++)
-//        for(k = 0; k < (int)instance->P1inf->size2; k++)
-//            rankp = rankp + (int)(*gsl_matrix_ptr(instance->P1inf, i, k));
-
-
-    /*option 1*/
-//    gsl_matrix_set(Q, 1, 1, pow(exp(x[0]/2),2));
-//    gsl_matrix_set(Q, 2, 2, pow(exp(x[1]/2),2));
-//    gsl_matrix_set(Q, 3, 3, pow(exp(x[2]/2),2));
-//    gsl_matrix_set(Q, 4, 4, pow(exp(x[3]/2),2));
-//    gsl_matrix_set(Q, 5, 5, pow(exp(x[4]/2),2));
-
-    /*option 3*/
-    tmp = (double)(q_upper + q_lower)/2 + x[0] * (double)(q_upper - q_lower)*0.5/pow(1 + x[0]*x[0], 0.5);
-    gsl_matrix_set(Q, 0, 0, tmp);
-    gsl_matrix_set(Q, 1, 1, tmp);
-    gsl_matrix_set(Q, 2, 2, tmp);
-    gsl_matrix_set(Q, 3, 3, tmp);
-    gsl_matrix_set(Q, 4, 4, tmp);
-
-    H = (h_upper + h_lower)/2 + x[1] * (double)(h_upper - h_lower)*0.5/pow(1 + x[1]*x[1], 0.5);
-
-
-    //H = pow(exp(x[5]/2),2);
-    // H = (q_upper + q_lower)/2 + x[3] * (double)(q_upper - q_lower)*0.5/pow(1 + x[3]*x[3],0.5);
-
-
-    initial_date = instance->clear_date_array[0];
-    /* diffuse initialization */
-//    if(rankp > 0)
-//    {
-//         while((d < instance->n)&&(rankp > 0))
-//         {
-//             dfilter1step(d + initial_date, instance->clear_date_array[valid_date_count], &valid_date_count,
-//                          (double)instance->yt[valid_date_count], instance->Z,
-//                          H, instance->T, Q,
-//                          at, pt, vt, ft, kt, pinf, finf, kinf,
-//                          &rankp, &lik, DEFAULT_M);
-//             d = d + 1;
-
-//         }
-
-//    }
-
-    /* non-diffuse filtering continues from i=d */
-    for( i = d; i < instance->n; i++)
-    {
-        filter1step(i + initial_date, instance->clear_date_array[valid_date_count], &valid_date_count,
-                    (double)instance->yt[valid_date_count], instance->Z,
-                     H, instance->T, Q, at, pt, vt, ft, kt, &lik, instance->m, TRUE, fit_cft, instance->structure);
-    }
-
-
-    free(vt);
-    free(ft);
-    free(fit_cft);
-    gsl_vector_free(at);
-    gsl_vector_free(kt);
-    gsl_matrix_free(pt);
-    gsl_matrix_free(Q);
-
-    return -lik;
-}
-
-double ssmloglik_gridsearching
-(
-    ssmodel *instance,
-    double H,
-    double q,
-    double *f_rmse,
-    double *v_rmse
-)
-{
-    int i, k;
-    double c = 0.5 * log(8.0 * atan(1.0));
-    double lik = 0.0;
-    int d = 0;
-    // int rankp = 0;
-    int valid_date_count = 0;
-    // double tmp;
-    double* fit_cft;
-    double* vt;
-    double* ft;
-    int initial_date;
-    gsl_vector* at;
-    gsl_matrix* pt;
-    gsl_vector* kt;
-    gsl_matrix* Q;
-    int valid_count = 0;
-
-    fit_cft = (double*) malloc(MAX_NUM_C * sizeof(double));
-    /* initialize fit_cft*/
-    vec_a2fit_cft(instance->a1, fit_cft, instance->clear_date_array[0], instance->m, instance->structure);
-
-    /* alloc memory  */
-    vt = (double*)malloc(sizeof(double));
-    ft = (double*)malloc(sizeof(double));
-    at = gsl_vector_alloc(instance->m);
-    kt = gsl_vector_alloc(instance->m);
-    pt = gsl_matrix_alloc(instance->m, instance->m);
-    Q = gsl_matrix_calloc(instance->m, instance->m);
-
-    /* initialize parameter  */
-    gsl_matrix_memcpy(pt, instance->P1);
-    gsl_vector_memcpy(at, instance->a1);
-
-    for(i = 0; i < instance->m; i++)
-       gsl_matrix_set(Q, i, i, q);
-
-
-
-    //H = pow(exp(x[5]/2),2);
-    // H = (q_upper + q_lower)/2 + x[3] * (double)(q_upper - q_lower)*0.5/pow(1 + x[3]*x[3],0.5);
-
-
-    initial_date = instance->clear_date_array[0];
-
-    /* non-diffuse filtering continues from i=d */
-    for( i = d; i < instance->n; i++)
-    {
-        filter1step(i + initial_date, instance->clear_date_array[valid_date_count], &valid_date_count,
-                    (double)instance->yt[valid_date_count], instance->Z,
-                     H, instance->T, Q, at, pt, vt, ft, kt, &lik, instance->m, TRUE, fit_cft, instance->structure);
-
-        /* first obs shouldn't be counted as arbitary initial P*/
-        if((i + initial_date) == instance->clear_date_array[valid_date_count - 1])
-        {
-
-            if(i > d)
-            //if(valid_date_count > SCCD_MAX_NUM_C - 1)
-            {
-                if((*vt) * (*vt) < 1.96 * 1.96 * H)
-                {
-                    *v_rmse = *v_rmse + (*vt) * (*vt);
-                    *f_rmse = *f_rmse + (*ft);
-                    valid_count++;
-                }
-
-            }
-        }
-
-    }
-
-    *f_rmse = *f_rmse / valid_count;
-    *v_rmse = *v_rmse / valid_count;
-
-    free(vt);
-    free(ft);
-    free(fit_cft);
-    gsl_vector_free(at);
-    gsl_vector_free(kt);
-    gsl_matrix_free(pt);
-    gsl_matrix_free(Q);
-
-    return lik;
-}
-
-int progress(
-    void *instance,
-    const lbfgsfloatval_t *x,
-    const lbfgsfloatval_t *g,
-    const lbfgsfloatval_t fx,
-    const lbfgsfloatval_t xnorm,
-    const lbfgsfloatval_t gnorm,
-    const lbfgsfloatval_t step,
-    int n,
-    int k,
-    int ls
-)
-{
-//    printf("Iteration %d:\n", k);
-//    printf("  fx = %f, x[0] = %f, x[1] = %f",
-//           fx, x[0], x[1]);
-//    printf("  xnorm = %f, gnorm = %f, step = %f\n", xnorm, gnorm, step);
-//    printf("\n");
-    return 0;
-}
-
-/* the function that optimized state-space model to get initial SSM_OPTIMVAR */
-int fitSSM
-(
-    ssmodel *instance
-)
-{
-    int result = 0;
-    lbfgs_parameter_t param;
-    lbfgsfloatval_t fx;
-    lbfgsfloatval_t *x;
-    int n_param;
-
-    double tmp;
-    /* if curve number is larger than 1, H is excluded*/
-    n_param = SSM_OPTIMVAR;
-    x = lbfgs_malloc(n_param);
-
-     /* Option 1: convert them for initialize the variables. */
-//    x[0] = log(sqrt(gsl_matrix_get(instance->Q, 1, 1))) * 2;
-//    //printf("x[0]=%f\n",x[0]);
-//    x[1] = log(sqrt(gsl_matrix_get(instance->Q, 2, 2))) * 2;
-//    //printf("x[1]=%f\n",x[1]);
-//    x[2] = log(sqrt(gsl_matrix_get(instance->Q, 3, 3))) * 2;
-//    x[3] = log(sqrt(gsl_matrix_get(instance->Q, 4, 4))) * 2;
-//    x[4] = log(sqrt(gsl_matrix_get(instance->Q, 5, 5))) * 2;
-
-
-    /* option2: don't convert  */
-//   x[0] = gsl_matrix_get(instance->Q, 1, 1);
-//   //printf("x[0]=%f\n",x[0]);
-//   x[1] = gsl_matrix_get(instance->Q, 2, 2);
-//   //printf("x[1]=%f\n",x[1]);
-//   x[2] = gsl_matrix_get(instance->Q, 3, 3);
-//   x[3] = gsl_matrix_get(instance->Q, 4, 4);
-//   x[4] = gsl_matrix_get(instance->Q, 5, 5);
-//   x[5] = instance->H;
-
-     /* option3: using bounded update functions  */
-
-   // printf("gsl_matrix_get(instance->Q, 1, 1)= %f\n", gsl_matrix_get(instance->Q, 1, 1));
-    tmp = pow(gsl_matrix_get(instance->Q, 0, 0)-(double)(Q00_UPPER + Q00_LOWER)/2, 2);
-    if (gsl_matrix_get(instance->Q, 0, 0) > (double)(Q00_UPPER + Q00_LOWER)/2)
-        x[0] =pow(tmp/(pow((double)(Q00_UPPER -Q00_LOWER)/2, 2) - tmp), 0.5);
-    else
-        x[0] = -pow(tmp/(pow((double)(Q00_UPPER -Q00_LOWER)/2, 2) - tmp), 0.5);
-
-    tmp = pow(gsl_matrix_get(instance->Q, 1, 1)-(double)(Q11_UPPER + Q11_LOWER)/2, 2);
-    if (gsl_matrix_get(instance->Q, 1, 1) > (double)(Q11_UPPER + Q11_LOWER)/2)
-        x[1] =pow(tmp/(pow((double)(Q11_UPPER -Q11_LOWER)/2, 2) - tmp), 0.5);
-    else
-        x[1] = -pow(tmp/(pow((double)(Q11_UPPER -Q11_LOWER)/2, 2) - tmp), 0.5);
-
-    tmp = pow(gsl_matrix_get(instance->Q, 2, 2)-(double)(Q22_UPPER + Q22_LOWER)/2, 2);
-    if (gsl_matrix_get(instance->Q, 2, 2) > (double)(Q22_UPPER + Q22_LOWER)/2)
-        x[2] = pow(tmp/(pow((double)(Q22_UPPER -Q22_LOWER)/2, 2) - tmp), 0.5);
-    else
-        x[2] = -pow(tmp/(pow((double)(Q22_UPPER -Q22_LOWER)/2, 2) - tmp), 0.5);
-
-
-
-    /* if it is for temperature band*/
-//    if (b_BT == TRUE)
-//    {
-//        tmp = pow(instance->H - (double)(q_upper_B6 + q_lower_B6)/2, 2);
-//        if (instance->H > (double)(q_upper_B6 + q_lower_B6)/2)
-//            x[3] = pow(tmp/(pow((double)(q_upper_B6 -q_lower_B6)/2, 2) - tmp), 0.5);
-//        else
-//            x[3] =-pow(tmp/(pow((double)(q_upper_B6 -q_lower_B6)/2, 2) - tmp), 0.5);
-//    }
-//    else
-//    {
-//        tmp = pow(instance->H - (double)(q_upper + q_lower)/2, 2);
-//        if (instance->H > (double)(q_upper + q_lower)/2)
-//            x[3] = pow(tmp/(pow((double)(q_upper -q_lower)/2, 2) - tmp), 0.5);
-//        else
-//            x[3] =-pow(tmp/(pow((double)(q_upper -q_lower)/2, 2) - tmp), 0.5);
-//    }
-
-
-    /* Initialize the parameters for the L-BFGS optimization. */
-    lbfgs_parameter_init(&param);
-    param.max_iterations = 50;
-    //param.past = 5;
-    //param.epsilon = 1e-7;
-    param.delta = 1e-2;
-    //param.linesearch =  LBFGS_LINESEARCH_BACKTRACKING_WOLFE;
-    param.linesearch = LBFGS_LINESEARCH_DEFAULT ;
-    //param.wolfe = 0.01;
-    param.min_step = 1e-7;
-//    param.max_step = 1e+20;
-//   param.gtol = 0.9;
-//    param.max_linesearch = 20;
-
-    /* Start the L-BFGS optimization; this will invoke the callback functions
-            evaluate() and progress() when necessary.*/
-
-
-   result = lbfgs(n_param, x, &fx, evaluate, progress, instance,
-               &param);
-
-
-
-    /* set the Q and H values in instance */
-
-    /*option 1*/
-//    gsl_matrix_set(instance->Q, 1, 1, pow(exp(x[0]/2),2));
-//    gsl_matrix_set(instance->Q, 2, 2, pow(exp(x[1]/2),2));
-//    gsl_matrix_set(instance->Q, 3, 3, pow(exp(x[2]/2),2));
-//    gsl_matrix_set(instance->Q, 4, 4, pow(exp(x[3]/2),2));
-//    gsl_matrix_set(instance->Q, 5, 5, pow(exp(x[4]/2),2));
-
-    /*option 3*/
-    gsl_matrix_set(instance->Q, 0, 0, (double)(Q00_UPPER + Q00_LOWER)/2 + x[0] * (double)(Q00_UPPER - Q00_LOWER)*0.5/pow(1 + x[0]*x[0],0.5));
-    gsl_matrix_set(instance->Q, 1, 1, (double)(Q11_UPPER + Q11_LOWER)/2 + x[1] * (double)(Q11_UPPER - Q11_LOWER)*0.5/pow(1 + x[1]*x[1],0.5));
-    gsl_matrix_set(instance->Q, 2, 2, (double)(Q11_UPPER + Q11_LOWER)/2 + x[1] * (double)(Q11_UPPER - Q11_LOWER)*0.5/pow(1 + x[1]*x[1],0.5));
-    gsl_matrix_set(instance->Q, 3, 3, (double)(Q22_UPPER + Q22_LOWER)/2 + x[2] * (double)(Q22_UPPER - Q22_LOWER)*0.5/pow(1 + x[2]*x[2],0.5));
-    gsl_matrix_set(instance->Q, 4, 4, (double)(Q22_UPPER + Q22_LOWER)/2 + x[2] * (double)(Q22_UPPER - Q22_LOWER)*0.5/pow(1 + x[2]*x[2],0.5));
-
-//    printf(" x[5] = %f\n", x[5]);
-
-//    if(b_BT == TRUE)
-//    {
-//        instance->H = (q_upper_B6 + q_lower_B6)/2 + x[3] * (double)(q_upper_B6 - q_lower_B6)*0.5/pow(1 + x[3]*x[3],0.5);
-
-//    }
-//    else
-//    {
-
-//        instance->H = (q_upper + q_lower)/2 + x[3] * (double)(q_upper - q_lower)*0.5/pow(1 + x[3]*x[3], 0.5);
-
-//    }
-
-
-//    printf("instance->Q[1] = %f\n", gsl_matrix_get(instance->Q, 1, 1));
-//    printf("instance->Q[2] = %f\n", gsl_matrix_get(instance->Q, 2, 2));
-//    printf("instance->Q[3] = %f\n", gsl_matrix_get(instance->Q, 3, 3));
-//    printf("instance->Q[4] = %f\n", gsl_matrix_get(instance->Q, 4, 4));
-//    printf("instance->Q[5] = %f\n", gsl_matrix_get(instance->Q, 5, 5));
-
-//    gsl_matrix_set(instance->Q, 1, 1, x[0]);
-//    printf("x[0]= %f\n", x[0]);
-//    gsl_matrix_set(instance->Q, 2, 2, x[1]);
-//    printf("x[1]= %f\n", x[1]);
-//    gsl_matrix_set(instance->Q, 3, 3, x[2]);
-//    printf("x[2]= %f\n", x[2]);
-//    gsl_matrix_set(instance->Q, 4, 4, x[3]);
-//    printf("x[3]= %f\n", x[3]);
-//    gsl_matrix_set(instance->Q, 5, 5, x[4]);
-//    printf("x[4]= %f\n", x[4]);
-//    instance->H = x[5];
-//    printf("x[5]= %f\n", x[5]);
-
-    lbfgs_free(x);
-
-    return result;
-
-
-}
-
-/* the function that optimized state-space model to get initial SSM_OPTIMVAR */
-int fitSSM_bounds
-(
-    ssmodel *instance,
-    double q_lower,
-    double q_upper
-)
-{
-    int result = 0;
-    lbfgs_parameter_t param;
-    lbfgsfloatval_t fx;
-    lbfgsfloatval_t *x;
-    int n_param;
-
-    double tmp;
-    double tmp2;
-    double tmp3;
-    /* if curve number is larger than 1, H is excluded*/
-    n_param = SSM_OPTIMVAR;
-    x = lbfgs_malloc(n_param);
-
-
-     /* option3: using bounded update functions  */
-
-   // printf("gsl_matrix_get(instance->Q, 1, 1)= %f\n", gsl_matrix_get(instance->Q, 1, 1));
-    tmp = pow(gsl_matrix_get(instance->Q, 0, 0)-(double)(q_lower + q_upper)/2, 2);
-    if (gsl_matrix_get(instance->Q, 0, 0) > (double)(q_lower + q_upper)/2)
-        x[0] =pow(tmp/(pow((double)(q_upper - q_lower)/2, 2) - tmp), 0.5);
-    else
-        x[0] = -pow(tmp/(pow((double)(q_upper - q_lower)/2, 2) - tmp), 0.5);
-
-
-    /* Initialize the parameters for the L-BFGS optimization. */
-    lbfgs_parameter_init(&param);
-    param.max_iterations = 50;
-    //param.past = 5;
-    //param.epsilon = 1e-7;
-    param.delta = 1e-2;
-    //param.linesearch =  LBFGS_LINESEARCH_BACKTRACKING_WOLFE;
-    param.linesearch = LBFGS_LINESEARCH_DEFAULT ;
-    //param.wolfe = 0.01;
-    param.min_step = 1e-7;
-//    param.max_step = 1e+20;
-//   param.gtol = 0.9;
-//    param.max_linesearch = 20;
-
-    /* Start the L-BFGS optimization; this will invoke the callback functions
-            evaluate() and progress() when necessary.*/
-
-    instance->q_lower = q_lower;
-    instance->q_upper = q_upper;
-    result = lbfgs(n_param, x, &fx, evaluate_bounds, progress, instance,
-               &param);
-
-
-
-    /* set the Q and H values in instance */
-
-    /*option 1*/
-//    gsl_matrix_set(instance->Q, 1, 1, pow(exp(x[0]/2),2));
-//    gsl_matrix_set(instance->Q, 2, 2, pow(exp(x[1]/2),2));
-//    gsl_matrix_set(instance->Q, 3, 3, pow(exp(x[2]/2),2));
-//    gsl_matrix_set(instance->Q, 4, 4, pow(exp(x[3]/2),2));
-//    gsl_matrix_set(instance->Q, 5, 5, pow(exp(x[4]/2),2));
-
-    /*option 3*/
-    tmp2 = (double)(q_upper + q_lower)/2 + x[0] * (double)(q_upper - q_lower)*0.5/pow(1 + x[0]*x[0], 0.5);
-    gsl_matrix_set(instance->Q, 0, 0, tmp2);
-    gsl_matrix_set(instance->Q, 1, 1, tmp2);
-    gsl_matrix_set(instance->Q, 2, 2, tmp2);
-    gsl_matrix_set(instance->Q, 3, 3, tmp2);
-    gsl_matrix_set(instance->Q, 4, 4, tmp2);
-
-
-    lbfgs_free(x);
-
-    return result;
-
-}
-
-/* the function that optimized state-space model to get initial SSM_OPTIMVAR */
-int fitSSM_2bounds
-(
-    ssmodel *instance,
-    double q_lower,
-    double q_upper,
-    double h_lower,
-    double h_upper
-)
-{
-    int result = 0;
-    lbfgs_parameter_t param;
-    lbfgsfloatval_t fx;
-    lbfgsfloatval_t *x;
-
-
-    double tmp;
-    double tmp2;
-    /* if curve number is larger than 1, H is excluded*/
-    x = lbfgs_malloc(SSM_OPTIMVAR);
-
-
-     /* option3: using bounded update functions  */
-
-   // printf("gsl_matrix_get(instance->Q, 1, 1)= %f\n", gsl_matrix_get(instance->Q, 1, 1));
-    tmp = pow(gsl_matrix_get(instance->Q, 0, 0)-(double)(q_lower + q_upper)/2, 2);
-    if (gsl_matrix_get(instance->Q, 0, 0) > (double)(q_lower + q_upper)/2)
-        x[0] =pow(tmp/(pow((double)(q_upper - q_lower)/2, 2) - tmp), 0.5);
-    else
-        x[0] = -pow(tmp/(pow((double)(q_upper - q_lower)/2, 2) - tmp), 0.5);
-
-
-    tmp = pow(instance->H - (double)(h_upper + h_lower)/2, 2);
-    if (instance->H > (double)(h_upper + h_lower)/2)
-        x[1] = pow(tmp/(pow((double)(h_upper - h_lower)/2, 2) - tmp), 0.5);
-    else
-        x[1] =-pow(tmp/(pow((double)(h_upper - h_lower)/2, 2) - tmp), 0.5);
-
-
-    /* Initialize the parameters for the L-BFGS optimization. */
-    lbfgs_parameter_init(&param);
-    param.max_iterations = 50;
-    //param.past = 5;
-    //param.epsilon = 1e-7;
-    param.delta = 1e-2;
-    //param.linesearch =  LBFGS_LINESEARCH_BACKTRACKING_WOLFE;
-    param.linesearch = LBFGS_LINESEARCH_DEFAULT ;
-    //param.wolfe = 0.01;
-    //param.min_step = 1e-7;
-    //param.epsilon = 1e-2;
-//    param.max_step = 1e+20;
-//   param.gtol = 0.9;
-    param.max_linesearch = 5;
-
-    /* Start the L-BFGS optimization; this will invoke the callback functions
-            evaluate() and progress() when necessary.*/
-
-    instance->q_lower = q_lower;
-    instance->q_upper = q_upper;
-    instance->h_lower = h_lower;
-    instance->h_upper = h_upper;
-    result = lbfgs(SSM_OPTIMVAR, x, &fx, evaluate_2bounds,  progress, instance,&param);
-
-
-
-    /* set the Q and H values in instance */
-
-    /*option 1*/
-//    gsl_matrix_set(instance->Q, 1, 1, pow(exp(x[0]/2),2));
-//    gsl_matrix_set(instance->Q, 2, 2, pow(exp(x[1]/2),2));
-//    gsl_matrix_set(instance->Q, 3, 3, pow(exp(x[2]/2),2));
-//    gsl_matrix_set(instance->Q, 4, 4, pow(exp(x[3]/2),2));
-//    gsl_matrix_set(instance->Q, 5, 5, pow(exp(x[4]/2),2));
-
-    /*option 3*/
-    tmp2 = (double)(q_upper + q_lower)/2 + x[0] * (double)(q_upper - q_lower)*0.5/pow(1 + x[0]*x[0], 0.5);
-    gsl_matrix_set(instance->Q, 0, 0, tmp2);
-    gsl_matrix_set(instance->Q, 1, 1, tmp2);
-    gsl_matrix_set(instance->Q, 2, 2, tmp2);
-    gsl_matrix_set(instance->Q, 3, 3, tmp2);
-    gsl_matrix_set(instance->Q, 4, 4, tmp2);
-
-    instance->H = (h_upper + h_lower)/2 + x[1] * (double)(h_upper - h_lower) * 0.5/pow(1 + x[1]*x[1],0.5);
-    lbfgs_free(x);
-
-    return result;
-
-
-}
-
-
+// convert harmonic coefficients to state value aat
 void fit_cft2vec_a
 (
-     double *fit_cft,
-     gsl_vector* vec_next_a,
-     int cur_date,
-     int m,
-     int structure
+     float *fit_cft,    /* I: harmonic coefficients  */
+     gsl_vector* next_a,   /* I: state values    */
+     int cur_date,      /* I: current date          */
+     int m,             /* I: the number of states   */
+     int structure     /*I: structure indicatore */
 )
 {
     double w = TWO_PI / AVE_DAYS_IN_A_YEAR;
-    int count_m = 1;
-    gsl_vector_set(vec_next_a, 0, (double)(fit_cft[0]));
-
+    int count_m = 2;
+    gsl_vector_set(next_a, 0, fit_cft[0] + cur_date * (double)fit_cft[1] / SLOPE_SCALE);
+    gsl_vector_set(next_a, 1, (double)fit_cft[1] / SLOPE_SCALE);
     if(count_m < m){
         if(structure % 10 == 1){
-            gsl_vector_set(vec_next_a, count_m , (double)(fit_cft[2] * cos((double)cur_date * w)
+            gsl_vector_set(next_a, count_m , (double)(fit_cft[2] * cos((double)cur_date * w)
                            + fit_cft[3] * sin((double)cur_date * w)));
-            gsl_vector_set(vec_next_a, count_m + 1, (double)(- fit_cft[2] * sin((double)cur_date * w)
+            gsl_vector_set(next_a, count_m + 1, (double)(- fit_cft[2] * sin((double)cur_date * w)
                            + fit_cft[3] * cos((double)cur_date * w)));
             count_m = count_m + 2;
         }
@@ -1622,9 +308,9 @@ void fit_cft2vec_a
 
     if(count_m < m){
         if(structure / 10 == 1){
-            gsl_vector_set(vec_next_a, count_m, (double)(fit_cft[4] * cos((double)cur_date * 2 * w)
+            gsl_vector_set(next_a, count_m, (double)(fit_cft[4] * cos((double)cur_date * 2 * w)
                            + fit_cft[5] * sin((double)cur_date * 2 * w)));
-            gsl_vector_set(vec_next_a, count_m + 1, (double)(- fit_cft[4] * sin((double)cur_date * 2 * w)
+            gsl_vector_set(next_a, count_m + 1, (double)(- fit_cft[4] * sin((double)cur_date * 2 * w)
                            + fit_cft[5] * cos((double)cur_date * 2 * w)));
             count_m = count_m + 2;
         }
@@ -1632,78 +318,320 @@ void fit_cft2vec_a
 
     if(count_m < m){
         if(structure / 100 == 1){
-            gsl_vector_set(vec_next_a, count_m, (double)(fit_cft[6] * cos((double)cur_date * 3 * w)
+            gsl_vector_set(next_a, count_m, (double)(fit_cft[6] * cos((double)cur_date * 3 * w)
                            + fit_cft[7] * sin((double)cur_date * 3 * w)));
-            gsl_vector_set(vec_next_a, count_m + 1, (double)(- fit_cft[6] * sin((double)cur_date * 3 * w)
+            gsl_vector_set(next_a, count_m + 1, (double)(- fit_cft[6] * sin((double)cur_date * 3 * w)
                            + fit_cft[7] * cos((double)cur_date * 3 * w)));
             count_m = count_m + 2;
         }
     }
-
-//    else if(m = 5)
-//    {
-//        gsl_vector_set(vec_next_a, 5, 0);
-//        gsl_vector_set(vec_next_a, 6, 0);
-//    }
-
-    //printf("cos((double)cur_date * 2 * w) = %f\n", cos((double)cur_date * 2 * w));
-
 }
 
 
+/*****************************************************************
+ *      convert a to harmonic coefficients
+ *****************************************************************/
 void vec_a2fit_cft
 (
-     gsl_vector *vec_next_a,
-     double *fit_cft,
+     gsl_vector *next_a,
+     float *fit_cft,
      int cur_date,
      int m,
      int structure
 )
 {
     double w = TWO_PI / AVE_DAYS_IN_A_YEAR;
-    int count_m = 1;
-    fit_cft[0] = gsl_vector_get(vec_next_a, 0);
-    fit_cft[1] = 0;
+    int count_m = 2;
     int i;
-    for (i = 1; i < LASSO_COEFFS;i++)
+    for (i = 0; i < SCCD_MAX_NUM_C;i++)
         fit_cft[i] = 0;
+
+    fit_cft[0] = gsl_vector_get(next_a, 0) - gsl_vector_get(next_a, 1) * cur_date;
+    // no slope scenario: m= 2, 4, 6, 8
+    fit_cft[1] = (float)(gsl_vector_get(next_a, 1) * SLOPE_SCALE);
+
 
     if(count_m < m){
         if(structure % 10 == 1){
-            fit_cft[2] = cos((double)cur_date * w) * gsl_vector_get(vec_next_a, count_m) -
-                                sin((double)cur_date * w) * gsl_vector_get(vec_next_a, count_m + 1);
-            fit_cft[3] = cos((double)cur_date * w) * gsl_vector_get(vec_next_a, count_m + 1) +
-                                sin((double)cur_date * w) * gsl_vector_get(vec_next_a, count_m);
+            fit_cft[2] = cos((double)cur_date * w) * gsl_vector_get(next_a, count_m) -
+                                sin((double)cur_date * w) * gsl_vector_get(next_a, count_m + 1);
+            fit_cft[3] = cos((double)cur_date * w) * gsl_vector_get(next_a, count_m + 1) +
+                                sin((double)cur_date * w) * gsl_vector_get(next_a, count_m);
             count_m = count_m + 2;
         }
     }
 
     if(count_m < m){
         if(structure / 10 == 1){
-            fit_cft[4] = cos((double)cur_date * 2 * w) * gsl_vector_get(vec_next_a, count_m) -
-                                sin((double)cur_date * 2 * w) * gsl_vector_get(vec_next_a, count_m + 1);
-            fit_cft[5] = cos((double)cur_date * 2 * w) * gsl_vector_get(vec_next_a, count_m + 1) +
-                                sin((double)cur_date * 2 * w) * gsl_vector_get(vec_next_a, count_m);
+            fit_cft[4] = cos((double)cur_date * 2 * w) * gsl_vector_get(next_a, count_m) -
+                                sin((double)cur_date * 2 * w) * gsl_vector_get(next_a, count_m + 1);
+            fit_cft[5] = cos((double)cur_date * 2 * w) * gsl_vector_get(next_a, count_m + 1) +
+                                sin((double)cur_date * 2 * w) * gsl_vector_get(next_a, count_m);
             count_m = count_m + 2;
         }
     }
 
     if(count_m < m){
         if(structure / 100 == 1){
-            fit_cft[6] = cos((double)cur_date * 3 * w) * gsl_vector_get(vec_next_a, count_m) -
-                                sin((double)cur_date * 3 * w) * gsl_vector_get(vec_next_a, count_m + 1);
-            fit_cft[7] = cos((double)cur_date * 3 * w) * gsl_vector_get(vec_next_a, count_m + 1) +
-                                sin((double)cur_date * 3 * w) * gsl_vector_get(vec_next_a, count_m);
+            fit_cft[6] = cos((double)cur_date * 3 * w) * gsl_vector_get(next_a, count_m) -
+                                sin((double)cur_date * 3 * w) * gsl_vector_get(next_a, count_m + 1);
+            fit_cft[7] = cos((double)cur_date * 3 * w) * gsl_vector_get(next_a, count_m + 1) +
+                                sin((double)cur_date * 3 * w) * gsl_vector_get(next_a, count_m);
             count_m = count_m + 2;
         }
     }
-
-
     //printf("cos((double)cur_date * 2 * w) = %f\n", cos((double)cur_date * 2 * w));
+}
+
+/******************************************************************************
+Date        Programmer       Reason
+--------    ---------------  -------------------------------------
+02/14/2021   Su Ye           create elements of ssm instance and give them default values
+******************************************************************************/
+int initialize_ssmconstants
+(
+   int n_state,
+   float rmse,
+   ssmodel_constants *instance
+)
+{
+    int i, j;
+    instance->m = n_state;
+
+    // it is a three-digit indicator, 11 meaning 'semi + annual cycle'
+    instance->structure = 11;
+
+    /* alloc memory for each element*/
 
 
+    /*
+               level      trend      cycle     cycle*       cycle     cycle*      cycle     cycle*
+        level      1       1      0.00000000 0.00000000  0.00000000 0.00000000  0.00000000  0.00000000
+        trend      0       1      0.00000000 0.00000000  0.00000000 0.00000000  0.00000000  0.00000000
+        cycle      0       0      0.99985204 0.01720158  0.00000000 0.00000000  0.00000000  0.00000000
+        cycle*     0       0     -0.01720158 0.99985204  0.00000000 0.00000000  0.00000000  0.00000000
+        cycle      0       0      0.00000000 0.00000000  0.99940821 0.03439806  0.00000000  0.00000000
+        cycle*     0       0      0.00000000 0.00000000 -0.03439806 0.99940821  0.00000000  0.00000000
+        cycle      0       0      0.00000000 0.00000000  0.00000000 0.00000000  0.99866864  0.05158437
+        cycle*     0       0      0.00000000 0.00000000  0.00000000 0.00000000 -0.05158437  0.99866864
+
+     */
+    /* initialize t */
+    for(i = 0; i < instance->m; i++)
+    {
+        for (j = 0; j < instance->m; j++)
+        {
+            if((i == 0)&&(j == 0))
+            {
+              gsl_matrix_set(instance->T, i, j, 1.0);
+              continue;
+            }
+
+            if((i == 0)&&(j == 1))
+            {
+              gsl_matrix_set(instance->T, i, j, 1.0);
+              continue;
+            }
+
+            if((i == 1)&&(j == 1))
+            {
+              gsl_matrix_set(instance->T, i, j, 1.0);
+              continue;
+            }
+
+            if((i == 2)&&(j == 2))
+            {
+              gsl_matrix_set(instance->T, i, j, cos((double)TWO_PI / (double)NUM_YEARS));
+              continue;
+            }
+
+            if((i == 2)&&(j == 3))
+            {
+              gsl_matrix_set(instance->T, i, j, sin((double)TWO_PI / (double)NUM_YEARS));
+              continue;
+            }
+
+            if((i == 3)&&(j == 3))
+            {
+              gsl_matrix_set(instance->T, i, j, cos((double)TWO_PI / (double)NUM_YEARS));
+              continue;
+            }
+
+            if((i == 3)&&(j == 2))
+            {
+              gsl_matrix_set(instance->T, i, j, -sin((double)TWO_PI / (double)NUM_YEARS));
+              continue;
+            }
+
+            if((i == 4)&&(j == 4))
+            {
+              gsl_matrix_set(instance->T, i, j, cos((double)TWO_PI / (double)NUM_YEARS * 2.0));
+              continue;
+            }
+
+            if((i == 5)&&(j == 5))
+            {
+              gsl_matrix_set(instance->T, i, j, cos((double)TWO_PI / (double)NUM_YEARS * 2.0));
+              continue;
+            }
+
+            if((i == 4)&&(j == 5))
+            {
+              gsl_matrix_set(instance->T, i, j, sin((double)TWO_PI / (double)NUM_YEARS * 2.0));
+              continue;
+            }
+
+            if((i == 5)&&(j == 4))
+            {
+              gsl_matrix_set(instance->T, i, j, -sin((double)TWO_PI / (double)NUM_YEARS * 2.0));
+              continue;
+            }
+
+            if(instance->m == 8)
+            {
+                if((i == 6)&&(j == 6))
+                {
+                  gsl_matrix_set(instance->T, i, j, cos((double)TWO_PI / (double)NUM_YEARS * 3.0));
+                  continue;
+                }
+
+                if((i == 7)&&(j == 7))
+                {
+                  gsl_matrix_set(instance->T, i, j, cos((double)TWO_PI / (double)NUM_YEARS * 3.0));
+                  continue;
+                }
+
+                if((i == 6)&&(j == 7))
+                {
+                  gsl_matrix_set(instance->T, i, j, sin((double)TWO_PI / (double)NUM_YEARS * 3.0));
+                  continue;
+                }
+
+                if((i == 7)&&(j == 6))
+                {
+                  gsl_matrix_set(instance->T, i, j, -sin((double)TWO_PI / (double)NUM_YEARS * 3.0));
+                  continue;
+                }
+
+            }
+
+        }
+    }
+
+    /*   initialize Z     */
+    if(instance->m == 6)    // the default
+    {
+            gsl_vector_set(instance->Z, 0, 1.0);
+            gsl_vector_set(instance->Z, 1, 0.0);
+            gsl_vector_set(instance->Z, 2, 1.0);
+            gsl_vector_set(instance->Z, 3, 0.0);
+            gsl_vector_set(instance->Z, 4, 1.0);
+            gsl_vector_set(instance->Z, 5, 0.0);
+
+    }
+    else if(instance->m == 1)
+    {
+        /*   initialize Z     */
+        gsl_vector_set(instance->Z, 0, 1.0);
+
+    }
+    else if(instance->m == 3)
+    {
+        /*   initialize Z     */
+        gsl_vector_set(instance->Z, 0, 1.0);
+        gsl_vector_set(instance->Z, 1, 1.0);
+        gsl_vector_set(instance->Z, 2, 0.0);
+
+    }
+    else if(instance->m == 5)
+    {
+        /*   initialize Z     */
+        gsl_vector_set(instance->Z, 0, 1.0);
+        gsl_vector_set(instance->Z, 1, 1.0);
+        gsl_vector_set(instance->Z, 2, 0.0);
+        gsl_vector_set(instance->Z, 3, 1.0);
+        gsl_vector_set(instance->Z, 4, 0.0);
+
+    }
+    else if(instance->m == 7)
+    {
+        /*   initialize Z     */
+        gsl_vector_set(instance->Z, 0, 1.0);
+        gsl_vector_set(instance->Z, 1, 1.0);
+        gsl_vector_set(instance->Z, 2, 0.0);
+        gsl_vector_set(instance->Z, 3, 1.0);
+        gsl_vector_set(instance->Z, 4, 0.0);
+        gsl_vector_set(instance->Z, 5, 1.0);
+        gsl_vector_set(instance->Z, 6, 0.0);
+    }
+
+    /*   initialize Q     */
+    for (i = 0; i < instance->m; i++)
+        if (i == 1)
+           gsl_matrix_set(instance->Q, i, i, INI_Q00 / SLOPE_SS_SCALE);
+        else
+           gsl_matrix_set(instance->Q, i, i, INI_Q00);
+
+    instance->H = rmse;
+    return SUCCESS;
 
 }
+
+
+/***********************************************************
+ * calculate initial p based on at
+ * *********************************************************/
+float caculate_ini_p(
+        int m,
+        gsl_vector* ini_a,
+        gsl_vector* z
+)
+{
+    /* initialize p based on a intensity*/
+    double a_intensity;
+    double z_sum = 0;
+    int k;
+    if(m == 1)
+        a_intensity = gsl_vector_get(ini_a, 0);
+    else if(m == 3)
+        a_intensity = gsl_vector_get(ini_a, 0) + gsl_vector_get(ini_a, 1);
+    else if(m == 5)
+        a_intensity = gsl_vector_get(ini_a, 0) + gsl_vector_get(ini_a, 1) + gsl_vector_get(ini_a, 3);
+    else if(m == 7)
+        a_intensity = gsl_vector_get(ini_a, 0) + gsl_vector_get(ini_a, 1) + gsl_vector_get(ini_a, 3) + gsl_vector_get(ini_a, 5);
+    else if(m == 6)
+        a_intensity = gsl_vector_get(ini_a, 0) + gsl_vector_get(ini_a, 2) + gsl_vector_get(ini_a, 4);
+    else if(m == 8)
+        a_intensity = gsl_vector_get(ini_a, 0) + gsl_vector_get(ini_a, 2) + gsl_vector_get(ini_a, 4) + gsl_vector_get(ini_a, 6);
+
+   // calculate z_sum
+   for (k = 0; k < m; k++)
+       z_sum = z_sum + gsl_vector_get(z, k);
+
+   return pow((float)a_intensity * INITIAL_P_RATIO, 2) / z_sum;
+}
+
+
+
+double compute_f
+(
+    gsl_matrix* P,
+    ssmodel_constants instance
+)
+{
+    gsl_vector* kt_tmp;
+    double ft_tmp;
+    kt_tmp = gsl_vector_alloc(instance.m);
+    gsl_blas_dsymv(CblasUpper, 1.0, P,
+                   instance.Z, 0.0, kt_tmp);
+
+    /* ft = kt *ztt + ht */
+    gsl_blas_ddot(instance.Z, kt_tmp, &ft_tmp);
+    ft_tmp = ft_tmp + instance.H;
+    gsl_vector_free(kt_tmp);
+    return ft_tmp;
+}
+
 //void vmmin(int n0, double *b, double *Fmin, optimfn fminfn, optimgr fmingr,
 //      int maxit, int trace, int *mask,
 //      double abstol, double reltol, int nREPORT, void *ex,

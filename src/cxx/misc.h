@@ -11,7 +11,7 @@ int adjust_median_variogram
     int dim2_end,               /* I: dimension 2 end index                          */
     float *date_vario,          /* O: outputted median variogran for dates           */
     float *max_neighdate_diff,  /*O: maximum difference for two neighbor times       */
-    float *output_array,        /* O: output array                                   */
+    short int *output_array,        /* O: output array                                   */
     int option          /* I: option for median variogram: 1 - normal; 2 - adjust (PYCCD version) */
 );
 
@@ -56,27 +56,6 @@ int auto_ts_fit
     double **v_dif
 );
 
-
-int state_ts_fit
-(
-    float **state_values,
-    int start_dates,
-    int end_dates,
-    int band_index,
-    float **coefs,
-    int type /* "ANNUAL_STATE" or "SEMIANNUAL_STATE" */
-);
-
-int level_ts_fit
-(
-    double **state_values,
-    int start_dates,
-    int end_dates,
-    int band_index,
-    double *c0,
-    double *c1,
-    int first_day
-);
 
 int auto_ts_predict
 (
@@ -472,10 +451,10 @@ float MediumAngl(
       int i_count      // input: the number of consecutive observations
 );
 
-double angl_scatter_measure
+float angl_scatter_measure
 (
-      double *med_diff,
-      double **v_diff, // input: a two-dimensional vector of different (i_count * lasso_num)
+      float *med_diff,
+      float **v_diff, // input: a two-dimensional vector of different (i_count * lasso_num)
       int lasso_num,   // input: the number of lasso band
       int i_count      // input: the number of consecutive observations
 );
@@ -518,6 +497,21 @@ float MeanAngl_float
 );
 
 int auto_ts_fit_float
+(
+    int *clrx,
+    float **clry,
+    int band_index,
+    int lasso_band_index, /* this variable is the legacy of experiments on modeling only lasso bands. Zhe wanted to keep all bands still. So pass i_b to this variable*/
+    int start,
+    int end,
+    int df,
+    float **coefs,
+    float *rmse,
+    float **v_dif
+);
+
+
+int auto_ts_fit_sccd
 (
     int *clrx,
     float **clry,

@@ -53,57 +53,40 @@ typedef struct
     int t_start;           /* time when series model gets started */
     int t_end;             /* time when series model gets ended */
     int t_break;           /* time when the first break (change) is observed */
-    int pos;        /* the location of each time series model */
     // float change_prob;     /* the probability of a pixel that have undergone */
                               /* change (between 0 and 100) */
     int num_obs;           /* the number of "good" observations used for model
                               estimation */
-    short int category;          /* the quality of the model estimation (what model
-                              is used, what process is used) */
-    /*
-    The current category in output structure:
-    first digit:
-    0: normal model (abrupt)
-    1: change at the beginning of time series model
-    2: change at the end of time series model
-    3: disturbance change in the extended period of initialization
-    4: fmask fail scenario
-    5: permanent snow scenario
-    6: outside user mask
-    7: normal model (short term)
-    second digit:
-    0: undefined
-    1: land disturbance
-    2: reforestation/afforestation
-    3: regrowth */
-
-    short int land_type;
-    int t_confirmed;          /* lag for near real-time */
-    int change_prob;     /* the probability of a pixel that have undergone
-                              change (between 0 and 100) */
-    double coefs[TOTAL_IMAGE_BANDS][SCCD_MAX_NUM_C];
+    float coefs[TOTAL_IMAGE_BANDS][SCCD_NUM_C];
                            /*  coefficients for each time series model for each
                                spectral band*/
-//    double obs_disturb[TOTAL_IMAGE_BANDS];
-//    double state_disturb[TOTAL_IMAGE_BANDS][SCCD_MAX_NUM_C - 1];
-    double rmse[TOTAL_IMAGE_BANDS];
+    float rmse[TOTAL_IMAGE_BANDS];
 
-    double magnitude[TOTAL_IMAGE_BANDS];/* the magnitude of change (difference between model
+    float magnitude[TOTAL_IMAGE_BANDS];/* the magnitude of change (difference between model
                                   prediction and observation for each spectral band)*/
 
-
-//    double coefs[TOTAL_IMAGE_BANDS+TOTAL_INDICES][SCCD_MAX_NUM_C];
-//                           /*  coefficients for each time series model for each
-//                               spectral band*/
-//    double obs_disturb[TOTAL_IMAGE_BANDS+TOTAL_INDICES];
-//    double state_disturb[TOTAL_IMAGE_BANDS+TOTAL_INDICES][SCCD_MAX_NUM_C - 1];
-//    double rmse[TOTAL_IMAGE_BANDS+TOTAL_INDICES];
-
-//    double magnitude[TOTAL_IMAGE_BANDS+TOTAL_INDICES];/* the magnitude of change (difference between model
-//                                  prediction and observation for each spectral band)*/
+} Output_sccd;
 
 
-} Output_t_sccd;
+typedef struct
+{
+    unsigned short int t_start_since1982;           /* dates (Julian dates - JULIAN_DATE_LAST_DAY_1972) when series model gets started */
+    unsigned short int num_obs;
+    unsigned short int obs[TOTAL_IMAGE_BANDS][DEFAULT_CONSE-1];   /* the last observations, d=(TOTAL_IMAGE_BANDS, conse - 1) */
+    unsigned short int obs_date_since1982[DEFAULT_CONSE-1];   /* dates (Julian dates - JULIAN_DATE_LAST_DAY_1972) the for observations, d=(TOTAL_IMAGE_BANDS, conse - 1) */
+    float covariance[TOTAL_IMAGE_BANDS][DEFAULT_N_STATE * DEFAULT_N_STATE];  /* covariance matrix,  d=(TOTAL_IMAGE_BANDS, SCCD_NUM_C * SCCD_NUM_C), the corresponding date is the first element of conse_obs_date */
+    float nrt_coefs[TOTAL_IMAGE_BANDS][SCCD_NUM_C];   /* state matrix, d=(TOTAL_IMAGE_BANDS, SCCD_NUM_C)  */
+    float H[TOTAL_IMAGE_BANDS];   /*  observation noice, d=TOTAL_IMAGE_BANDS   */
+    unsigned int rmse_sum[TOTAL_IMAGE_BANDS];
+} output_nrtmodel;
+
+
+typedef struct
+{
+    unsigned short int clry[TOTAL_IMAGE_BANDS];
+    unsigned short int clrx_since1982;
+} output_nrtqueue;
+
 
 /* SY 09242018 */
 int firstDegradationYear
@@ -131,11 +114,6 @@ void write_envi_header
     Input_meta_t *meta     /* I: saved header file info */
 );
 
-void write_output_csv
-(
-    FILE *csv_fptr,      /* I: pointer to the csv file */
-    Output_t t           /* I: outputted structure     */
-);
 
 int write_output_binary
 (
@@ -146,7 +124,7 @@ int write_output_binary
 int write_output_binary_sccd
 (
     FILE *fptr,      /* I: pointer to the binary file */
-    Output_t_sccd t          /* I: outputted structure     */
+    Output_sccd t          /* I: outputted structure     */
 );
 
 #endif

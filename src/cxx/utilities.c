@@ -424,7 +424,6 @@ int partition_index (int arr[],  int *index, int left, int right)
     int tmp;
     int temp_index;
     int pivot = arr[(left + right) / 2];
-    int k;
 
     while (i <= j)
     {
@@ -691,7 +690,6 @@ int get_variables
     char line1[MAX_STR_LEN], line2[MAX_STR_LEN], line3[MAX_STR_LEN],
             line4[MAX_STR_LEN], line5[MAX_STR_LEN],
             line6[MAX_STR_LEN], line7[MAX_STR_LEN], line8[MAX_STR_LEN],
-            line9[MAX_STR_LEN], line10[MAX_STR_LEN], line11[MAX_STR_LEN],
             line12[MAX_STR_LEN];
     int output_mode;
     char FUNC_NAME[] = "get_variables";
@@ -873,213 +871,213 @@ int get_classificationconfig
 }
 
 
-/******************************************************************************
-MODULE:  get_args
+///******************************************************************************
+//MODULE:  get_args
 
-PURPOSE:  Gets the command-line arguments and validates that the required
-arguments were specified.
+//PURPOSE:  Gets the command-line arguments and validates that the required
+//arguments were specified.
 
-RETURN VALUE:
-Type = int
-Value           Description
------           -----------
-FAILURE         Error getting the command-line arguments or a command-line
-                argument and associated value were not specified
-SUCCESS         No errors encountered
+//RETURN VALUE:
+//Type = int
+//Value           Description
+//-----           -----------
+//FAILURE         Error getting the command-line arguments or a command-line
+//                argument and associated value were not specified
+//SUCCESS         No errors encountered
 
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-1/5/2015    Song Guo         Original Development
-20151203    Brian Davis      Added arguments for input and output
-                             directories, and scene list file.
-20191124    Su Ye            Modified for sccd
+//HISTORY:
+//Date        Programmer       Reason
+//--------    ---------------  -------------------------------------
+//1/5/2015    Song Guo         Original Development
+//20151203    Brian Davis      Added arguments for input and output
+//                             directories, and scene list file.
+//20191124    Su Ye            Modified for sccd
 
-NOTES:
-  1. Memory is allocated for the input and output files.  All of these should
-     be character pointers set to NULL on input.  The caller is responsible
-     for freeing the allocated memory upon successful return.
-  2. chi2inv(T_cg, num_bands) = chi2inv(0.99, 5) = 15.0863
-  3. chi2inv(T_max_cg, num_bands) = chi2inv(1-1e-6, 5) = 35.8882
-******************************************************************************/
+//NOTES:
+//  1. Memory is allocated for the input and output files.  All of these should
+//     be character pointers set to NULL on input.  The caller is responsible
+//     for freeing the allocated memory upon successful return.
+//  2. chi2inv(T_cg, num_bands) = chi2inv(0.99, 5) = 15.0863
+//  3. chi2inv(T_max_cg, num_bands) = chi2inv(1-1e-6, 5) = 35.8882
+//******************************************************************************/
 
-int get_args
-(
-    int argc,              /* I: number of cmd-line args                    */
-    char *argv[],          /* I: string of cmd-line args                    */
-    int *mode,             /* O: 1 - pixel-based; 2 - scanline-based; 3 - wholescene; 4-validation */
-    char *in_path,         /* O: directory locaiton for input data          */
-    char *out_path,        /* O: directory location for output files        */
-    int *n_cores,          /* O: the number of cores                        */
-    int *row,              /* O: row number for the pixel                   */
-    int *col,              /* O: col number for the pixel                   */
-    int *method,
-    char *user_mask_path,
-    double *probability_threshold,
-    int *min_days_conse,
-    bool *b_fastmode,
-    bool *b_outputCSV
-)
-{
-    int c;                         /* current argument index                */
-    int output_mode;
-    int option_index;              /* index for the command-line option     */
-    static int verbose_flag = 0;   /* verbose flag                          */
-    char errmsg[MAX_STR_LEN];      /* error message                         */
-    char FUNC_NAME[] = "get_args"; /* function name                         */
-    static struct option long_options[] = {
-        {"mode", required_argument, 0, 'm'},
-        {"in-path", required_argument, 0, 'i'},
-        {"out-path", required_argument, 0, 'o'},
-        {"n_cores", required_argument, 0, 'n'},
-        {"row", required_argument, 0, 'r'},
-        {"col", required_argument, 0, 'c'},
-        {"method", required_argument, 0, 'me'},
-        {"user_mask_path", required_argument, 0, 'u'},
-        {"probability_threshold", required_argument, 0, 'p'},
-        {"min_days_conse", required_argument, 0, 'mi'},
-        {"output_mode", required_argument, 0, 'ou'},
-        {"help", no_argument, 0, 'h'},
-        {0, 0, 0, 0}
-    };
+//int get_args
+//(
+//    int argc,              /* I: number of cmd-line args                    */
+//    char *argv[],          /* I: string of cmd-line args                    */
+//    int *mode,             /* O: 1 - pixel-based; 2 - scanline-based; 3 - wholescene; 4-validation */
+//    char *in_path,         /* O: directory locaiton for input data          */
+//    char *out_path,        /* O: directory location for output files        */
+//    int *n_cores,          /* O: the number of cores                        */
+//    int *row,              /* O: row number for the pixel                   */
+//    int *col,              /* O: col number for the pixel                   */
+//    int *method,
+//    char *user_mask_path,
+//    double *probability_threshold,
+//    int *min_days_conse,
+//    bool *b_fastmode,
+//    bool *b_outputCSV
+//)
+//{
+//    int c;                         /* current argument index                */
+//    int output_mode;
+//    int option_index;              /* index for the command-line option     */
+//    static int verbose_flag = 0;   /* verbose flag                          */
+//    char errmsg[MAX_STR_LEN];      /* error message                         */
+//    char FUNC_NAME[] = "get_args"; /* function name                         */
+//    static struct option long_options[] = {
+//        {"mode", required_argument, 0, 'm'},
+//        {"in-path", required_argument, 0, 'i'},
+//        {"out-path", required_argument, 0, 'o'},
+//        {"n_cores", required_argument, 0, 'n'},
+//        {"row", required_argument, 0, 'r'},
+//        {"col", required_argument, 0, 'c'},
+//        {"method", required_argument, 0, 'me'},
+//        {"user_mask_path", required_argument, 0, 'u'},
+//        {"probability_threshold", required_argument, 0, 'p'},
+//        {"min_days_conse", required_argument, 0, 'mi'},
+//        {"output_mode", required_argument, 0, 'ou'},
+//        {"help", no_argument, 0, 'h'},
+//        {0, 0, 0, 0}
+//    };
 
-    /******************************************************************/
-    /*                                                                */
-    /* Loop through all the cmd-line options                          */
-    /*                                                                */
-    /******************************************************************/
+//    /******************************************************************/
+//    /*                                                                */
+//    /* Loop through all the cmd-line options                          */
+//    /*                                                                */
+//    /******************************************************************/
 
-    while (1)
-    {
-        /* optstring in call to getopt_long is empty since we will only
-           support the long options */
-        c = getopt_long (argc, argv, "", long_options, &option_index);
-        if (c == -1)
-        {
+//    while (1)
+//    {
+//        /* optstring in call to getopt_long is empty since we will only
+//           support the long options */
+//        c = getopt_long (argc, argv, "", long_options, &option_index);
+//        if (c == -1)
+//        {
 
-            /**********************************************************/
-            /*                                                        */
-            /* Out of cmd-line options                                */
-            /*                                                        */
-            /**********************************************************/
+//            /**********************************************************/
+//            /*                                                        */
+//            /* Out of cmd-line options                                */
+//            /*                                                        */
+//            /**********************************************************/
 
-            break;
-        }
+//            break;
+//        }
 
-        switch (c)
-        {
-            case 0:
+//        switch (c)
+//        {
+//            case 0:
 
-                /******************************************************/
-                /*                                                    */
-                /* If this option set a flag, do nothing else now.    */
-                /*                                                    */
-                /******************************************************/
+//                /******************************************************/
+//                /*                                                    */
+//                /* If this option set a flag, do nothing else now.    */
+//                /*                                                    */
+//                /******************************************************/
 
-                if (long_options[option_index].flag != 0)
-                {
-                    break;
-                }
-                sprintf (errmsg, "option %s\n", long_options[option_index].name);
-                if (optarg)
-                {
-                    sprintf (errmsg, "option %s with arg %s\n",
-                             long_options[option_index].name, optarg);
-                }
-                RETURN_ERROR (errmsg, FUNC_NAME, ERROR);
-                break;
-            case 'm':              /* mode */
-                *mode = atoi (optarg);
-                break;
-            case 'i':
-                strcpy (in_path, optarg);
-                break;
-            case 'o':
-                strcpy (out_path, optarg);
-                break;
-            case 'n':
-                *n_cores = atoi (optarg);
-                break;
-            case 'r':
-                *row = atoi (optarg);
-                break;
-            case 'c':
-                *col = atoi (optarg);
-                break;
-            case 'me':
-                *method = atoi (optarg);
-                break;
-            case 'u':
-                strcpy (user_mask_path, optarg);
-            case 'p':
-                *probability_threshold = atof (optarg);
-                break;
-            case 'mi':
-                *min_days_conse = atoi (optarg);
-                break;
-            case 'ou':
-                output_mode = atoi (optarg);
-                if(output_mode % 10 == 1)
-                    *b_fastmode = TRUE;
-                else
-                    *b_fastmode = FALSE;
+//                if (long_options[option_index].flag != 0)
+//                {
+//                    break;
+//                }
+//                sprintf (errmsg, "option %s\n", long_options[option_index].name);
+//                if (optarg)
+//                {
+//                    sprintf (errmsg, "option %s with arg %s\n",
+//                             long_options[option_index].name, optarg);
+//                }
+//                RETURN_ERROR (errmsg, FUNC_NAME, ERROR);
+//                break;
+//            case 'm':              /* mode */
+//                *mode = atoi (optarg);
+//                break;
+//            case 'i':
+//                strcpy (in_path, optarg);
+//                break;
+//            case 'o':
+//                strcpy (out_path, optarg);
+//                break;
+//            case 'n':
+//                *n_cores = atoi (optarg);
+//                break;
+//            case 'r':
+//                *row = atoi (optarg);
+//                break;
+//            case 'c':
+//                *col = atoi (optarg);
+//                break;
+//            case 'me':
+//                *method = atoi (optarg);
+//                break;
+//            case 'u':
+//                strcpy (user_mask_path, optarg);
+//            case 'p':
+//                *probability_threshold = atof (optarg);
+//                break;
+//            case 'mi':
+//                *min_days_conse = atoi (optarg);
+//                break;
+//            case 'ou':
+//                output_mode = atoi (optarg);
+//                if(output_mode % 10 == 1)
+//                    *b_fastmode = TRUE;
+//                else
+//                    *b_fastmode = FALSE;
 
-                if(output_mode / 10 == 1)
-                    *b_outputCSV = TRUE;
-                else
-                    *b_outputCSV = FALSE;
-                break;
-            case 'h':              /* help */
-                usage_message ();
-                exit (SUCCESS);
-                break;
-            case '?':
-            default:
-                sprintf (errmsg, "Unknown option %s", argv[optind - 1]);
-                usage_message ();
-                RETURN_ERROR (errmsg, FUNC_NAME, ERROR);
-                break;
-        }
-    }
+//                if(output_mode / 10 == 1)
+//                    *b_outputCSV = TRUE;
+//                else
+//                    *b_outputCSV = FALSE;
+//                break;
+//            case 'h':              /* help */
+//                usage_message ();
+//                exit (SUCCESS);
+//                break;
+//            case '?':
+//            default:
+//                sprintf (errmsg, "Unknown option %s", argv[optind - 1]);
+//                usage_message ();
+//                RETURN_ERROR (errmsg, FUNC_NAME, ERROR);
+//                break;
+//        }
+//    }
 
-    /******************************************************************/
-    /*                                                                */
-    /* Check the input values                                         */
-    /*                                                                */
-    /******************************************************************/
+//    /******************************************************************/
+//    /*                                                                */
+//    /* Check the input values                                         */
+//    /*                                                                */
+//    /******************************************************************/
 
-    if (*row < 0)
-    {
-        sprintf (errmsg, "row number must be > 0");
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
+//    if (*row < 0)
+//    {
+//        sprintf (errmsg, "row number must be > 0");
+//        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+//    }
 
-    if (*col < 0)
-    {
-        sprintf (errmsg, "column number must be > 0");
-        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
-    }
+//    if (*col < 0)
+//    {
+//        sprintf (errmsg, "column number must be > 0");
+//        RETURN_ERROR(errmsg, FUNC_NAME, FAILURE);
+//    }
 
-    /******************************************************************/
-    /*                                                                */
-    /* If in_path and out_path were not specified, assign local       */
-    /* directory, so that pre-pending a directory/path later on will  */
-    /* not cause an error, but instead result in ./<filename> .       */
-    /*                                                                */
-    /******************************************************************/
+//    /******************************************************************/
+//    /*                                                                */
+//    /* If in_path and out_path were not specified, assign local       */
+//    /* directory, so that pre-pending a directory/path later on will  */
+//    /* not cause an error, but instead result in ./<filename> .       */
+//    /*                                                                */
+//    /******************************************************************/
 
-    if (strlen(in_path) == 0)
-    {
-        strcpy (in_path, ".");
-    }
-    if (strlen(out_path) == 0)
-    {
-        strcpy (out_path, ".");
-    }
+//    if (strlen(in_path) == 0)
+//    {
+//        strcpy (in_path, ".");
+//    }
+//    if (strlen(out_path) == 0)
+//    {
+//        strcpy (out_path, ".");
+//    }
 
 
-    return (SUCCESS);
-}
+//    return (SUCCESS);
+//}
 
 /******************************************************************************
 MODULE:  usage_message
@@ -1205,8 +1203,8 @@ int get_coldparameters
 (
     int *n_rows,
     int *n_cols,
-    int *n_block_h,
-    int *n_block_v,
+    int *n_block_x,
+    int *n_block_y,
     int *CM_OUTPUT_INTERVAL,
     float *probability_threshold,
     int *conse
@@ -1216,16 +1214,11 @@ int get_coldparameters
     // char var_path[MAX_STR_LEN];
     FILE *var_fp;
     char line[MAX_STR_LEN];
-    char line1[MAX_STR_LEN];
     char var_path[MAX_STR_LEN];
-    char parameter_name[MAX_STR_LEN];
     char errmsg[MAX_STR_LEN];      /* error message   */
-    float val;
     char *token;
     const char deli[] = ":";
-    int output_mode;
     char FUNC_NAME[] = "get_coldparameters";
-    int status = 0;
     char s1[] = "n_rows";
     char s2[] = "n_cols";
     char s3[] = "n_block_x";
@@ -1260,11 +1253,11 @@ int get_coldparameters
           }
           else if (strcmp(token, s3) == 0){
               token = strtok(NULL, deli);
-              *n_block_h = atoi(token);
+              *n_block_x = atoi(token);
           }
           else if (strcmp(token, s4) == 0){
               token = strtok(NULL, deli);
-              *n_block_v = atoi(token);
+              *n_block_y = atoi(token);
           }
           else if(strcmp(token, s5) == 0){
               token = strtok(NULL, deli);
@@ -1289,10 +1282,10 @@ int get_coldparameters
         RETURN_ERROR("n_rows is missing in the parameter.yaml", FUNC_NAME, ERROR);
     if (*n_cols == 0)
         RETURN_ERROR("n_cols is missing in the parameter.yaml", FUNC_NAME, ERROR);
-    if (*n_block_h == 0)
-        RETURN_ERROR("n_block_h is missing in the parameter.yaml", FUNC_NAME, ERROR);
-    if (*n_block_v == 0)
-        RETURN_ERROR("n_block_v is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*n_block_x == 0)
+        RETURN_ERROR("n_block_x is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*n_block_y == 0)
+        RETURN_ERROR("n_block_y is missing in the parameter.yaml", FUNC_NAME, ERROR);
     if (*CM_OUTPUT_INTERVAL == 0)
         RETURN_ERROR("CM_OUTPUT_INTERVAL is missing in the parameter.yaml", FUNC_NAME, ERROR);
     if (*probability_threshold == 0)
@@ -1302,3 +1295,102 @@ int get_coldparameters
     return SUCCESS;
 
 }
+
+
+/******************************************************************************
+MODULE:  preprocessing
+
+PURPOSE:  preprocessing time series to flag valid data range, and calculate statistics
+of clear, water, shadow, snow and cloud categories
+
+RETURN VALUE:
+Type = int (SUCCESS OR FAILURE)
+
+HISTORY:
+Date        Programmer       Reason
+--------    ---------------  -------------------------------------
+11/14/2018   Su Ye         Original Development
+******************************************************************************/
+
+int preprocessing
+(
+    long *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_s1,           /* I:  Landsat swir1 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_s2,           /* I:  Landsat swir2 spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_t,            /* I:  Landsat thermal spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *fmask_buf,        /* I:   mask time series  */
+    int *valid_num_scenes, /* I/O: * number of scenes after cfmask counts and  */
+    int *id_range,
+    int *clear_sum,      /* I/O: Total number of clear cfmask pixels          */
+    int *water_sum,      /* I/O: counter for cfmask water pixels.             */
+    int *shadow_sum,     /* I/O: counter for cfmask shadow pixels.            */
+    int *sn_sum,         /* I/O: Total number of snow cfmask pixels           */
+    int *cloud_sum,      /* I/O: counter for cfmask cloud pixels.             */
+    bool b_c2
+)
+{
+
+    int i;
+    long buf_t_tmp ;
+
+    for (i = 0; i < *valid_num_scenes; i++)
+    {
+        if (buf_t[i] != 0)
+        {
+            if(b_c2 == TRUE)
+               buf_t_tmp = 0;
+            else
+               buf_t_tmp = (long)(buf_t[i] * 10 - 27320);
+        }
+
+
+        if ((buf_b[i] > 0) && (buf_b[i] < 10000) &&
+            (buf_g[i] > 0) && (buf_g[i] < 10000) &&
+            (buf_r[i] > 0) && (buf_r[i] < 10000) &&
+            (buf_n[i] > 0) && (buf_n[i] < 10000) &&
+            (buf_s1[i] > 0) && (buf_s1[i] < 10000) &&
+            (buf_s2[i] > 0) && (buf_s2[i] < 10000) &&
+            (buf_t_tmp > -9320) && (buf_t_tmp < 7070) &&
+                (fmask_buf[i] < FILL_VALUE))
+         {
+            id_range[i] = 1;
+         }
+        else
+         {
+            id_range[i] = 0;
+         }
+
+
+        switch (fmask_buf[i])
+        {
+            case CFMASK_CLEAR:
+                (*clear_sum)++;
+                break;
+            case CFMASK_WATER:
+                (*water_sum)++;
+                (*clear_sum)++;
+                break;
+            case CFMASK_SHADOW:
+                (*shadow_sum)++;
+                break;
+            case CFMASK_SNOW:
+                (*sn_sum)++;
+                break;
+            case CFMASK_CLOUD:
+                (*cloud_sum)++;
+                break;
+            case FILL_VALUE:
+                break;
+            default:
+                printf ("Unknown cfmask value %d\n", (int)fmask_buf[i]);
+                return (FAILURE);
+            break;
+        }
+    }
+    return (SUCCESS);
+}
+
+

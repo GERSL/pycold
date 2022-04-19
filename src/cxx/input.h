@@ -144,24 +144,6 @@ int read_bip_lines
     short int *sensor_buf
 );
 
-int read_bip_auxval
-(
-    char *auxval_path,       /* I: Landsat ARD directory  */
-    int  row,                 /* I:   the row (Y) location within img/grid   */
-    int  col,                 /* I:   the col (X) location within img/grid   */
-    int num_samples,
-    short int *auxval
-);
-
-int read_bip_maskval
-(
-    char *mask_path,       /* I: Landsat ARD directory  */
-    int  row,                 /* I:   the row (Y) location within img/grid   */
-    int  col,                 /* I:   the col (X) location within img/grid   */
-    int num_samples,
-    char *maskval
-);
-
 //int read_tif_lines
 //(
 //    char *in_path,       /* I: Landsat ARD directory  */
@@ -185,14 +167,6 @@ int save_scene_list
     char** scene_list
 );
 
-int read_bip_breakdates
-(
-    char *breakdate_path,       /* I: Landsat ARD directory  */
-    int  row,                 /* I:   the row (Y) location within img/grid   */
-    int  col,                 /* I:   the col (X) location within img/grid   */
-    int num_samples,
-    int *breakdate
-);
 
 #endif // INPUTS_H
 

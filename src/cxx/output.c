@@ -146,29 +146,7 @@ void write_envi_header
             meta->upper_left_x, meta->upper_left_y, meta->pixel_size, meta->pixel_size);
 }
 
-void write_output_csv
-(
-    FILE *csv_fptr,      /* I: pointer to the csv file */
-    Output_t t          /* I: outputted structure     */
-)
-{
-     int i, j;
 
-    fprintf(csv_fptr, "%d,%d,%d,%d,%d,%d,%f,", t.pos, t.category, t.t_start, t.t_end, t.t_break,
-            t.num_obs, t.change_prob);
-
-    for (i = 0; i < TOTAL_IMAGE_BANDS; i++)
-        fprintf(csv_fptr, "%f, ", t.magnitude[i]);
-
-    for (i = 0; i < TOTAL_IMAGE_BANDS; i++)
-        for(j = 0; j < NUM_COEFFS; j++)
-           fprintf(csv_fptr, "%f, ", t.coefs[i][j]);
-
-    for (i = 0; i < TOTAL_IMAGE_BANDS; i++)
-        fprintf(csv_fptr, "%f, ", t.rmse[i]);
-
-    fprintf(csv_fptr,"\n");
-}
 int write_output_binary
 (
     FILE *fptr,      /* I: pointer to the binary file */
@@ -192,13 +170,13 @@ int write_output_binary
 int write_output_binary_sccd
 (
     FILE *fptr,      /* I: pointer to the binary file */
-    Output_t_sccd t          /* I: outputted structure     */
+    Output_sccd t          /* I: outputted structure     */
 )
 {
     int nvals;               /* number of values written to the file */
     char FUNC_NAME[] = "write_output_binary_sccd"; /* function name */
 
-    nvals = fwrite(&t, sizeof(Output_t_sccd), 1, fptr);
+    nvals = fwrite(&t, sizeof(Output_sccd), 1, fptr);
 
     if (nvals != 1)
     {
