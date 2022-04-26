@@ -69,15 +69,23 @@ int sccd
     bool b_snow;               // indicate if snow pixels
     float max_date_difference;   /* maximum difference between two neighbor dates        */
     float date_vario;           /* median date                                          */
+    int len_clrx;         /* length of clrx  */
 
-    id_range = (int*)calloc((valid_num_scenes + *num_obs_queue), sizeof(int));
-    clrx = (int *)malloc((valid_num_scenes + *num_obs_queue) * sizeof(int));
+    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD))
+        len_clrx = valid_num_scenes + *num_obs_queue;
+    else if ((*nrt_mode  == NRT_MONITOR_SNOW)|(*nrt_mode  == NRT_MONITOR_STANDARD))
+        len_clrx = valid_num_scenes + DEFAULT_CONSE;
+    else
+       len_clrx = valid_num_scenes;
+
+    id_range = (int*)calloc(len_clrx, sizeof(int));
+    clrx = (int *)malloc(len_clrx * sizeof(int));
     if (clrx == NULL)
     {
         RETURN_ERROR ("Allocating clrx memory", FUNC_NAME, FAILURE);
     }
 
-    clry = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS, (valid_num_scenes + *num_obs_queue),
+    clry = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS, len_clrx,
                                          sizeof (float));
     if (clry == NULL)
     {
@@ -125,7 +133,7 @@ int sccd
     }else if ((*nrt_mode  == NRT_MONITOR_SNOW)|(*nrt_mode  == NRT_MONITOR_STANDARD))
     {
         //  if monitor mode, will append output_nrtmodel default conse-1 obs
-        for (k = 0; k < DEFAULT_CONSE - 1; k++){
+        for (k = 0; k < DEFAULT_CONSE; k++){
             for(i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
             {
                 clry[i_b][k] = nrt_model->obs[i_b][k];
@@ -311,7 +319,6 @@ int step1_ssm_initialize
     int n_clr
 )
 {
-
     char FUNC_NAME[] = "step1_ssm_initialize";
     float* state_sum;
     float ini_p;
@@ -2015,7 +2022,7 @@ int step3_processing_end
         nrt_model->num_obs = (unsigned short int)(num_obs_processed);
 
         /*     5. observations in tail       */
-        for(k = 0; k < DEFAULT_CONSE - 1; k ++)
+        for(k = 0; k < DEFAULT_CONSE; k ++)
         {
             for(i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
             {
@@ -2218,7 +2225,7 @@ int sccd_standard
     /* While loop - process til the conse -1 observation remains  */
     /*                                                            */
     /**************************************************************/
-    while (i + conse - 1 <= n_clr-1)
+    while (i + conse <= n_clr-1)
     {
 //        if (i > 0){
 //            printf("%d\n",clrx[i]);
@@ -2565,13 +2572,13 @@ int sccd_snow
     nrt_model[0].t_start_since1982 = (unsigned short int)(clrx[i_start] - JULIAN_LANDSAT4_LAUNCH);
     nrt_model[0].num_obs = (unsigned short int)(n_clr);
 
-    for(k = 0; k < DEFAULT_CONSE - 1; k ++)
+    for(k = 0; k < DEFAULT_CONSE; k ++)
     {
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
         {
-            nrt_model[0].obs[i_b][k] = (unsigned short int)clry[i_b][n_clr + 1 - DEFAULT_CONSE+ k];
+            nrt_model[0].obs[i_b][k] = (unsigned short int)clry[i_b][n_clr  - DEFAULT_CONSE+ k];
         }
-        nrt_model[0].obs_date_since1982[k] = (unsigned short int)(clrx[n_clr + 1 - DEFAULT_CONSE+ k] - JULIAN_LANDSAT4_LAUNCH);
+        nrt_model[0].obs_date_since1982[k] = (unsigned short int)(clrx[n_clr - DEFAULT_CONSE+ k] - JULIAN_LANDSAT4_LAUNCH);
     }
 
     for(i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)

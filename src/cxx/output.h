@@ -72,8 +72,8 @@ typedef struct
 {
     unsigned short int t_start_since1982;           /* dates (Julian dates - JULIAN_DATE_LAST_DAY_1972) when series model gets started */
     unsigned short int num_obs;
-    unsigned short int obs[TOTAL_IMAGE_BANDS][DEFAULT_CONSE-1];   /* the last observations, d=(TOTAL_IMAGE_BANDS, conse - 1) */
-    unsigned short int obs_date_since1982[DEFAULT_CONSE-1];   /* dates (Julian dates - JULIAN_DATE_LAST_DAY_1972) the for observations, d=(TOTAL_IMAGE_BANDS, conse - 1) */
+    unsigned short int obs[TOTAL_IMAGE_BANDS][DEFAULT_CONSE];   /* the last observations, d=(TOTAL_IMAGE_BANDS, conse - 1) */
+    unsigned short int obs_date_since1982[DEFAULT_CONSE];   /* dates (Julian dates - JULIAN_DATE_LAST_DAY_1972) the for observations, d=(TOTAL_IMAGE_BANDS, conse - 1) */
     float covariance[TOTAL_IMAGE_BANDS][DEFAULT_N_STATE * DEFAULT_N_STATE];  /* covariance matrix,  d=(TOTAL_IMAGE_BANDS, SCCD_NUM_C * SCCD_NUM_C), the corresponding date is the first element of conse_obs_date */
     float nrt_coefs[TOTAL_IMAGE_BANDS][SCCD_NUM_C];   /* state matrix, d=(TOTAL_IMAGE_BANDS, SCCD_NUM_C)  */
     float H[TOTAL_IMAGE_BANDS];   /*  observation noice, d=TOTAL_IMAGE_BANDS   */

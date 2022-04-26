@@ -67,8 +67,8 @@ cdef extern from "../../cxx/output.h":
     ctypedef struct output_nrtmodel:
         unsigned short int t_start_since1982
         unsigned short int num_obs
-        unsigned short int obs[7][5]
-        unsigned short int obs_date_since1982[5]
+        unsigned short int obs[7][6]
+        unsigned short int obs_date_since1982[6]
         float covariance[7][36]
         float nrt_coefs[7][6]
         float H[7]
@@ -143,7 +143,7 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     	ts_g: 1d array of shape(observation numbers), time series of green band
     	ts_r: 1d array of shape(observation numbers), time series of red band
     	ts_n: 1d array of shape(observation numbers), time series of nir band
-   	ts_s1: 1d array of shape(observation numbers), time series of swir1 band
+   	    ts_s1: 1d array of shape(observation numbers), time series of swir1 band
     	ts_s2: 1d array of shape(observation numbers), time series of swir2 band
     	ts_t: 1d array of shape(observation numbers), time series of thermal band
     	qas: 1d array, the QA cfmask bands. '0' - clear; '1' - water; '2' - shadow; '3' - snow; '4' - cloud
@@ -300,7 +300,7 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     	ts_g: 1d array of shape(observation numbers), time series of green band
     	ts_r: 1d array of shape(observation numbers), time series of red band
     	ts_n: 1d array of shape(observation numbers), time series of nir band
-   	ts_s1: 1d array of shape(observation numbers), time series of swir1 band
+   	    ts_s1: 1d array of shape(observation numbers), time series of swir1 band
     	ts_s2: 1d array of shape(observation numbers), time series of swir2 band
     	ts_t: 1d array of shape(observation numbers), time series of thermal band
     	qas: 1d array, the QA cfmask bands. '0' - clear; '1' - water; '2' - shadow; '3' - snow; '4' - cloud

@@ -62,7 +62,7 @@ int getnrtstructurefromtxt(char* nrtoutput_affix,  Output_sccd *s_rec_cg, output
     strcat(rmse_with_extension, rmse_ext);
     /* add the extension */
     ptr = fopen(rmse_with_extension,"rb");  // r for read, b for binary
-    if(fread(min_rmse, sizeof(short), 7, ptr)==7)
+    if(fread(min_rmse, sizeof(short), 7, ptr)!=7)
     {
         printf("reading minimum rmse fails \n");
     }

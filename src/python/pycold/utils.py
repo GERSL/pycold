@@ -288,3 +288,9 @@ def read_data(path):
     return np.genfromtxt(path, delimiter=',', dtype=np.int64).T
 
 
+def date2matordinal(year, month, day):
+    return pd.Timestamp.toordinal(dt.date(year, month, day)) + 366
+
+
+def matordinal2date(ordinal):
+    return pd.Timestamp.fromordinal(ordinal - 366)

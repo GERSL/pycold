@@ -113,7 +113,6 @@
 #define SCCD 2
 #define OBCOLD 3 // COLD with outputting CM magnitudes
 #define OBCOLD_RECONSTRUCT 4
-#define SCCDONLINE 5
 
 
 #define SKIP_PERCENTAGE 0.03
@@ -139,6 +138,7 @@
 #define NRT_QUEUE_STANDARD 2
 #define NRT_MONITOR_SNOW 3
 #define NRT_QUEUE_SNOW 4
+#define MAX_OBS_QUEUE 300 /* the maximum number of observations in queue (for NRT) */
 
 #define LANDSAT45_TM 4
 #define LANDSAT7_ETM 5
@@ -147,5 +147,4 @@
 #define KFAS_TOL 1E-14
 #define KFAS_LIK_C 0.5 * log(8.0 * atan(1.0))
 #define SLOPE_SS_SCALE 1000000
-#define MAX_OBS_QUEUE 300 /* the maximum number of observations in queue (for NRT) */
 
