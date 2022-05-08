@@ -23,8 +23,8 @@ C5_threshold: 15.086
 C5_sizeslope: 0.05
 C6_threshold: 11.07
 C6_sizeslope: 0.1
-C7_threshold: 15.086
-C7_sizeslope: 0.05
+C7_threshold: 11.07
+C7_sizeslope: 0.1
 C8_threshold: 15.086
 C8_sizeslope: 0.05
 default_sizeslope: 0
