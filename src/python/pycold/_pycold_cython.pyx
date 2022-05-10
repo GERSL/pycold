@@ -83,7 +83,7 @@ cdef extern from "../../cxx/cold.h":
     cdef int cold(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2,
                   long *buf_t, long *fmask_buf, long *valid_date_array, int valid_num_scenes, int pos, 
                   double tcg, int conse, bool b_output_cm, int starting_date, Output_t *rec_cg,
-                  int *num_fc, int cm_output_interval, short int *cm_outputs, unsigned char *CMdirection_outputs,
+                  int *num_fc, int cm_output_interval, short int *cm_outputs, 
                   unsigned char *cm_outputs_date);
 
 
@@ -195,20 +195,17 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
         if starting_date == 0:
            starting_date = dates[0]
         cm_outputs = np.full(n_cm, -9999, dtype=np.short)
-        cm_direction_outputs = np.full(n_cm, 255, dtype=np.uint8)
         cm_outputs_date = np.full(n_cm, 255, dtype=np.uint8)
     # set the length to 1 to save memory, as they won't be assigned values
     else:  
         cm_outputs = np.full(1, -9999, dtype=np.short)
-        cm_direction_outputs = np.full(1, 255, dtype=np.uint8)
         cm_outputs_date = np.full(1, 255, dtype=np.uint8)
     cdef short [:] cm_outputs_view = cm_outputs  # memory view
-    cdef unsigned char [:] cm_direction_outputs_view = cm_direction_outputs  # memory view
     cdef unsigned char [:] cm_outputs_date_view = cm_outputs_date  # memory view
 
     result = cold(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0], &ts_t_view[0],
                  &qas_view[0], &dates_view[0], valid_num_scenes, pos, t_cg, conse, b_output_cm,
-                 starting_date, rec_cg, &num_fc, cm_output_interval, &cm_outputs_view[0], &cm_direction_outputs_view[0], &cm_outputs_date_view[0])
+                 starting_date, rec_cg, &num_fc, cm_output_interval, &cm_outputs_view[0], &cm_outputs_date_view[0])
     if result != 0:
         raise RuntimeError("cold function fails for pos = {} ".format(pos))
     else:
@@ -219,7 +216,7 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
                 return np.asarray(<Output_t[:num_fc]>rec_cg) # np.asarray uses also the buffer-protocol and is able to construct
                                                              # a dtype-object from cython's array
             else:  # for object-based COLD
-                return [np.asarray(<Output_t[:num_fc]>rec_cg), cm_outputs, cm_direction_outputs, cm_outputs_date]
+                return [np.asarray(<Output_t[:num_fc]>rec_cg), cm_outputs, cm_outputs_date]
 
 
 def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,

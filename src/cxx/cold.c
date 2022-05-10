@@ -83,7 +83,6 @@ int cold
     int *num_fc,                /* O: number of fitting curves                   */
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: (optional) maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    unsigned char* CMdirection_outputs,      /* I/O: direction of change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     unsigned char* CM_outputs_date        /* I/O: (optional) dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 
 )
@@ -174,10 +173,10 @@ int cold
 //        printf("conse=%d\n", conse);
 //        printf("num_fc=%d\n", *num_fc);
          result = stand_procedure(valid_num_scenes, valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t, fmask_buf, id_range,
-                                 tcg, conse, b_outputCM, starting_date, rec_cg, num_fc, CM_OUTPUT_INTERVAL, CM_outputs, CMdirection_outputs,
+                                 tcg, conse, b_outputCM, starting_date, rec_cg, num_fc, CM_OUTPUT_INTERVAL, CM_outputs,
                                  CM_outputs_date);
 //        result = stand_procedure_fixeddays(valid_num_scenes, valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t, fmask_buf, id_range,
-//                                 tcg, conse, b_outputCM, starting_date, rec_cg, num_fc, CM_OUTPUT_INTERVAL, CM_outputs, CMdirection_outputs,
+//                                 tcg, conse, b_outputCM, starting_date, rec_cg, num_fc, CM_OUTPUT_INTERVAL, CM_outputs,
 //                                 CM_outputs_date, (conse - 1) * 16);
 
 
@@ -236,7 +235,6 @@ int stand_procedure_fixeddays
     int *num_fc,                /* O: number of fitting curves                       */
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    unsigned char* CMdirection_outputs,      /* I/O: direction of change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     unsigned char* CM_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     int min_days_conse
 )
@@ -1208,7 +1206,6 @@ int stand_procedure_fixeddays
                                         }
                                     }
                                     CM_outputs[current_CM_n] = tmp_CM;
-                                    CMdirection_outputs[current_CM_n] = tmp_direction;
                                     CM_outputs_date[current_CM_n] = clrx[i_ini+1] - starting_date - current_CM_n * CM_OUTPUT_INTERVAL;
                                     // printf("date = %d\n", clrx[i_ini+1]);
                                 }
@@ -2011,7 +2008,6 @@ int stand_procedure_fixeddays
                             }
                         }
                         CM_outputs[current_CM_n] = tmp_CM;
-                        CMdirection_outputs[current_CM_n] = tmp_direction;
                         CM_outputs_date[current_CM_n] = clrx[i] - starting_date - current_CM_n * CM_OUTPUT_INTERVAL;
                     }
                 }
@@ -2653,7 +2649,6 @@ int stand_procedure
     int *num_fc,                /* O: number of fitting curves                       */
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    unsigned char* CMdirection_outputs,      /* I/O: direction of change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     unsigned char* CM_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 )
 {
@@ -3603,25 +3598,25 @@ int stand_procedure
                                     /*********************************************/
                                     /*      change direction by majority vote    */
                                     /*********************************************/
-                                    tmp_direction = 0;
-                                    for (b = 0; b < NUM_LASSO_BANDS; b++)
-                                    {
-                                        posi_count = 0;
-                                        nega_count = 0;
-                                        for(j = 0; j < adj_conse; j++){
-                                            if (v_diff_tmp[b][j] > 0){
-                                                posi_count++;
-                                            }else{
-                                                nega_count++;
-                                            }
-                                        }
+//                                    tmp_direction = 0;
+//                                    for (b = 0; b < NUM_LASSO_BANDS; b++)
+//                                    {
+//                                        posi_count = 0;
+//                                        nega_count = 0;
+//                                        for(j = 0; j < adj_conse; j++){
+//                                            if (v_diff_tmp[b][j] > 0){
+//                                                posi_count++;
+//                                            }else{
+//                                                nega_count++;
+//                                            }
+//                                        }
 
-                                        if (posi_count > nega_count){
-                                            tmp_direction = tmp_direction + pow(2, b);
-                                        }
-                                    }
+//                                        if (posi_count > nega_count){
+//                                            tmp_direction = tmp_direction + pow(2, b);
+//                                        }
+//                                    }
                                     CM_outputs[current_CM_n] = tmp_CM;
-                                    CMdirection_outputs[current_CM_n] = tmp_direction;
+//                                    CMdirection_outputs[current_CM_n] = tmp_direction;
                                     CM_outputs_date[current_CM_n] = clrx[i_ini+1] - starting_date - current_CM_n * CM_OUTPUT_INTERVAL;
                                     // printf("date = %d\n", clrx[i_ini+1]);
                                 }
@@ -4311,24 +4306,24 @@ int stand_procedure
                     /*********************************************/
                     if(tmp_CM > CM_outputs[current_CM_n])
                     {
-                        tmp_direction = 0;
-                        for (b = 0; b < NUM_LASSO_BANDS; b++)
-                        {
-                            posi_count = 0;
-                            nega_count = 0;
-                            for(j = 0; j < adj_conse; j++){
-                                if (v_diff[b][j] > 0){
-                                    posi_count++;
-                                }else{
-                                    nega_count++;
-                                }
-                            }
-                            if (posi_count > nega_count){
-                                tmp_direction = tmp_direction + pow(2, b);
-                            }
-                        }
+//                        tmp_direction = 0;
+//                        for (b = 0; b < NUM_LASSO_BANDS; b++)
+//                        {
+//                            posi_count = 0;
+//                            nega_count = 0;
+//                            for(j = 0; j < adj_conse; j++){
+//                                if (v_diff[b][j] > 0){
+//                                    posi_count++;
+//                                }else{
+//                                    nega_count++;
+//                                }
+//                            }
+//                            if (posi_count > nega_count){
+//                                tmp_direction = tmp_direction + pow(2, b);
+//                            }
+//                        }
                         CM_outputs[current_CM_n] = tmp_CM;
-                        CMdirection_outputs[current_CM_n] = tmp_direction;
+//                        CMdirection_outputs[current_CM_n] = tmp_direction;
                         CM_outputs_date[current_CM_n] = clrx[i] - starting_date - current_CM_n * CM_OUTPUT_INTERVAL;
                     }
                 }
