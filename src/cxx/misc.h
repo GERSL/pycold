@@ -11,7 +11,7 @@ int adjust_median_variogram
     int dim2_end,               /* I: dimension 2 end index                          */
     float *date_vario,          /* O: outputted median variogran for dates           */
     float *max_neighdate_diff,  /*O: maximum difference for two neighbor times       */
-    short int *output_array,        /* O: output array                                   */
+    float *output_array,        /* O: output array                                   */
     int option          /* I: option for median variogram: 1 - normal; 2 - adjust (PYCCD version) */
 );
 

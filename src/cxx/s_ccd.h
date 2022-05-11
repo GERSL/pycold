@@ -26,14 +26,14 @@ int sccd
     output_nrtmodel *rec_nrt,
     int *num_obs_queue,             /* O: the number of multispectral observations    */
     output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
-    short int *min_rmse         /* O: adjusted rmse for the pixel    */
+    float *min_rmse         /* O: adjusted rmse for the pixel    */
 );
 
 
 int step1_cold_initialize
 (
     int conse,              /* I: adjusted consecutive observation number               */
-    short int* min_rmse,           /* I: the adjusted RMS                        */
+    float* min_rmse,           /* I: the adjusted RMS                        */
     int* n_clr,                 /* I: number of clear observations                         */
     double tcg,               /* I: the threshold of change magnitude                       */
     int* i_dense,               /* I: used to count i for dense time point check          */
@@ -72,7 +72,7 @@ int step2_KF_ChangeDetection
     int cur_i,                     /* I: the ith of observation to be processed   */
     int *num_curve,                /* I: the number of curves   */
     int conse,                     /* I: the consecutive number of observations   */
-    short int *min_rmse,               /* I: adjusted RMSE   */
+    float *min_rmse,               /* I: adjusted RMSE   */
     float tcg,                    /* I: the change threshold  */
     int *n_clr,               /* I: the total observation of current observation queue  */
     gsl_matrix** cov_p,       /* I/O: covariance matrix */
@@ -178,7 +178,7 @@ int sccd_standard
     output_nrtmodel *rec_nrt,     /* O: nrt records    */
     int *num_obs_queue,             /* O: the number of multispectral observations    */
     output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
-    short int *min_rmse       /* O: adjusted rmse for the pixel    */
+    float *min_rmse       /* O: adjusted rmse for the pixel    */
 );
 
 

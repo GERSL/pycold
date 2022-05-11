@@ -69,7 +69,6 @@ void update_cft
 }
 
 
-
 int adjust_median_variogram
 (
     int *clrx,                  /* I: dates                                          */
@@ -79,7 +78,7 @@ int adjust_median_variogram
     int dim2_end,               /* I: dimension 2 end index                          */
     float *date_vario,          /* O: outputted median variogran for dates           */
     float *max_neighdate_diff,  /*O: maximum difference for two neighbor times       */
-    short int *output_array,        /* O: output array                                   */
+    float *output_array,        /* O: output array                                   */
     int option          /* I: option for median variogram: 1 - normal; 2 - adjust (PYCCD version) */
 )
 {
@@ -110,15 +109,15 @@ int adjust_median_variogram
        for(i = 0; i < dim1_len; i++)
        {
            output_array[i] = 0;
-	   *date_vario = 0;
-	   return (SUCCESS);
+       *date_vario = 0;
+       return (SUCCESS);
        }
     }
     if (dim2_len == 1)
     {
         for (i = 0; i < dim1_len; i++)
         {
-            output_array[i] = (short int)array[i][dim2_start];
+            output_array[i] = array[i][dim2_start];
             *date_vario = clrx[dim2_start];
             return (SUCCESS);
         }
@@ -153,7 +152,7 @@ int adjust_median_variogram
         {
             for (j = dim2_start; j < dim2_end; j++)
             {
-                var[j - dim2_start] = fabs(array[i][j+1] - array[i][j]);
+                var[j - dim2_start] = abs(array[i][j+1] - array[i][j]);
                 //printf("%d var for band %d: %f\n", j, i+1, (float)var[j]);
 
             }
@@ -167,10 +166,10 @@ int adjust_median_variogram
             {
                 //printf("%f\n", var[m-1]);
                //printf("%f\n", var[m]);
-                output_array[i] = (short int)(var[m-1] + var[m]) / 2.0;
+                output_array[i] = (var[m-1] + var[m]) / 2.0;
             }
             else
-                output_array[i] = (short int)var[m];
+                output_array[i] = var[m];
 
         }
     }
@@ -241,7 +240,7 @@ int adjust_median_variogram
             {
                 if(clrx[j+step - 1] - clrx[j] > 30)
                 {
-                   var[s] = (float)fabs(array[i][j+step-1] - array[i][j]);
+                   var[s] = (float)abs(array[i][j+step-1] - array[i][j]);
                    //printf("%d\n", clrx[j+step - 1] - clrx[j]);
                    s++;
                 }
@@ -256,10 +255,10 @@ int adjust_median_variogram
             m = s / 2 ;
             if (s % 2 == 0)
             {
-                output_array[i] = (short int)(var[m-1] + var[m]) / 2.0;
+                output_array[i] = (var[m-1] + var[m]) / 2.0;
             }
             else
-                output_array[i] = (short int)var[m];
+                output_array[i] = var[m];
 
             //printf("%d\n", output_array[i]);
         }
@@ -294,10 +293,10 @@ int adjust_median_variogram
             {
                 //printf("%f\n", var[m-1]);
                //printf("%f\n", var[m]);
-                output_array[i] = (short int)(var[m-1] + var[m]) / 2.0 * (clrx[dim2_end] - clrx[dim2_start]) / (dim2_len - 1);
+                output_array[i] = (var[m-1] + var[m]) / 2.0 * (clrx[dim2_end] - clrx[dim2_start]) / (dim2_len - 1);
             }
             else
-                output_array[i] = (short int)var[m] * (clrx[dim2_end] - clrx[dim2_start]) / (dim2_len - 1);
+                output_array[i] = var[m] * (clrx[dim2_end] - clrx[dim2_start]) / (dim2_len - 1);
 
         }
     }
@@ -328,10 +327,10 @@ int adjust_median_variogram
             {
                 //printf("%f\n", var[m-1]);
                //printf("%f\n", var[m]);
-                output_array[i] = (short int)(var[m-1] + var[m]) / 2.0;
+                output_array[i] = (var[m-1] + var[m]) / 2.0;
             }
             else
-                output_array[i] = (short int)var[m];
+                output_array[i] = var[m];
 
         }
     }
@@ -339,6 +338,7 @@ int adjust_median_variogram
 
     return (SUCCESS);
 }
+
 
 
 /******************************************************************************

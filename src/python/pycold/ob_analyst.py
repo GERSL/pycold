@@ -739,12 +739,12 @@ class ObjectAnalystHPC:
         return classification_map
 
     def obia_execute(self, date, floodfill_ratio=None, uniform_threshold=None, uniform_sizeslope=None,
-                     method='watershed'):
+                     method='floodfill'):
         """
         a function for executing OBIA pipeline
         Args:
             date: the date as an index of the temporal snapshot to be processed
-            floodfill_ratio: the ratio of 𝚕𝚘𝙳𝚒𝚏𝚏/𝚞𝚙𝙳𝚒𝚏𝚏 raltive to the seed pixel value as the fixed range for connecting
+            floodfill_ratio: the ratio of change magnitude relative to the seed pixel value as the fixed range for connecting
                              neighborhood in the floodfill algorithm
                              (https://docs.opencv.org/3.4/d7/d1b/group__imgproc__misc.html#gaf1f55a048f8a45bc3383586e80b1f0d0)
             uniform_threshold: double, if not none, using a uniform change probability for all land categories, only used

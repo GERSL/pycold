@@ -32,6 +32,25 @@ if (err != 0) {                                                         \
 }                                                                       \
 }
 
+// convert NLCD category index for grand county study
+int getlabelfromNLCD(int maskval){
+    if(maskval == 21 || maskval == 22 || maskval == 23 || maskval == 24)
+        return 0;
+    else if(maskval == 81 || maskval == 82 )
+        return 1;
+    else if(maskval == 41 || maskval == 42 || maskval == 43)
+        return 2;
+    else if(maskval == 71 || maskval == 52)
+        return 3;
+    else if(maskval == 90 || maskval == 95)
+        return 4;
+    else if(maskval == 11)
+        return 5;
+    else if(maskval==31)
+        return 6;
+    else
+        return NA_VALUE;
+}
 
 long getMicrotime(){
     struct timeval currentTime;
@@ -47,6 +66,53 @@ void substr(char dest[], char src[], int offset, int len)
     dest[i] = '\0';
 }
 
+
+const char *check_parameter(int mode,char* in_path,char* out_path,int n_cores,
+                            int row, int col,int task,char* mask_path,double probability_threshold,
+                            int conse,int min_days_conse,int output_mode,
+                            int verbose){
+
+    if ((mode < 1 || mode > 4)){
+        return "unknown mode type";
+    }
+
+    struct stat st_tmp = {0};
+    if(mode != 4){
+        if (stat(in_path, &st_tmp) == -1)
+            return "in_path does not exists";
+    }else{
+       if(access(in_path, F_OK ) != 0)
+           return "in_path does not exists";
+    }
+
+
+    if (*mask_path != '\0'){
+        if(access(mask_path, F_OK ) != 0)
+            return "mask_path does not exists";
+    }
+
+    if (task != COLD &&
+        task != SCCD &&
+        task != OBCOLD &&
+        task != OBCOLD_RECONSTRUCT
+        )
+        return "unknown task type";
+
+    if (output_mode != 0 &&
+        output_mode != 1 &&
+        output_mode != 10 &&
+        output_mode != 11
+        )
+        return "unknown output_mode";
+
+
+
+    if ((probability_threshold < 0) || (probability_threshold > 1)) {
+        return "probability_threshold must be within 0 and 1";
+    }
+
+    return NULL;
+}
 
 
 /******************************************************************************
@@ -83,6 +149,7 @@ int cold
     int *num_fc,                /* O: number of fitting curves                   */
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: (optional) maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+//    unsigned char* CMdirection_outputs,      /* I/O: direction of change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     unsigned char* CM_outputs_date        /* I/O: (optional) dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 
 )
@@ -113,7 +180,7 @@ int cold
 
     status = preprocessing(buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
                            fmask_buf, &valid_num_scenes, id_range, &clear_sum,
-                           &water_sum, &shadow_sum, &sn_sum, &cloud_sum, false);
+                           &water_sum, &shadow_sum, &sn_sum, &cloud_sum, FALSE);
     // printf("preprocessing finished \n");
 
     if (status != SUCCESS)
@@ -298,7 +365,7 @@ int stand_procedure_fixeddays
     float break_mag;
     int adj_conse;
     float adj_TCG;
-    short int min_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
+    float adj_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
     float date_vario;           /* I: median date                                          */
     float max_date_difference;   /* I: maximum difference between two neighbor dates        */
     float** v_diff_tmp;
@@ -329,7 +396,7 @@ int stand_procedure_fixeddays
 
     for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
     {
-            min_rmse[k] = 0.0;
+            adj_rmse[k] = 0.0;
     }
 
 
@@ -383,7 +450,7 @@ int stand_procedure_fixeddays
                     else if (k == 5)
                         clry[k][n_clr] = (float)buf_s2[i];
                     else if (k == 6)
-                        clry[k][n_clr] = (float)buf_t[i];
+                        clry[k][n_clr] = (float)(buf_t[i] * 10 - 27320);
                     //printf("%3.2f\n", clry[k][n_clr]);
                 }
                 n_clr++;
@@ -491,7 +558,7 @@ int stand_procedure_fixeddays
     /*                                                            */
     /**************************************************************/
     status = adjust_median_variogram(clrx, clry, TOTAL_IMAGE_BANDS, 0, end-1, &date_vario,
-                                     &max_date_difference, min_rmse, 1);
+                                     &max_date_difference, adj_rmse, 1);
     if (status != SUCCESS)
     {
             RETURN_ERROR("ERROR calling median_variogram routine", FUNC_NAME,
@@ -659,7 +726,7 @@ int stand_procedure_fixeddays
 
                 status = auto_mask(clrx, clry, i_start-1, i+conse_min-1,
                                (float)(clrx[i+conse_min-1]-clrx[i_start-1]) / NUM_YEARS,
-                               min_rmse[1], min_rmse[4], (float)T_CONST, bl_ids);
+                               adj_rmse[1], adj_rmse[4], (float)T_CONST, bl_ids);
                 // printf("ddstep2 auto_mask finished \n");
                 if (status != SUCCESS)
                 {
@@ -911,7 +978,7 @@ int stand_procedure_fixeddays
                     /*                                            */
                     /**********************************************/
 
-                    mini_rmse = max((float)min_rmse[lasso_blist[i_b]], rmse[lasso_blist[i_b]]);
+                    mini_rmse = max((float)adj_rmse[lasso_blist[i_b]], rmse[lasso_blist[i_b]]);
 
                     /**********************************************/
                     /*                                            */
@@ -1128,7 +1195,7 @@ int stand_procedure_fixeddays
                                         /*                        */
                                         /**************************/
 
-                                        mini_rmse = max((float)min_rmse[i_b], rmse[i_b]);
+                                        mini_rmse = max((float)adj_rmse[i_b], rmse[i_b]);
 
                                         /**************************/
                                         /*                        */
@@ -1185,26 +1252,6 @@ int stand_procedure_fixeddays
                                 tmp_CM = (short int) (tmp);
                                 if(tmp_CM > CM_outputs[current_CM_n])
                                 {
-                                    /*********************************************/
-                                    /*      change direction by majority vote    */
-                                    /*********************************************/
-                                    tmp_direction = 0;
-                                    for (b = 0; b < NUM_LASSO_BANDS; b++)
-                                    {
-                                        posi_count = 0;
-                                        nega_count = 0;
-                                        for(j = 0; j < ini_conse; j++){
-                                            if (v_diff_tmp[b][j] > 0){
-                                                posi_count++;
-                                            }else{
-                                                nega_count++;
-                                            }
-                                        }
-
-                                        if (posi_count > nega_count){
-                                            tmp_direction = tmp_direction + pow(2, b);
-                                        }
-                                    }
                                     CM_outputs[current_CM_n] = tmp_CM;
                                     CM_outputs_date[current_CM_n] = clrx[i_ini+1] - starting_date - current_CM_n * CM_OUTPUT_INTERVAL;
                                     // printf("date = %d\n", clrx[i_ini+1]);
@@ -1609,7 +1656,7 @@ int stand_procedure_fixeddays
                                     /*                            */
                                     /******************************/
 
-                                    mini_rmse = max(min_rmse[i_b], rmse[i_b]);
+                                    mini_rmse = max(adj_rmse[i_b], rmse[i_b]);
                                     v_diff[b][i_conse-1] = v_dif_mag[i_b][i_conse-1] / mini_rmse;
                                     v_dif_norm += v_diff[b][i_conse-1] * v_diff[b][i_conse-1];
                                 }
@@ -1862,7 +1909,7 @@ int stand_procedure_fixeddays
                                 /*                                */
                                 /**********************************/
 
-                                mini_rmse = max((double)min_rmse[i_b], tmpcg_rmse[b]);
+                                mini_rmse = max((double)adj_rmse[i_b], tmpcg_rmse[b]);
 
                                 /**********************************/
                                 /*                                */
@@ -1933,7 +1980,7 @@ int stand_procedure_fixeddays
                                     if (i_b == lasso_blist[b])
                                     {
 
-                                        mini_rmse = max((float)min_rmse[i_b], tmpcg_rmse[b]);
+                                        mini_rmse = max((float)adj_rmse[i_b], tmpcg_rmse[b]);
 
                                         v_diff[b][i_conse] = v_dif_mag[i_b][i_conse] / mini_rmse;
                                         vec_mag[i_conse] += v_diff[b][i_conse] * v_diff[b][i_conse]; // SY 02132014
@@ -1991,22 +2038,6 @@ int stand_procedure_fixeddays
                     /*********************************************/
                     if(tmp_CM > CM_outputs[current_CM_n])
                     {
-                        tmp_direction = 0;
-                        for (b = 0; b < NUM_LASSO_BANDS; b++)
-                        {
-                            posi_count = 0;
-                            nega_count = 0;
-                            for(j = 0; j < adj_conse; j++){
-                                if (v_diff[b][j] > 0){
-                                    posi_count++;
-                                }else{
-                                    nega_count++;
-                                }
-                            }
-                            if (posi_count > nega_count){
-                                tmp_direction = tmp_direction + pow(2, b);
-                            }
-                        }
                         CM_outputs[current_CM_n] = tmp_CM;
                         CM_outputs_date[current_CM_n] = clrx[i] - starting_date - current_CM_n * CM_OUTPUT_INTERVAL;
                     }
@@ -2202,7 +2233,7 @@ int stand_procedure_fixeddays
                         if (i_b == lasso_blist[b])
                         {
 
-                            mini_rmse = max((double)min_rmse[i_b], tmpcg_rmse[b]);
+                            mini_rmse = max((double)adj_rmse[i_b], tmpcg_rmse[b]);
 
                             v_diff[b][i_conse] = v_dif_mag[i_b][i_conse] / mini_rmse;
                             vec_mag[i_conse] += v_diff[b][i_conse] * v_diff[b][i_conse]; // SY 02132014
@@ -2344,7 +2375,7 @@ int stand_procedure_fixeddays
 
             status = auto_mask(clrx, clry, i_start-1, end-1,
                            (float)(clrx[end-1]-clrx[i_start-1]) / NUM_YEARS,
-                           (float)min_rmse[1], (float)min_rmse[4], (float)T_CONST, bl_ids);
+                           adj_rmse[1], adj_rmse[4], (float)T_CONST, bl_ids);
             if (status != SUCCESS)
                 RETURN_ERROR("ERROR calling auto_mask at the end of time series",
                               FUNC_NAME, FAILURE);
@@ -2711,7 +2742,7 @@ int stand_procedure
     float break_mag;
     int adj_conse;
     float adj_TCG;
-    short int min_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
+    float adj_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
     float date_vario;           /* I: median date                                          */
     float max_date_difference;   /* I: maximum difference between two neighbor dates        */
     float** v_diff_tmp;
@@ -2740,7 +2771,7 @@ int stand_procedure
 
     for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
     {
-            min_rmse[k] = 0.0;
+            adj_rmse[k] = 0.0;
     }
 
 
@@ -2794,7 +2825,7 @@ int stand_procedure
                     else if (k == 5)
                         clry[k][n_clr] = (float)buf_s2[i];
                     else if (k == 6)
-                        clry[k][n_clr] = (float)buf_t[i];
+                        clry[k][n_clr] = (float)(buf_t[i] * 10 - 27320);
                     //printf("%3.2f\n", clry[k][n_clr]);
                 }
                 n_clr++;
@@ -2902,7 +2933,7 @@ int stand_procedure
     /*                                                            */
     /**************************************************************/
     status = adjust_median_variogram(clrx, clry, TOTAL_IMAGE_BANDS, 0, end-1, &date_vario,
-                                     &max_date_difference, min_rmse, 1);
+                                     &max_date_difference, adj_rmse, 1);
     if (status != SUCCESS)
     {
             RETURN_ERROR("ERROR calling median_variogram routine", FUNC_NAME,
@@ -3069,7 +3100,7 @@ int stand_procedure
 
                 status = auto_mask(clrx, clry, i_start-1, i+adj_conse-1,
                                (float)(clrx[i+adj_conse-1]-clrx[i_start-1]) / NUM_YEARS,
-                               (float)min_rmse[1], (float)min_rmse[4], (float)T_CONST, bl_ids);
+                               adj_rmse[1], adj_rmse[4], (float)T_CONST, bl_ids);
                 // printf("ddstep2 auto_mask finished \n");
                 if (status != SUCCESS)
                 {
@@ -3321,7 +3352,7 @@ int stand_procedure
                     /*                                            */
                     /**********************************************/
 
-                    mini_rmse = max((float)min_rmse[lasso_blist[i_b]], rmse[lasso_blist[i_b]]);
+                    mini_rmse = max((float)adj_rmse[lasso_blist[i_b]], rmse[lasso_blist[i_b]]);
 
                     /**********************************************/
                     /*                                            */
@@ -3538,7 +3569,7 @@ int stand_procedure
                                         /*                        */
                                         /**************************/
 
-                                        mini_rmse = max((float)min_rmse[i_b], rmse[i_b]);
+                                        mini_rmse = max((float)adj_rmse[i_b], rmse[i_b]);
 
                                         /**************************/
                                         /*                        */
@@ -3996,7 +4027,7 @@ int stand_procedure
                                     /*                            */
                                     /******************************/
 
-                                    mini_rmse = max(min_rmse[i_b], rmse[i_b]);
+                                    mini_rmse = max(adj_rmse[i_b], rmse[i_b]);
                                     v_diff[b][i_conse-1] = v_dif_mag[i_b][i_conse-1] / mini_rmse;
                                     v_dif_norm += v_diff[b][i_conse-1] * v_diff[b][i_conse-1];
                                 }
@@ -4250,7 +4281,7 @@ int stand_procedure
                                 /*                                */
                                 /**********************************/
 
-                                mini_rmse = max((double)min_rmse[i_b], tmpcg_rmse[b]);
+                                mini_rmse = max((double)adj_rmse[i_b], tmpcg_rmse[b]);
 
                                 /**********************************/
                                 /*                                */
@@ -4582,7 +4613,7 @@ int stand_procedure
 
             status = auto_mask(clrx, clry, i_start-1, end-1,
                            (float)(clrx[end-1]-clrx[i_start-1]) / NUM_YEARS,
-                           (float)min_rmse[1], (float)min_rmse[4], (float)T_CONST, bl_ids);
+                           adj_rmse[1], adj_rmse[4], (float)T_CONST, bl_ids);
             if (status != SUCCESS)
                 RETURN_ERROR("ERROR calling auto_mask at the end of time series",
                               FUNC_NAME, FAILURE);
@@ -4962,7 +4993,7 @@ int inefficientobs_procedure
                     else if(k == 5)
                         clry[k][n_sn] = (float)buf_s2[i];
                     else if(k == 6)
-                        clry[k][n_sn] = (float)buf_t[i];
+                        clry[k][n_sn] = (float)(buf_t[i] * 10 - 27320);
                 }
                 n_sn++;
             }
@@ -5200,7 +5231,7 @@ int inefficientobs_procedure
                     else if(k == 5)
                         clry[k][n_clr] = (float)buf_s2[i];
                     else if(k == 6)
-                        clry[k][n_clr] = (float)buf_t[i];
+                        clry[k][n_clr] = (float)(buf_t[i] * 10 - 27320);
                 }
                 n_clr++;
             }
@@ -5435,7 +5466,7 @@ int obcold_reconstruction_procedure
     int num_c = 8;                   /* Max number of coefficients for model  */
     int update_num_c = 8;            /* Number of coefficients to update      */
 
-    short int min_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
+    float adj_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
 
 
     int n_clr;                  /* I: the number of clear pixels                          */
@@ -5464,11 +5495,12 @@ int obcold_reconstruction_procedure
 
     int break_num = 0;
     int i_last_break = 0;
+    int ini_date;
 
     int adj_conse = conse;
     float **v_dif_mag;
     int last_break_record = 0;  // used to record the year of the last break
-    
+
     if(valid_num_scenes == 0){
         return (SUCCESS);
     }
@@ -5476,7 +5508,7 @@ int obcold_reconstruction_procedure
 
     for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
     {
-            min_rmse[k] = 0.0;
+            adj_rmse[k] = 0.0;
     }
 
     fit_cft = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS, LASSO_COEFFS,
@@ -5526,13 +5558,11 @@ int obcold_reconstruction_procedure
 
     status = preprocessing(buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
                            fmask_buf, &valid_num_scenes, id_range, &clear_sum,
-                           &water_sum, &shadow_sum, &sn_sum, &cloud_sum, false);
+                           &water_sum, &shadow_sum, &sn_sum, &cloud_sum, FALSE);
     if (status != SUCCESS)
     {
         RETURN_ERROR("Error for preprocessing.", FUNC_NAME, ERROR);
     }
-
-    sn_pct = (float) sn_sum/ (float) (sn_sum + clear_sum + 0.01);
 
     for (i = 0; i < valid_num_scenes; i++)
     {
@@ -5560,7 +5590,7 @@ int obcold_reconstruction_procedure
                     else if (k == 5)
                         clry[k][n_clr] = (float)buf_s2[i];
                     else if (k == 6)
-                        clry[k][n_clr] = (float)buf_t[i];
+                        clry[k][n_clr] = (float)(buf_t[i] * 10 - 27320);
                     //printf("%3.2f\n", clry[k][n_clr]);
                 }
                 n_clr++;
@@ -5602,7 +5632,7 @@ int obcold_reconstruction_procedure
         /*                                                            */
         /**************************************************************/
         status = adjust_median_variogram(clrx, clry, TOTAL_IMAGE_BANDS, 0, end-1, &date_vario,
-                                         &max_date_difference, min_rmse, 1);
+                                         &max_date_difference, adj_rmse, 1);
         if (status != SUCCESS)
         {
                 RETURN_ERROR("ERROR calling median_variogram routine", FUNC_NAME,
@@ -5644,7 +5674,7 @@ int obcold_reconstruction_procedure
                 /****************************************************/
                 status = auto_mask(clrx, clry, i_last_break, i_break_tmp - 1,
                                     (float)(clrx[i_break_tmp - 1]-clrx[i_last_break] + 1) / NUM_YEARS,
-                                    (float)min_rmse[1], (float)min_rmse[4], (float)T_CONST, bl_ids);
+                                    adj_rmse[1], adj_rmse[4], (float)T_CONST, bl_ids);
                 // printf("auto_mask finished \n");
                 if (status != SUCCESS)
                 {
@@ -5700,7 +5730,7 @@ int obcold_reconstruction_procedure
                 /* Test 2:        COLD test analysis           */
                 /**************************************************/
                 update_cft(i_break_tmp - 1 - i_last_break + 1, N_TIMES, MIN_NUM_C, MID_NUM_C, MAX_NUM_C,
-                           num_c, &update_num_c);
+                          num_c, &update_num_c);
 
                 for (i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
                 {
@@ -5740,7 +5770,7 @@ int obcold_reconstruction_procedure
                             {
                                 auto_ts_predict_float(clrx_tmp, fit_cft, update_num_c, i_b, k, k,
                                                 &ts_pred_temp); //SY 09192018
-                                mini_rmse = max(min_rmse[i_b], rmse[i_b]);
+                                mini_rmse = max(adj_rmse[i_b], rmse[i_b]);
                                 v_dif[b] = (clry_tmp[i_b][k] - ts_pred_temp) / mini_rmse;
                                 v_dif_norm += v_dif[b]* v_dif[b];
                             }
@@ -5963,5 +5993,7 @@ int obcold_reconstruction_procedure
     free(break_list);
     return (SUCCESS);
 }
+
+
 
 
