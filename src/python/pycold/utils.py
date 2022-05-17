@@ -7,6 +7,7 @@ import os
 import datetime as dt
 
 NAN_VAL = -9999
+JULIAN_LANDSAT4_LAUNCH = 723742
 
 
 def get_block_y(block_id, n_block_x):
@@ -96,10 +97,10 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
     elif prefix == 'CM_date':
         output_type = np.int32
         # cuz the date is produced as byte to squeeze the storage size, need to expand
-        anchor_dates_list_single = np.arange(start=starting_date,
-                                             stop=starting_date + config['CM_OUTPUT_INTERVAL'] * n_cm_maps,
-                                             step=config['CM_OUTPUT_INTERVAL'])
-        anchor_dates_list = np.tile(anchor_dates_list_single, config['block_width'] * config['block_height'])
+        # anchor_dates_list_single = np.arange(start=starting_date,
+        #                                      stop=starting_date + config['CM_OUTPUT_INTERVAL'] * n_cm_maps,
+        #                                      step=config['CM_OUTPUT_INTERVAL'])
+        # anchor_dates_list = np.tile(anchor_dates_list_single, config['block_width'] * config['block_height'])
 
     elif prefix == 'CM_direction':
         output_type = np.uint8
@@ -117,9 +118,9 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
 
         if prefix == 'CM_date':
             cm_block_copy = cm_block.copy()
-            cm_block = cm_block + anchor_dates_list
+            cm_block = cm_block + JULIAN_LANDSAT4_LAUNCH
             # we assign an extremely large value to original NA value (255)
-            cm_block[cm_block_copy == 255] = -9999
+            cm_block[cm_block_copy == -9999] = -9999
 
         cm_block_reshape = np.reshape(cm_block, (config['block_width'] * config['block_height'],
                                                  n_cm_maps))
@@ -133,7 +134,7 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
     for count, cm_map in enumerate(cm_map_list):
         ordinal_date = starting_date + count * config['CM_OUTPUT_INTERVAL']
         outfile = join(cmmap_path, '{}_maps_{}_{}{}.npy'.format(prefix, str(ordinal_date),
-                                                                pd.Timestamp.fromordinal(ordinal_date - 366).year,
+                                                                pd.Timestamp.fromordinal(ordinal_date).year,
                                                                 get_doy(ordinal_date)))
         np.save(outfile, cm_map)
     
@@ -223,7 +224,7 @@ def get_doy(ordinal_date):
     -------
     doy
     """
-    return str(pd.Timestamp.fromordinal(ordinal_date-366).timetuple().tm_yday).zfill(3)
+    return str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3)
 
 
 def get_anchor_days(starting_day, n_cm_maps, interval):
@@ -265,7 +266,7 @@ def read_blockdata(block_folder, total_pixels, total_bands):
 
     # sort image files by dates
     img_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder_name[9:13]), 1, 1) +
-                                        dt.timedelta(int(folder_name[13:16]) - 1)) + 366
+                                        dt.timedelta(int(folder_name[13:16]) - 1))
                  for folder_name in img_files]
     files_date_zip = sorted(zip(img_dates, img_files))
     img_files_sorted = [x[1] for x in files_date_zip]
@@ -289,8 +290,8 @@ def read_data(path):
 
 
 def date2matordinal(year, month, day):
-    return pd.Timestamp.toordinal(dt.date(year, month, day)) + 366
+    return pd.Timestamp.toordinal(dt.date(year, month, day))
 
 
 def matordinal2date(ordinal):
-    return pd.Timestamp.fromordinal(ordinal - 366)
+    return pd.Timestamp.fromordinal(ordinal)

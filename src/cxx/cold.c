@@ -150,7 +150,7 @@ int cold
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: (optional) maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 //    unsigned char* CMdirection_outputs,      /* I/O: direction of change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    unsigned char* CM_outputs_date        /* I/O: (optional) dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* CM_outputs_date        /* I/O: (optional) dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 
 )
 {
@@ -302,7 +302,7 @@ int stand_procedure_fixeddays
     int *num_fc,                /* O: number of fitting curves                       */
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    unsigned char* CM_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* CM_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     int min_days_conse
 )
 {
@@ -365,7 +365,7 @@ int stand_procedure_fixeddays
     float break_mag;
     int adj_conse;
     float adj_TCG;
-    float adj_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
+    float min_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
     float date_vario;           /* I: median date                                          */
     float max_date_difference;   /* I: maximum difference between two neighbor dates        */
     float** v_diff_tmp;
@@ -396,7 +396,7 @@ int stand_procedure_fixeddays
 
     for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
     {
-            adj_rmse[k] = 0.0;
+            min_rmse[k] = 0.0;
     }
 
 
@@ -558,7 +558,7 @@ int stand_procedure_fixeddays
     /*                                                            */
     /**************************************************************/
     status = adjust_median_variogram(clrx, clry, TOTAL_IMAGE_BANDS, 0, end-1, &date_vario,
-                                     &max_date_difference, adj_rmse, 1);
+                                     &max_date_difference, min_rmse, 1);
     if (status != SUCCESS)
     {
             RETURN_ERROR("ERROR calling median_variogram routine", FUNC_NAME,
@@ -726,7 +726,7 @@ int stand_procedure_fixeddays
 
                 status = auto_mask(clrx, clry, i_start-1, i+conse_min-1,
                                (float)(clrx[i+conse_min-1]-clrx[i_start-1]) / NUM_YEARS,
-                               adj_rmse[1], adj_rmse[4], (float)T_CONST, bl_ids);
+                               min_rmse[1], min_rmse[4], (float)T_CONST, bl_ids);
                 // printf("ddstep2 auto_mask finished \n");
                 if (status != SUCCESS)
                 {
@@ -978,7 +978,7 @@ int stand_procedure_fixeddays
                     /*                                            */
                     /**********************************************/
 
-                    mini_rmse = max((float)adj_rmse[lasso_blist[i_b]], rmse[lasso_blist[i_b]]);
+                    mini_rmse = max((float)min_rmse[lasso_blist[i_b]], rmse[lasso_blist[i_b]]);
 
                     /**********************************************/
                     /*                                            */
@@ -1195,7 +1195,7 @@ int stand_procedure_fixeddays
                                         /*                        */
                                         /**************************/
 
-                                        mini_rmse = max((float)adj_rmse[i_b], rmse[i_b]);
+                                        mini_rmse = max((float)min_rmse[i_b], rmse[i_b]);
 
                                         /**************************/
                                         /*                        */
@@ -1253,7 +1253,7 @@ int stand_procedure_fixeddays
                                 if(tmp_CM > CM_outputs[current_CM_n])
                                 {
                                     CM_outputs[current_CM_n] = tmp_CM;
-                                    CM_outputs_date[current_CM_n] = clrx[i_ini+1] - starting_date - current_CM_n * CM_OUTPUT_INTERVAL;
+                                    CM_outputs_date[current_CM_n] = (short int)(clrx[i_ini+1] - JULIAN_LANDSAT4_LAUNCH);
                                     // printf("date = %d\n", clrx[i_ini+1]);
                                 }
                             }
@@ -1656,7 +1656,7 @@ int stand_procedure_fixeddays
                                     /*                            */
                                     /******************************/
 
-                                    mini_rmse = max(adj_rmse[i_b], rmse[i_b]);
+                                    mini_rmse = max(min_rmse[i_b], rmse[i_b]);
                                     v_diff[b][i_conse-1] = v_dif_mag[i_b][i_conse-1] / mini_rmse;
                                     v_dif_norm += v_diff[b][i_conse-1] * v_diff[b][i_conse-1];
                                 }
@@ -1909,7 +1909,7 @@ int stand_procedure_fixeddays
                                 /*                                */
                                 /**********************************/
 
-                                mini_rmse = max((double)adj_rmse[i_b], tmpcg_rmse[b]);
+                                mini_rmse = max((double)min_rmse[i_b], tmpcg_rmse[b]);
 
                                 /**********************************/
                                 /*                                */
@@ -1980,7 +1980,7 @@ int stand_procedure_fixeddays
                                     if (i_b == lasso_blist[b])
                                     {
 
-                                        mini_rmse = max((float)adj_rmse[i_b], tmpcg_rmse[b]);
+                                        mini_rmse = max((float)min_rmse[i_b], tmpcg_rmse[b]);
 
                                         v_diff[b][i_conse] = v_dif_mag[i_b][i_conse] / mini_rmse;
                                         vec_mag[i_conse] += v_diff[b][i_conse] * v_diff[b][i_conse]; // SY 02132014
@@ -2039,7 +2039,7 @@ int stand_procedure_fixeddays
                     if(tmp_CM > CM_outputs[current_CM_n])
                     {
                         CM_outputs[current_CM_n] = tmp_CM;
-                        CM_outputs_date[current_CM_n] = clrx[i] - starting_date - current_CM_n * CM_OUTPUT_INTERVAL;
+                        CM_outputs_date[current_CM_n] = (short int)(clrx[i] - JULIAN_LANDSAT4_LAUNCH);
                     }
                 }
 
@@ -2233,7 +2233,7 @@ int stand_procedure_fixeddays
                         if (i_b == lasso_blist[b])
                         {
 
-                            mini_rmse = max((double)adj_rmse[i_b], tmpcg_rmse[b]);
+                            mini_rmse = max((double)min_rmse[i_b], tmpcg_rmse[b]);
 
                             v_diff[b][i_conse] = v_dif_mag[i_b][i_conse] / mini_rmse;
                             vec_mag[i_conse] += v_diff[b][i_conse] * v_diff[b][i_conse]; // SY 02132014
@@ -2375,7 +2375,7 @@ int stand_procedure_fixeddays
 
             status = auto_mask(clrx, clry, i_start-1, end-1,
                            (float)(clrx[end-1]-clrx[i_start-1]) / NUM_YEARS,
-                           adj_rmse[1], adj_rmse[4], (float)T_CONST, bl_ids);
+                           min_rmse[1], min_rmse[4], (float)T_CONST, bl_ids);
             if (status != SUCCESS)
                 RETURN_ERROR("ERROR calling auto_mask at the end of time series",
                               FUNC_NAME, FAILURE);
@@ -2680,7 +2680,7 @@ int stand_procedure
     int *num_fc,                /* O: number of fitting curves                       */
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    unsigned char* CM_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* CM_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 )
 {
     int status;
@@ -2742,7 +2742,7 @@ int stand_procedure
     float break_mag;
     int adj_conse;
     float adj_TCG;
-    float adj_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
+    float min_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
     float date_vario;           /* I: median date                                          */
     float max_date_difference;   /* I: maximum difference between two neighbor dates        */
     float** v_diff_tmp;
@@ -2771,7 +2771,7 @@ int stand_procedure
 
     for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
     {
-            adj_rmse[k] = 0.0;
+            min_rmse[k] = 0.0;
     }
 
 
@@ -2933,7 +2933,7 @@ int stand_procedure
     /*                                                            */
     /**************************************************************/
     status = adjust_median_variogram(clrx, clry, TOTAL_IMAGE_BANDS, 0, end-1, &date_vario,
-                                     &max_date_difference, adj_rmse, 1);
+                                     &max_date_difference, min_rmse, 1);
     if (status != SUCCESS)
     {
             RETURN_ERROR("ERROR calling median_variogram routine", FUNC_NAME,
@@ -3100,7 +3100,7 @@ int stand_procedure
 
                 status = auto_mask(clrx, clry, i_start-1, i+adj_conse-1,
                                (float)(clrx[i+adj_conse-1]-clrx[i_start-1]) / NUM_YEARS,
-                               adj_rmse[1], adj_rmse[4], (float)T_CONST, bl_ids);
+                               min_rmse[1], min_rmse[4], (float)T_CONST, bl_ids);
                 // printf("ddstep2 auto_mask finished \n");
                 if (status != SUCCESS)
                 {
@@ -3352,7 +3352,7 @@ int stand_procedure
                     /*                                            */
                     /**********************************************/
 
-                    mini_rmse = max((float)adj_rmse[lasso_blist[i_b]], rmse[lasso_blist[i_b]]);
+                    mini_rmse = max((float)min_rmse[lasso_blist[i_b]], rmse[lasso_blist[i_b]]);
 
                     /**********************************************/
                     /*                                            */
@@ -3569,7 +3569,7 @@ int stand_procedure
                                         /*                        */
                                         /**************************/
 
-                                        mini_rmse = max((float)adj_rmse[i_b], rmse[i_b]);
+                                        mini_rmse = max((float)min_rmse[i_b], rmse[i_b]);
 
                                         /**************************/
                                         /*                        */
@@ -3648,7 +3648,7 @@ int stand_procedure
 //                                    }
                                     CM_outputs[current_CM_n] = tmp_CM;
 //                                    CMdirection_outputs[current_CM_n] = tmp_direction;
-                                    CM_outputs_date[current_CM_n] = clrx[i_ini+1] - starting_date - current_CM_n * CM_OUTPUT_INTERVAL;
+                                    CM_outputs_date[current_CM_n] = (short int)(clrx[i_ini+1] - JULIAN_LANDSAT4_LAUNCH);
                                     // printf("date = %d\n", clrx[i_ini+1]);
                                 }
                             }
@@ -4027,7 +4027,7 @@ int stand_procedure
                                     /*                            */
                                     /******************************/
 
-                                    mini_rmse = max(adj_rmse[i_b], rmse[i_b]);
+                                    mini_rmse = max(min_rmse[i_b], rmse[i_b]);
                                     v_diff[b][i_conse-1] = v_dif_mag[i_b][i_conse-1] / mini_rmse;
                                     v_dif_norm += v_diff[b][i_conse-1] * v_diff[b][i_conse-1];
                                 }
@@ -4281,7 +4281,7 @@ int stand_procedure
                                 /*                                */
                                 /**********************************/
 
-                                mini_rmse = max((double)adj_rmse[i_b], tmpcg_rmse[b]);
+                                mini_rmse = max((double)min_rmse[i_b], tmpcg_rmse[b]);
 
                                 /**********************************/
                                 /*                                */
@@ -4355,7 +4355,7 @@ int stand_procedure
 //                        }
                         CM_outputs[current_CM_n] = tmp_CM;
 //                        CMdirection_outputs[current_CM_n] = tmp_direction;
-                        CM_outputs_date[current_CM_n] = clrx[i] - starting_date - current_CM_n * CM_OUTPUT_INTERVAL;
+                        CM_outputs_date[current_CM_n] = (short int)(clrx[i] - JULIAN_LANDSAT4_LAUNCH);
                     }
                 }
 
@@ -4613,7 +4613,7 @@ int stand_procedure
 
             status = auto_mask(clrx, clry, i_start-1, end-1,
                            (float)(clrx[end-1]-clrx[i_start-1]) / NUM_YEARS,
-                           adj_rmse[1], adj_rmse[4], (float)T_CONST, bl_ids);
+                           min_rmse[1], min_rmse[4], (float)T_CONST, bl_ids);
             if (status != SUCCESS)
                 RETURN_ERROR("ERROR calling auto_mask at the end of time series",
                               FUNC_NAME, FAILURE);
@@ -5466,7 +5466,7 @@ int obcold_reconstruction_procedure
     int num_c = 8;                   /* Max number of coefficients for model  */
     int update_num_c = 8;            /* Number of coefficients to update      */
 
-    float adj_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
+    float min_rmse[TOTAL_IMAGE_BANDS]; /* Adjusted RMSE for all bands          */
 
 
     int n_clr;                  /* I: the number of clear pixels                          */
@@ -5508,7 +5508,7 @@ int obcold_reconstruction_procedure
 
     for (k = 0; k < TOTAL_IMAGE_BANDS; k++)
     {
-            adj_rmse[k] = 0.0;
+            min_rmse[k] = 0.0;
     }
 
     fit_cft = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS, LASSO_COEFFS,
@@ -5632,7 +5632,7 @@ int obcold_reconstruction_procedure
         /*                                                            */
         /**************************************************************/
         status = adjust_median_variogram(clrx, clry, TOTAL_IMAGE_BANDS, 0, end-1, &date_vario,
-                                         &max_date_difference, adj_rmse, 1);
+                                         &max_date_difference, min_rmse, 1);
         if (status != SUCCESS)
         {
                 RETURN_ERROR("ERROR calling median_variogram routine", FUNC_NAME,
@@ -5674,7 +5674,7 @@ int obcold_reconstruction_procedure
                 /****************************************************/
                 status = auto_mask(clrx, clry, i_last_break, i_break_tmp - 1,
                                     (float)(clrx[i_break_tmp - 1]-clrx[i_last_break] + 1) / NUM_YEARS,
-                                    adj_rmse[1], adj_rmse[4], (float)T_CONST, bl_ids);
+                                    min_rmse[1], min_rmse[4], (float)T_CONST, bl_ids);
                 // printf("auto_mask finished \n");
                 if (status != SUCCESS)
                 {
@@ -5770,7 +5770,7 @@ int obcold_reconstruction_procedure
                             {
                                 auto_ts_predict_float(clrx_tmp, fit_cft, update_num_c, i_b, k, k,
                                                 &ts_pred_temp); //SY 09192018
-                                mini_rmse = max(adj_rmse[i_b], rmse[i_b]);
+                                mini_rmse = max(min_rmse[i_b], rmse[i_b]);
                                 v_dif[b] = (clry_tmp[i_b][k] - ts_pred_temp) / mini_rmse;
                                 v_dif_norm += v_dif[b]* v_dif[b];
                             }

@@ -20,7 +20,7 @@ cm_array_l1_date = np.load('tests/resources/cm_maps/CM_date_maps_730663_2000178.
 
 
 def test_workflow():
-    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date-366, stack_path='tests/resources', result_path='tests/resources',
+    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date, stack_path='tests/resources', result_path='tests/resources',
                                   thematic_path='tests/resources/feature_maps')
     ob_analyst.hpc_preparation()
     ob_analyst.obia_execute(date, method='slic')
@@ -58,7 +58,7 @@ def test_object_analysis():
 
 
 def test_get_lastyear_cmap_fromdate():
-    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date-366, stack_path='tests/resources', result_path='tests/resources',
+    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date, stack_path='tests/resources', result_path='tests/resources',
                                   thematic_path='tests/resources/feature_maps')
     cmap = ob_analyst.get_lastyear_cmap_fromdate(date)
     assert cmap is not None

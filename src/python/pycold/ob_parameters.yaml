@@ -2,9 +2,8 @@ band_num: 8
 NAN_VAL: -9999
 NAN_VAL_UINT8: 255
 cm_scale: 100
-gate_thres: 7.289
-floodfill_thres: 0.4
 gate_probability: 0.7
+floodfill_thres: 0.4
 TOTAL_IMAGE_BANDS: 7
 min_category_samples: 600
 max_category_samples: 8000
@@ -31,4 +30,3 @@ C8_sizeslope: 0.05
 default_sizeslope: 0
 N_FEATURES: 3
 SLOPE_SCALE: 10000
-ORDINALDAY_19710101: 719528

@@ -33,8 +33,8 @@ def cmname_fromdate(ordinal_date):
         CM file name
     """
     return 'CM_maps_{}_{}{}'.format(str(ordinal_date),
-                             pd.Timestamp.fromordinal(ordinal_date - 366).year,
-                             str(pd.Timestamp.fromordinal(ordinal_date - 366).timetuple().tm_yday).zfill(3))
+                             pd.Timestamp.fromordinal(ordinal_date).year,
+                             str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3))
 
 def cmdatename_fromdate(ordinal_date):
     """
@@ -44,9 +44,8 @@ def cmdatename_fromdate(ordinal_date):
     Returns:
         CM date file name
     """
-    return 'CM_date_maps_{}_{}{}'.format(str(ordinal_date), pd.Timestamp.fromordinal(ordinal_date - 366).year,
-                                              str(pd.Timestamp.fromordinal(ordinal_date
-                                                                           - 366).timetuple().tm_yday).zfill(3))
+    return 'CM_date_maps_{}_{}{}'.format(str(ordinal_date), pd.Timestamp.fromordinal(ordinal_date).year,
+                                              str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3))
 
 
 def obiaresname_fromdate(ordinal_date):
@@ -58,8 +57,8 @@ def obiaresname_fromdate(ordinal_date):
         CM file name
     """
     return 'obiaresult_{}_{}{}'.format(str(ordinal_date),
-                                    pd.Timestamp.fromordinal(ordinal_date - 366).year,
-                                    str(pd.Timestamp.fromordinal(ordinal_date - 366).timetuple().tm_yday).zfill(3))
+                                    pd.Timestamp.fromordinal(ordinal_date).year,
+                                    str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3))
 
 
 def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keyword, classification_map):
@@ -87,7 +86,7 @@ def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keywor
     # barren: 8
 
     log10_size = np.log10(int(stats_lut_row['npixels']))
-    intercept = 0.95
+    intercept = 1
     if classification_map is None:
         if log10_size * defaults['default_sizeslope'] + intercept < 2:
             scale = log10_size * defaults['default_sizeslope'] + intercept
@@ -683,7 +682,7 @@ class ObjectAnalystHPC:
             self.obcold_recg_path = obcold_recg_path
         self.stack_path = stack_path
         self.starting_date = starting_date
-        self.year_lowbound = pd.Timestamp.fromordinal(starting_date - 366).year
+        self.year_lowbound = pd.Timestamp.fromordinal(starting_date).year
 
     @staticmethod
     def _check_inputs(config, stack_path, result_path, cmmap_path, obia_path, obcold_recg_path,
@@ -728,10 +727,10 @@ class ObjectAnalystHPC:
                 raise e
 
     def get_lastyear_cmap_fromdate(self, date):
-        if pd.Timestamp.fromordinal(date - 366).year - 1 < self.year_lowbound:  # we used the the year before the date
+        if pd.Timestamp.fromordinal(date).year - 1 < self.year_lowbound:  # we used the the year before the date
             classified_year = self.year_lowbound
         else:
-            classified_year = pd.Timestamp.fromordinal(date - 366).year - 1
+            classified_year = pd.Timestamp.fromordinal(date).year - 1
         try:
             classification_map = np.load(join(self.thematic_path, 'yearlyclassification_{}.npy'.format(classified_year)))
         except IOError as e:

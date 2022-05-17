@@ -84,7 +84,7 @@ cdef extern from "../../cxx/cold.h":
                   long *buf_t, long *fmask_buf, long *valid_date_array, int valid_num_scenes, int pos, 
                   double tcg, int conse, bool b_output_cm, int starting_date, Output_t *rec_cg,
                   int *num_fc, int cm_output_interval, short int *cm_outputs, 
-                  unsigned char *cm_outputs_date);
+                  short int *cm_outputs_date);
 
 
 cdef extern from "../../cxx/cold.h":
@@ -189,19 +189,19 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     # cm_outputs and cm_outputs_date are not used so far, but left for object-based cold (under development)
     if b_output_cm == True:
         if cm_output_interval == 0:
-           cm_output_interval = 48
+           cm_output_interval = 60
         if n_cm == 0:
            n_cm = math.ceil((dates[valid_num_scenes-1] - starting_date + 1) / cm_output_interval) + 1
         if starting_date == 0:
            starting_date = dates[0]
         cm_outputs = np.full(n_cm, -9999, dtype=np.short)
-        cm_outputs_date = np.full(n_cm, 255, dtype=np.uint8)
+        cm_outputs_date = np.full(n_cm, -9999, dtype=np.short)
     # set the length to 1 to save memory, as they won't be assigned values
     else:  
         cm_outputs = np.full(1, -9999, dtype=np.short)
-        cm_outputs_date = np.full(1, 255, dtype=np.uint8)
+        cm_outputs_date = np.full(1, -9999, dtype=np.short)
     cdef short [:] cm_outputs_view = cm_outputs  # memory view
-    cdef unsigned char [:] cm_outputs_date_view = cm_outputs_date  # memory view
+    cdef short [:] cm_outputs_date_view = cm_outputs_date  # memory view
 
     result = cold(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0], &ts_t_view[0],
                  &qas_view[0], &dates_view[0], valid_num_scenes, pos, t_cg, conse, b_output_cm,

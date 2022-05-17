@@ -4,4 +4,4 @@ n_block_x: 2
 n_block_y: 2
 probability_threshold: 0.99
 conse: 6
-CM_OUTPUT_INTERVAL: 32
+CM_OUTPUT_INTERVAL: 60

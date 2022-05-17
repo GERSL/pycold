@@ -175,7 +175,7 @@ class PyClassifier:
                                   self.config['block_width'] * self.config['block_height'],
                                   self.n_features),
                                  defaults['NAN_VAL'], dtype=np.float32)
-        ordinal_day_list = [pd.Timestamp.toordinal(dt.date(year, 7, 1)) + 366 for year
+        ordinal_day_list = [pd.Timestamp.toordinal(dt.date(year, 7, 1)) for year
                             in range(year_lowbound, year_uppbound + 1)]
         if len(cold_block) == 0:
             logger.warning('the rec_cg file for block_id'.format(block_id))
