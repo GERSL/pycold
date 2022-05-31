@@ -9,14 +9,12 @@ import shutil
 with open('tests/resources/test_config_obanalyst.yaml', 'r') as yaml_obj:
     test_config = yaml.safe_load(yaml_obj)
 
-date = 730695
+date = 730329
 
-cm_array = np.load('tests/resources/cm_maps/CM_maps_730695_2000210.npy')
-cm_array_l1 = np.load('tests/resources/cm_maps/CM_maps_730663_2000178.npy')
-cm_direction_array = np.load('tests/resources/cm_maps/CM_direction_maps_730695_2000210.npy')
-cm_array_l1_direction = np.load('tests/resources/cm_maps/CM_direction_maps_730663_2000178.npy')
-cm_date_array = np.load('tests/resources/cm_maps/CM_date_maps_730695_2000210.npy')
-cm_array_l1_date = np.load('tests/resources/cm_maps/CM_date_maps_730663_2000178.npy')
+cm_array = np.load('tests/resources/cm_maps/CM_maps_730329_2000210.npy')
+cm_array_l1 = np.load('tests/resources/cm_maps/CM_maps_730297_2000178.npy')
+cm_date_array = np.load('tests/resources/cm_maps/CM_date_maps_730329_2000210.npy')
+cm_array_l1_date = np.load('tests/resources/cm_maps/CM_date_maps_730297_2000178.npy')
 
 
 def test_workflow():
@@ -30,18 +28,18 @@ def test_workflow():
 
 
 def test_segmentation():
-    [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation_floodfill(cm_array, cm_direction_array,
+    [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation_floodfill(cm_array,
                                                                      cm_date_array,
-                                                                     cm_array_l1, cm_array_l1_direction,
+                                                                     cm_array_l1,
                                                                      cm_array_l1_date)
     assert len(np.unique(object_map_s1)) > 1
     assert len(np.unique(object_map_s2)) > 1
 
 
 def test_object_analysis():
-    [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation_slic(cm_array, cm_direction_array,
+    [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation_floodfill(cm_array,
                                                                              cm_date_array, cm_array_l1,
-                                                                             cm_array_l1_direction, cm_array_l1_date)
+                                                                             cm_array_l1_date)
     classification_map = np.load('tests/resources/feature_maps/yearlyclassification_1999.npy')
     change_map = object_analysis(object_map_s1, object_map_s2, s1_info, classification_map)
     # import matplotlib.pyplot as plt
@@ -58,7 +56,7 @@ def test_object_analysis():
 
 
 def test_get_lastyear_cmap_fromdate():
-    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date, stack_path='tests/resources', result_path='tests/resources',
+    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date - 366, stack_path='tests/resources', result_path='tests/resources',
                                   thematic_path='tests/resources/feature_maps')
     cmap = ob_analyst.get_lastyear_cmap_fromdate(date)
     assert cmap is not None

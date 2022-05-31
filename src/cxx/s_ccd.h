@@ -26,14 +26,18 @@ int sccd
     output_nrtmodel *rec_nrt,
     int *num_obs_queue,             /* O: the number of multispectral observations    */
     output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
-    float *min_rmse         /* O: adjusted rmse for the pixel    */
+    short int *min_rmse,         /* O: adjusted rmse for the pixel    */
+    int cm_output_interval,
+    int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
+    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 );
 
 
 int step1_cold_initialize
 (
     int conse,              /* I: adjusted consecutive observation number               */
-    float* min_rmse,           /* I: the adjusted RMS                        */
+    short int* min_rmse,           /* I: the adjusted RMS                        */
     int* n_clr,                 /* I: number of clear observations                         */
     double tcg,               /* I: the threshold of change magnitude                       */
     int* i_dense,               /* I: used to count i for dense time point check          */
@@ -72,14 +76,18 @@ int step2_KF_ChangeDetection
     int cur_i,                     /* I: the ith of observation to be processed   */
     int *num_curve,                /* I: the number of curves   */
     int conse,                     /* I: the consecutive number of observations   */
-    float *min_rmse,               /* I: adjusted RMSE   */
+    short int *min_rmse,               /* I: adjusted RMSE   */
     float tcg,                    /* I: the change threshold  */
     int *n_clr,               /* I: the total observation of current observation queue  */
     gsl_matrix** cov_p,       /* I/O: covariance matrix */
     float** fit_cft,       /* I/O: state variables  */
     Output_sccd* rec_cg,           /* I/O: the outputted S-CCD result structure   */
     unsigned int *sum_square_vt,              /* I/O:  the sum of predicted square of residuals  */
-    int *count_cur_obs             /* I/O:  the number of current non-noise observations being processed */
+    int *count_cur_obs,             /* I/O:  the number of current non-noise observations being processed */
+    int starting_date,
+    int cm_output_interval,
+    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 );
 
 
@@ -139,7 +147,7 @@ int step3_processing_end
     float **clry,
     int cur_i,
     int *n_clr,
-    int bl_train,
+    int nrt_mode,
     int i_start,
     int prev_i_break,             /* I: the i_break of the last curve*/
     output_nrtmodel *nrt_model,         /* I/O: the NRT change records */
@@ -147,7 +155,11 @@ int step3_processing_end
     output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
     unsigned *sum_square_vt,              /* I/O:  the sum of predicted square of residuals  */
     int num_obs_processed,
-    int t_start
+    int t_start,
+    int cm_output_interval,
+    int starting_date,
+    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 );
 
 
@@ -169,16 +181,20 @@ int sccd_snow
 int sccd_standard
 (
     int *clrx,                  /* I: clear pixel curve in X direction (date)             */
-    float **clry,               /* O: clear pixel curve in Y direction (spectralbands)    */
+    float **clry,               /* I: clear pixel curve in Y direction (spectralbands)    */
     int n_clr,
     double tcg,              /* I:  threshold of change magnitude   */
     Output_sccd *rec_cg,    /* O: offline change records */
     int *num_fc,            /* O: intialize NUM of Functional Curves    */
     int *nrt_mode,             /* O: 1 - monitor mode; 2 - queue mode    */
-    output_nrtmodel *rec_nrt,     /* O: nrt records    */
+    output_nrtmodel *nrt_model,     /* O: nrt records    */
     int *num_obs_queue,             /* O: the number of multispectral observations    */
     output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
-    float *min_rmse       /* O: adjusted rmse for the pixel    */
+    short int *min_rmse,       /* O: adjusted rmse for the pixel    */
+    int cm_output_interval,
+    int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
+    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 );
 
 

@@ -2,7 +2,7 @@ import numpy as np
 from datetime import datetime
 import pandas as pd
 from os.path import join
-import gdal
+# import gdal
 import os
 import datetime as dt
 
@@ -170,34 +170,34 @@ def get_rowcol_intile(pos, block_width, block_height, block_x, block_y):
     return original_row, original_col
 
 
-def gdal_save_file_1band(out_path, array, gdal_type, trans, proj, cols, rows, image_format='GTiff'):
-    """
-    save array as tiff format
-    Parameters
-    ----------
-    out_path : full outputted path
-    array : numpy array to be saved
-    gdal_type: gdal type
-    trans: transform coefficients
-    proj: projection
-    rows: the row number
-    cols: the col number
-    image_format: default is GTiff
-    Returns
-    -------
-    TRUE OR FALSE
-    """
-    outdriver = gdal.GetDriverByName(image_format)
-    outdata = outdriver.Create(out_path, cols, rows, 1, gdal_type)
-    if outdata == None:
-        return False
-    outdata.GetRasterBand(1).WriteArray(array)
-    outdata.FlushCache()
-    outdata.SetGeoTransform(trans)
-    outdata.FlushCache()
-    outdata.SetProjection(proj)
-    outdata.FlushCache()
-    return True
+# def gdal_save_file_1band(out_path, array, gdal_type, trans, proj, cols, rows, image_format='GTiff'):
+#     """
+#     save array as tiff format
+#     Parameters
+#     ----------
+#     out_path : full outputted path
+#     array : numpy array to be saved
+#     gdal_type: gdal type
+#     trans: transform coefficients
+#     proj: projection
+#     rows: the row number
+#     cols: the col number
+#     image_format: default is GTiff
+#     Returns
+#     -------
+#     TRUE OR FALSE
+#     """
+#     outdriver = gdal.GetDriverByName(image_format)
+#     outdata = outdriver.Create(out_path, cols, rows, 1, gdal_type)
+#     if outdata == None:
+#         return False
+#     outdata.GetRasterBand(1).WriteArray(array)
+#     outdata.FlushCache()
+#     outdata.SetGeoTransform(trans)
+#     outdata.FlushCache()
+#     outdata.SetProjection(proj)
+#     outdata.FlushCache()
+#     return True
 
 
 def get_time_now(tz):
@@ -295,3 +295,18 @@ def date2matordinal(year, month, day):
 
 def matordinal2date(ordinal):
     return pd.Timestamp.fromordinal(ordinal)
+
+
+def save_nrtfiles(out_folder, outfile_prefix, sccd_plot, data_ext):
+    ## save all files for C debug
+    data_ext.to_csv(join(out_folder, 'spectral_{}_extension.csv').format(outfile_prefix), index=False, header=False)
+    # data_ini_current.to_csv(join(out_path, 'spectral_{}_ini.csv').format(pid), index=False, header=False)
+    np.asarray(sccd_plot.nrt_mode).tofile(join(out_folder, 'sccd_plot{}_nrt_mode').format(outfile_prefix))
+    sccd_plot.rec_cg.tofile(join(out_folder, 'sccd_plot{}_rec_cg').format(outfile_prefix))
+    sccd_plot.nrt_model.tofile(join(out_folder, 'sccd_plot{}_nrt_model').format(outfile_prefix))
+    sccd_plot.nrt_queue.tofile(join(out_folder, 'sccd_plot{}_nrt_queue').format(outfile_prefix))
+    sccd_plot.min_rmse.tofile(join(out_folder, 'sccd_plot{}_min_rmse').format(outfile_prefix))
+
+
+def save_obs2csv(out_path, data):
+    data.to_csv(out_path, index=False, header=False)

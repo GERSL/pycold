@@ -665,210 +665,162 @@ Date        Programmer       Reason
 --------    ---------------  -------------------------------------
 11/15/2018  Su Ye            orginal develop
 ******************************************************************************/
-int get_variables
-(
-    int argc,              /* I: number of cmd-line args                    */
-    char *argv[],          /* I: string of cmd-line args                    */
-    int *mode,              /* O: 1 - pixel-based; 2 - scanline-based;       */
-                           /*    3 - wholescene                             */
-    char *in_path,         /* O: directory locaiton for input data          */
-    char *out_path,        /* O: directory location for output files        */
-    int *n_cores,            /* O: number of cores                            */
-    int *row,              /* O: (required for mode 1 and mode 2)           */
-                           /*    row number for the pixel                   */
-    int *col,              /* O: (required for mode 1)                      */
-                           /* O: col number for the pixel                   */
-    int *task,
-    char *user_mask_path,   /* O: directory location for user_mask           */
-    bool *b_fastmode,
-    bool *b_outputCSV
-)
-{
-    char cwd[MAX_STR_LEN]; // current directory path
-    char var_path[MAX_STR_LEN];
-    FILE *var_fp;
-    char line1[MAX_STR_LEN], line2[MAX_STR_LEN], line3[MAX_STR_LEN],
-            line4[MAX_STR_LEN], line5[MAX_STR_LEN],
-            line6[MAX_STR_LEN], line7[MAX_STR_LEN], line8[MAX_STR_LEN],
-            line12[MAX_STR_LEN];
-    int output_mode;
-    char FUNC_NAME[] = "get_variables";
+//int get_variables
+//(
+//    int argc,              /* I: number of cmd-line args                    */
+//    char *argv[],          /* I: string of cmd-line args                    */
+//    int *mode,              /* O: 1 - pixel-based; 2 - scanline-based;       */
+//                           /*    3 - wholescene                             */
+//    char *in_path,         /* O: directory locaiton for input data          */
+//    char *out_path,        /* O: directory location for output files        */
+//    int *n_cores,            /* O: number of cores                            */
+//    int *row,              /* O: (required for mode 1 and mode 2)           */
+//                           /*    row number for the pixel                   */
+//    int *col,              /* O: (required for mode 1)                      */
+//                           /* O: col number for the pixel                   */
+//    int *task,
+//    char *user_mask_path,   /* O: directory location for user_mask           */
+//    bool *b_fastmode,
+//    bool *b_outputCSV
+//)
+//{
+//    char cwd[MAX_STR_LEN]; // current directory path
+//    char var_path[MAX_STR_LEN];
+//    FILE *var_fp;
+//    char line1[MAX_STR_LEN], line2[MAX_STR_LEN], line3[MAX_STR_LEN],
+//            line4[MAX_STR_LEN], line5[MAX_STR_LEN],
+//            line6[MAX_STR_LEN], line7[MAX_STR_LEN], line8[MAX_STR_LEN],
+//            line12[MAX_STR_LEN];
+//    int output_mode;
+//    char FUNC_NAME[] = "get_variables";
 
-    // when there is no variable command-line argument,
-    // use the default variable text path
-    if(argc < 2)
-    {
-        getcwd(cwd, sizeof(cwd));
-        //printf("getvariable");
-        sprintf(var_path, "%s/%s", cwd, "variables");
-    }
-    else if(argc == 2)
-    {
-        strcpy (var_path, argv[1]);
-    }
-    else
-    {
-        RETURN_ERROR("only the argument for variable file "
-                     "path can be added in the command line", FUNC_NAME, ERROR);
-    }
+//    // when there is no variable command-line argument,
+//    // use the default variable text path
+//    if(argc < 2)
+//    {
+//        getcwd(cwd, sizeof(cwd));
+//        //printf("getvariable");
+//        sprintf(var_path, "%s/%s", cwd, "variables");
+//    }
+//    else if(argc == 2)
+//    {
+//        strcpy (var_path, argv[1]);
+//    }
+//    else
+//    {
+//        RETURN_ERROR("only the argument for variable file "
+//                     "path can be added in the command line", FUNC_NAME, ERROR);
+//    }
 
-    var_fp = fopen(var_path, "r");
+//    var_fp = fopen(var_path, "r");
 
-    if(var_fp == NULL)
-    {
-        RETURN_ERROR("There is no variable file in the bin folder", FUNC_NAME, ERROR);
-    }
-
-
-    fscanf(var_fp, "%s\n", line1);
-    *mode = atoi(strchr(line1, '=') + 1);
+//    if(var_fp == NULL)
+//    {
+//        RETURN_ERROR("There is no variable file in the bin folder", FUNC_NAME, ERROR);
+//    }
 
 
-    fscanf(var_fp, "%s\n", line2);
-    //in_path = strchr(line2, '=') + 1;getvariable
-    strcpy(in_path, strchr(line2, '=') + 1);
+//    fscanf(var_fp, "%s\n", line1);
+//    *mode = atoi(strchr(line1, '=') + 1);
+
+
+//    fscanf(var_fp, "%s\n", line2);
+//    //in_path = strchr(line2, '=') + 1;getvariable
+//    strcpy(in_path, strchr(line2, '=') + 1);
 
 
 
-    fscanf(var_fp, "%s\n", line3);
-    strcpy(out_path, strchr(line3, '=') + 1);
+//    fscanf(var_fp, "%s\n", line3);
+//    strcpy(out_path, strchr(line3, '=') + 1);
 
-    fscanf(var_fp, "%s\n", line4);
-    *n_cores = atoi(strchr(line4, '=') + 1);
-
-
-    fscanf(var_fp, "%s\n", line5);
-    strcpy(user_mask_path, strchr(line5, '=') + 1);
+//    fscanf(var_fp, "%s\n", line4);
+//    *n_cores = atoi(strchr(line4, '=') + 1);
 
 
-    fscanf(var_fp, "%s\n", line6);
-    *row = atoi(strchr(line6, '=') + 1);
+//    fscanf(var_fp, "%s\n", line5);
+//    strcpy(user_mask_path, strchr(line5, '=') + 1);
 
-    fscanf(var_fp, "%s\n", line7);
-    *col = atoi(strchr(line7, '=') + 1);
 
-    fscanf(var_fp, "%s\n", line8);
-    *task = atoi(strchr(line8, '=') + 1);
+//    fscanf(var_fp, "%s\n", line6);
+//    *row = atoi(strchr(line6, '=') + 1);
 
-    fscanf(var_fp, "%s\n", line12);
-    output_mode = atoi(strchr(line12, '=') + 1);
+//    fscanf(var_fp, "%s\n", line7);
+//    *col = atoi(strchr(line7, '=') + 1);
 
-    // second digit
-    if(output_mode % 10 == 1)
-        *b_fastmode = FALSE;
-    else
-        *b_fastmode = TRUE;
+//    fscanf(var_fp, "%s\n", line8);
+//    *task = atoi(strchr(line8, '=') + 1);
 
-    // first digit
-    if(output_mode / 10 == 1)
-        *b_outputCSV = TRUE;
-    else
-        *b_outputCSV = FALSE;
+//    fscanf(var_fp, "%s\n", line12);
+//    output_mode = atoi(strchr(line12, '=') + 1);
 
-    // check if variable inputs are complete
-    if (*mode == 0)
-    {
-        RETURN_ERROR("Variables error: please define 'mode' in "
-                     "the variable file: 1 - pixel-based; 2 - scanline-based;"
-                     " 3 - whole scene ", FUNC_NAME, ERROR);
+//    // second digit
+//    if(output_mode % 10 == 1)
+//        *b_fastmode = FALSE;
+//    else
+//        *b_fastmode = TRUE;
 
-    }
-    if (*in_path == '\0')
-    {
-        RETURN_ERROR("Variables error: 'in_path' "
-                     "cannot be empty in 'Variables' file!", FUNC_NAME, ERROR);
+//    // first digit
+//    if(output_mode / 10 == 1)
+//        *b_outputCSV = TRUE;
+//    else
+//        *b_outputCSV = FALSE;
 
-    }
-    if (*out_path == '\0')
-    {
-        RETURN_ERROR("Variables error: 'out_path' "
-                     "cannot be empty in 'Variables' file!", FUNC_NAME, ERROR);
-    }
-    if (*mode == 3)
-    {
-        if(*n_cores == 0)
-        {
-            RETURN_ERROR("Variables error: 'n_cores' "
-                         "cannot be empty in 'Variables' "
-                         "file for mode 3!", FUNC_NAME, ERROR);
+//    // check if variable inputs are complete
+//    if (*mode == 0)
+//    {
+//        RETURN_ERROR("Variables error: please define 'mode' in "
+//                     "the variable file: 1 - pixel-based; 2 - scanline-based;"
+//                     " 3 - whole scene ", FUNC_NAME, ERROR);
 
-        }
+//    }
+//    if (*in_path == '\0')
+//    {
+//        RETURN_ERROR("Variables error: 'in_path' "
+//                     "cannot be empty in 'Variables' file!", FUNC_NAME, ERROR);
 
-    }
-    if ((*mode == 1)||(*mode == 2))
-    {
-        if(*row == 0)
-        {
-            RETURN_ERROR("Variables error: 'row' cannot "
-                         "be empty in 'Variables' file "
-                         "for mode 2 or 3!", FUNC_NAME, ERROR);
+//    }
+//    if (*out_path == '\0')
+//    {
+//        RETURN_ERROR("Variables error: 'out_path' "
+//                     "cannot be empty in 'Variables' file!", FUNC_NAME, ERROR);
+//    }
+//    if (*mode == 3)
+//    {
+//        if(*n_cores == 0)
+//        {
+//            RETURN_ERROR("Variables error: 'n_cores' "
+//                         "cannot be empty in 'Variables' "
+//                         "file for mode 3!", FUNC_NAME, ERROR);
 
-        }
-    }
+//        }
 
-    if (*mode == 1)
-    {
-        if(*col == 0)
-        {
-            RETURN_ERROR("Variables error: 'col' "
-                         "cannot be empty in 'Variables' "
-                         "file for mode 1!", FUNC_NAME, ERROR);
-        }
-    }
+//    }
+//    if ((*mode == 1)||(*mode == 2))
+//    {
+//        if(*row == 0)
+//        {
+//            RETURN_ERROR("Variables error: 'row' cannot "
+//                         "be empty in 'Variables' file "
+//                         "for mode 2 or 3!", FUNC_NAME, ERROR);
 
-    fclose(var_fp);
-    return SUCCESS;
+//        }
+//    }
 
-}
+//    if (*mode == 1)
+//    {
+//        if(*col == 0)
+//        {
+//            RETURN_ERROR("Variables error: 'col' "
+//                         "cannot be empty in 'Variables' "
+//                         "file for mode 1!", FUNC_NAME, ERROR);
+//        }
+//    }
 
-/******************************************************************************
-MODULE:  get_classificationconfig
-PURPOSE:  Gets the command-line arguments and validates that the required
-arguments were specified.
-RETURN VALUE:
-Type = int
-Value           Description
------           -----------
-FAILURE         Error getting the command-line arguments or a command-line
-                argument and associated value were not specified
-SUCCESS         No errors encountered
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-04/12/2018  Su Ye            orginal develop
-******************************************************************************/
-int get_classificationconfig
-(
-    char* var_path,
-    char *xgboost_model_path,
-    int *specific_label,
-    char *auxiliary_var1
-)
-{
-    FILE *var_fp;
-    char line1[MAX_STR_LEN], line2[MAX_STR_LEN], line3[MAX_STR_LEN];
-    char FUNC_NAME[] = "get_classificationconfig";
+//    fclose(var_fp);
+//    return SUCCESS;
 
-    var_fp = fopen(var_path, "r");
+//}
 
-    if(var_fp == NULL)
-    {
-        RETURN_ERROR("There is no variable file in the bin folder", FUNC_NAME, ERROR);
-    }
-
-    fscanf(var_fp, "%s\n", line1);
-    strcpy(xgboost_model_path, strchr(line1, '=') + 1);
-
-    fscanf(var_fp, "%s\n", line2);
-    *specific_label = atoi(strchr(line2, '=') + 1);
-
-    fscanf(var_fp, "%s\n", line3);
-    strcpy(auxiliary_var1, strchr(line3, '=') + 1);
-
-    fclose(var_fp);
-    return SUCCESS;
-
-}
 
 
 ///******************************************************************************
@@ -1184,117 +1136,7 @@ int find_index_clrx
 }
 
 
-/******************************************************************************
-MODULE:  get_coldparameters
-PURPOSE:  Gets the parameters from yaml
-RETURN VALUE:
-Type = int
-Value           Description
------           -----------
-FAILURE         Error Can't locate yaml file
-SUCCESS         No errors encountered
-SOURCE: https://stackoverflow.com/questions/49785153/c-reading-from-txt-file-into-struct
-HISTORY:
-Date        Programmer       Reason
---------    ---------------  -------------------------------------
-09/01/2021  Su Ye            orginal develop
-******************************************************************************/
-int get_coldparameters
-(
-    int *n_rows,
-    int *n_cols,
-    int *n_block_x,
-    int *n_block_y,
-    int *CM_OUTPUT_INTERVAL,
-    float *probability_threshold,
-    int *conse
-)
-{
-    char cwd[MAX_STR_LEN]; // current directory path
-    // char var_path[MAX_STR_LEN];
-    FILE *var_fp;
-    char line[MAX_STR_LEN];
-    char var_path[MAX_STR_LEN];
-    char errmsg[MAX_STR_LEN];      /* error message   */
-    char *token;
-    const char deli[] = ":";
-    char FUNC_NAME[] = "get_coldparameters";
-    char s1[] = "n_rows";
-    char s2[] = "n_cols";
-    char s3[] = "n_block_x";
-    char s4[] = "n_block_y";
-    char s5[] = "CM_OUTPUT_INTERVAL";
-    char s6[] = "probability_threshold";
-    char s7[] = "conse";
 
-    getcwd(cwd, sizeof(cwd));
-    //printf("getvariable");
-    sprintf(var_path, "%s/%s", cwd, "parameters.yaml");
-
-    var_fp = fopen(var_path, "r");
-
-    if(var_fp == NULL)
-    {
-        sprintf(errmsg, "no parameter.yaml was found in %s \n", cwd);
-        RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
-    }
-
-    while (true)
-    {
-        if (fscanf(var_fp, " %[^\n]", line) != EOF){
-          token = strtok(line, deli);
-          if (strcmp(token, s1) == 0){
-              token = strtok(NULL, deli);
-              *n_rows = atoi(token);
-          }
-          else if (strcmp(token, s2) == 0){
-              token = strtok(NULL, deli);
-              *n_cols = atoi(token);
-          }
-          else if (strcmp(token, s3) == 0){
-              token = strtok(NULL, deli);
-              *n_block_x = atoi(token);
-          }
-          else if (strcmp(token, s4) == 0){
-              token = strtok(NULL, deli);
-              *n_block_y = atoi(token);
-          }
-          else if(strcmp(token, s5) == 0){
-              token = strtok(NULL, deli);
-              *CM_OUTPUT_INTERVAL = atoi(token);
-          }
-          else if(strcmp(token, s6) == 0){
-              token = strtok(NULL, deli);
-              *probability_threshold = atof(token);
-          }
-          else if(strcmp(token, s7) == 0){
-              token = strtok(NULL, deli);
-              *conse = atoi(token);
-          }
-        }else{
-            break;//end of file
-        }
-    }
-
-    fclose(var_fp);
-
-    if (*n_rows == 0)
-        RETURN_ERROR("n_rows is missing in the parameter.yaml", FUNC_NAME, ERROR);
-    if (*n_cols == 0)
-        RETURN_ERROR("n_cols is missing in the parameter.yaml", FUNC_NAME, ERROR);
-    if (*n_block_x == 0)
-        RETURN_ERROR("n_block_x is missing in the parameter.yaml", FUNC_NAME, ERROR);
-    if (*n_block_y == 0)
-        RETURN_ERROR("n_block_y is missing in the parameter.yaml", FUNC_NAME, ERROR);
-    if (*CM_OUTPUT_INTERVAL == 0)
-        RETURN_ERROR("CM_OUTPUT_INTERVAL is missing in the parameter.yaml", FUNC_NAME, ERROR);
-    if (*probability_threshold == 0)
-        RETURN_ERROR("probability_threshold is missing in the parameter.yaml", FUNC_NAME, ERROR);
-    if (*conse == 0)
-        RETURN_ERROR("conse is missing in the parameter.yaml", FUNC_NAME, ERROR);
-    return SUCCESS;
-
-}
 
 
 /******************************************************************************
@@ -1344,6 +1186,8 @@ int preprocessing
                buf_t_tmp = 0;
             else
                buf_t_tmp = (long)(buf_t[i] * 10 - 27320);
+        }else{
+            buf_t_tmp = 0;
         }
 
 
@@ -1393,4 +1237,19 @@ int preprocessing
     return (SUCCESS);
 }
 
+double angle_decaying(double input, double lowbound, double highbound){
+    double prob;
+    if (input < lowbound){
+        prob = 1.0;
+    }else if (input > highbound)
+    {
+        prob = 0.0;
 
+    }else{
+        double a = 1.0 / (highbound - lowbound);
+        // double b = (lowbound * log(999) - highbound * log(1.0 / 999)) / (lowbound - highbound);
+        prob = 1.0 - a * (input - lowbound);
+    }
+    return prob;
+
+}

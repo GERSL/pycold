@@ -4,7 +4,8 @@
 /* and conflicts existed.                                             */
 
 /* from ccdc.c */
-#define TOTAL_IMAGE_BANDS 7 /* Number of image bands, for loops.   HLS   */
+#define TOTAL_IMAGE_BANDS 7 /* Number of image bands, for loops.   */
+#define TOTAL_IMAGE_BANDS_HLS 6 /* Number of HLS image bands, for loops.   */
 #define TOTAL_INDICES 0 /* Number of image bands, for loops. */
 #define TOTAL_BANDS 8     /* Total image plus mask bands, for loops.  HLS */
 #define MIN_NUM_C 4       /* Minimum number of coefficients           */
@@ -113,7 +114,7 @@
 #define SCCD 2
 #define OBCOLD 3 // COLD with outputting CM magnitudes
 #define OBCOLD_RECONSTRUCT 4
-
+#define SCCDONLINE 5
 
 #define SKIP_PERCENTAGE 0.03
 
@@ -135,8 +136,9 @@
 #define NRT_VOID 0
 #define NRT_MONITOR_STANDARD 1
 #define NRT_QUEUE_STANDARD 2
-#define NRT_MONITOR_SNOW 3
-#define NRT_QUEUE_SNOW 4
+#define NRT_NEWCHANGE 3
+#define NRT_MONITOR_SNOW 4
+#define NRT_QUEUE_SNOW 5
 #define MAX_OBS_QUEUE 300 /* the maximum number of observations in queue (for NRT) */
 
 #define LANDSAT45_TM 4

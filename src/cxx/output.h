@@ -51,18 +51,17 @@ typedef struct
 typedef struct
 {
     int t_start;           /* time when series model gets started */
-    int t_end;             /* time when series model gets ended */
     int t_break;           /* time when the first break (change) is observed */
     // float change_prob;     /* the probability of a pixel that have undergone */
                               /* change (between 0 and 100) */
     int num_obs;           /* the number of "good" observations used for model
                               estimation */
-    float coefs[TOTAL_IMAGE_BANDS][SCCD_NUM_C];
+    float coefs[TOTAL_IMAGE_BANDS_HLS][SCCD_NUM_C];
                            /*  coefficients for each time series model for each
                                spectral band*/
-    float rmse[TOTAL_IMAGE_BANDS];
+    float rmse[TOTAL_IMAGE_BANDS_HLS];
 
-    float magnitude[TOTAL_IMAGE_BANDS];/* the magnitude of change (difference between model
+    float magnitude[TOTAL_IMAGE_BANDS_HLS];/* the magnitude of change (difference between model
                                   prediction and observation for each spectral band)*/
 
 } Output_sccd;
@@ -70,21 +69,23 @@ typedef struct
 
 typedef struct
 {
-    unsigned short int t_start_since1982;           /* dates (Julian dates - JULIAN_DATE_LAST_DAY_1972) when series model gets started */
-    unsigned short int num_obs;
-    unsigned short int obs[TOTAL_IMAGE_BANDS][DEFAULT_CONSE];   /* the last observations, d=(TOTAL_IMAGE_BANDS, conse - 1) */
-    unsigned short int obs_date_since1982[DEFAULT_CONSE];   /* dates (Julian dates - JULIAN_DATE_LAST_DAY_1972) the for observations, d=(TOTAL_IMAGE_BANDS, conse - 1) */
-    float covariance[TOTAL_IMAGE_BANDS][DEFAULT_N_STATE * DEFAULT_N_STATE];  /* covariance matrix,  d=(TOTAL_IMAGE_BANDS, SCCD_NUM_C * SCCD_NUM_C), the corresponding date is the first element of conse_obs_date */
-    float nrt_coefs[TOTAL_IMAGE_BANDS][SCCD_NUM_C];   /* state matrix, d=(TOTAL_IMAGE_BANDS, SCCD_NUM_C)  */
-    float H[TOTAL_IMAGE_BANDS];   /*  observation noice, d=TOTAL_IMAGE_BANDS   */
-    unsigned int rmse_sum[TOTAL_IMAGE_BANDS];
+    short int t_start_since1982;           /* dates (Julian dates - JULIAN_DATE_LAST_DAY_1972) when series model gets started */
+    short int num_obs;
+    short int obs[TOTAL_IMAGE_BANDS_HLS][DEFAULT_CONSE - 1];   /* the last observations, d=(TOTAL_IMAGE_BANDS, conse - 1) */
+    short int obs_date_since1982[DEFAULT_CONSE - 1];   /* dates (Julian dates - JULIAN_DATE_LAST_DAY_1972) the for observations, d=(TOTAL_IMAGE_BANDS, conse - 1) */
+    float covariance[TOTAL_IMAGE_BANDS_HLS][DEFAULT_N_STATE * DEFAULT_N_STATE];  /* covariance matrix,  d=(TOTAL_IMAGE_BANDS, SCCD_NUM_C * SCCD_NUM_C), the corresponding date is the first element of conse_obs_date */
+    float nrt_coefs[TOTAL_IMAGE_BANDS_HLS][SCCD_NUM_C];   /* state matrix, d=(TOTAL_IMAGE_BANDS, SCCD_NUM_C)  */
+    float H[TOTAL_IMAGE_BANDS_HLS];   /*  observation noice, d=TOTAL_IMAGE_BANDS   */
+    unsigned int rmse_sum[TOTAL_IMAGE_BANDS_HLS];
+    short int cm_outputs;
+    short int cm_outputs_date;
 } output_nrtmodel;
 
 
 typedef struct
 {
-    unsigned short int clry[TOTAL_IMAGE_BANDS];
-    unsigned short int clrx_since1982;
+    short int clry[TOTAL_IMAGE_BANDS_HLS];
+    short int clrx_since1982;
 } output_nrtqueue;
 
 

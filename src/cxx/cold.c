@@ -5397,24 +5397,6 @@ int inefficientobs_procedure
 
 
 
-double angle_decaying(double input, double lowbound, double highbound){
-    double prob;
-    if (input < lowbound){
-        prob = 1.0;
-    }else if (input > highbound)
-    {
-        prob = 0.0;
-
-    }else{
-        double a = 1.0 / (highbound - lowbound);
-        // double b = (lowbound * log(999) - highbound * log(1.0 / 999)) / (lowbound - highbound);
-        prob = 1.0 - a * (input - lowbound);
-    }
-    return prob;
-
-}
-
-
 
 /******************************************************************************
 MODULE:  obcold_reconstruction_procedure

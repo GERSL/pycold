@@ -1,9 +1,6 @@
 # this script show how to run COLD from a csv file that store time series information
 import numpy as np
-import os
 from pycold import cold_detect, obcold_reconstruct
-# sys.path.append('/Users/coloury/Dropbox/Documents/pycold')
-# os.chdir('/Users/coloury/Dropbox/Documents/pycold')
 from pycold.utils import read_data
 
 Landsat_bandname = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2', 'Thermal']
@@ -43,8 +40,8 @@ def test_cold_detect():
     dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, sensor = data.copy()  # exclude header
     cold_result = cold_detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
     assert cold_result[0]['t_break'] == 735040
-    assert cold_result[0]['num_obs'] == 139
-    assert cold_result[1]['t_end'] == 737352
+    assert cold_result[0]['num_obs'] == 142
+    assert cold_result[1]['t_end'] == 737368
 
 
 def test_obcold_reconstruct():

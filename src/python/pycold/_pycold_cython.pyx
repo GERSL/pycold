@@ -20,7 +20,8 @@ except ImportError:
 
 cdef int NUM_FC = 40  # define the maximum number of outputted curves
 cdef int NUM_nrt_queue = 300
-
+DEF NRT_CONSE = 6
+DEF NRT_BAND = 6
 
 reccg_dt = np.dtype([('t_start', np.int32),  # time when series model gets started
                      ('t_end', np.int32),  # time when series model gets ended
@@ -51,28 +52,29 @@ cdef extern from "../../cxx/output.h":
 cdef extern from "../../cxx/output.h":
     ctypedef struct Output_sccd:
         int t_start
-        int t_end
         int t_break
         int num_obs
-        float coefs[7][6]
-        float rmse[7]
-        float magnitude[7]
+        float coefs[6][6]
+        float rmse[6]
+        float magnitude[6]
 
 cdef extern from "../../cxx/output.h":
     ctypedef struct output_nrtqueue:
-        unsigned short int clry[7]
-        unsigned short int clrx_since1982
+        short int clry[NRT_BAND]
+        short int clrx_since1982
         
 cdef extern from "../../cxx/output.h":
     ctypedef struct output_nrtmodel:
-        unsigned short int t_start_since1982
-        unsigned short int num_obs
-        unsigned short int obs[7][6]
-        unsigned short int obs_date_since1982[6]
-        float covariance[7][36]
-        float nrt_coefs[7][6]
-        float H[7]
-        unsigned int rmse_sum[7]
+        short int t_start_since1982
+        short int num_obs
+        short int obs[NRT_BAND][NRT_CONSE-1]
+        short int obs_date_since1982[NRT_CONSE-1]
+        float covariance[NRT_BAND][36]
+        float nrt_coefs[NRT_BAND][6]
+        float H[NRT_BAND]
+        unsigned int rmse_sum[NRT_BAND]
+        short int cm_outputs;
+        short int cm_outputs_date;
  
 cdef Output_sccd t
 cdef output_nrtqueue t2
@@ -97,7 +99,7 @@ cdef extern from "../../cxx/s_ccd.h":
     cdef int sccd(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2, long *buf_t,
                   long *fmask_buf, long *valid_date_array, int valid_num_scenes, double tcg, int *num_fc, int *nrt_mode,
                   Output_sccd *rec_cg, output_nrtmodel *nrt_model, int *num_nrt_queue, output_nrtqueue *nrt_queue,
-                  short int *min_rmse)
+                  short int *min_rmse, int cm_output_interval, int starting_date, short int* cm_outputs, short int* cm_outputs_date)
 
 
 # @cython.dataclasses.dataclass
@@ -166,6 +168,26 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     cdef Output_t t
     cdef Output_t* rec_cg = <Output_t*> PyMem_Malloc(NUM_FC * sizeof(t))
 
+    # make sure it is c contiguous array
+#    if dates.flags['C_CONTIGUOUS'] == False:
+#        dates = np.ascontiguousarray(dates)
+#    if ts_b.flags['C_CONTIGUOUS'] == False:
+#        ts_b = np.ascontiguousarray(ts_b)
+#    if ts_g.flags['C_CONTIGUOUS'] == False:
+#        ts_g = np.ascontiguousarray(ts_g)
+#    if ts_r.flags['C_CONTIGUOUS'] == False:
+#        ts_r = np.ascontiguousarray(ts_r)
+#    if ts_n.flags['C_CONTIGUOUS'] == False:
+#        ts_n = np.ascontiguousarray(ts_n)
+#    if ts_s1.flags['C_CONTIGUOUS'] == False:
+#        ts_s1 = np.ascontiguousarray(ts_s1)
+#    if ts_s2.flags['C_CONTIGUOUS'] == False:
+#        ts_s2 = np.ascontiguousarray(ts_s2)
+#    if ts_t.flags['C_CONTIGUOUS'] == False:
+#        ts_t = np.ascontiguousarray(ts_t)
+#    if qas.flags['C_CONTIGUOUS'] == False:
+#        qas = np.ascontiguousarray(qas)
+    
     cdef long [:] dates_view = dates
     cdef long [:] ts_b_view = ts_b
     cdef long [:] ts_g_view = ts_g
@@ -186,14 +208,14 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
-    # cm_outputs and cm_outputs_date are not used so far, but left for object-based cold (under development)
+    # cm_outputs and cm_outputs_date are for object-based cold
     if b_output_cm == True:
         if cm_output_interval == 0:
            cm_output_interval = 60
-        if n_cm == 0:
-           n_cm = math.ceil((dates[valid_num_scenes-1] - starting_date + 1) / cm_output_interval) + 1
         if starting_date == 0:
            starting_date = dates[0]
+        if n_cm == 0:
+           n_cm = math.ceil((dates[valid_num_scenes-1] - starting_date + 1) / cm_output_interval) + 1
         cm_outputs = np.full(n_cm, -9999, dtype=np.short)
         cm_outputs_date = np.full(n_cm, -9999, dtype=np.short)
     # set the length to 1 to save memory, as they won't be assigned values
@@ -272,7 +294,6 @@ def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
-
     result = obcold_reconstruction_procedure(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0], &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, &break_dates_view[0], break_date_len, pos, conse, rec_cg, &num_fc)
     if result != 0:
         raise RuntimeError("cold function fails for pos = {} ".format(pos))
@@ -286,7 +307,7 @@ def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64
 def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
                 np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
-                double t_cg = 15.0863, int pos=1, int conse=6):
+                bint b_output_cm=False, int starting_date=0, int n_cm=0, int cm_output_interval=60, double t_cg = 15.0863, int pos=1, int conse=6):
     """
     S-CCD processing. It is required to be done before near real time monitoring
 
@@ -301,6 +322,9 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     	ts_s2: 1d array of shape(observation numbers), time series of swir2 band
     	ts_t: 1d array of shape(observation numbers), time series of thermal band
     	qas: 1d array, the QA cfmask bands. '0' - clear; '1' - water; '2' - shadow; '3' - snow; '4' - cloud
+    	starting_date: the global starting date of the dataset
+    	n_cm: the global number of change magnitude snapshots
+    	cm_output_interval: the interval of change magnitude output
     	t_cg: threshold of change magnitude, default is chi2.ppf(0.99,5)
         pos: position id of the pixel
     	conse: consecutive observation number
@@ -311,10 +335,28 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
             change records: the S-CCD outputs that characterizes each temporal segment
             rec_cg:
             min_rmse
-            int nrt_mode,             /* O: 0 - void; 1 - monitor mode for standard; 2 - queue mode for standard; 3 - monitor mode for snow; 4 - queue mode for snow */
+            int nrt_mode,             /* O: 0 - void; 1 - monitor mode for standard; 2 - queue mode for standard; 3 - new change; 4 - monitor mode for snow; 5 - queue mode for snow */
             output_nrtmodel: nrt model if monitor mode, empty if queue mode
             output_nrtqueue: obs queue if queue mode, empty if monitor mode
     """
+    if dates.flags['C_CONTIGUOUS'] == False:
+       dates = np.ascontiguousarray(dates)
+    if ts_b.flags['C_CONTIGUOUS'] == False:
+        ts_b = np.ascontiguousarray(ts_b)
+    if ts_g.flags['C_CONTIGUOUS'] == False:
+        ts_g = np.ascontiguousarray(ts_g)
+    if ts_r.flags['C_CONTIGUOUS'] == False:
+        ts_r = np.ascontiguousarray(ts_r)
+    if ts_n.flags['C_CONTIGUOUS'] == False:
+        ts_n = np.ascontiguousarray(ts_n)
+    if ts_s1.flags['C_CONTIGUOUS'] == False:
+        ts_s1 = np.ascontiguousarray(ts_s1)
+    if ts_s2.flags['C_CONTIGUOUS'] == False:
+        ts_s2 = np.ascontiguousarray(ts_s2)
+    if ts_t.flags['C_CONTIGUOUS'] == False:
+        ts_t = np.ascontiguousarray(ts_t)
+    if qas.flags['C_CONTIGUOUS'] == False:
+        qas = np.ascontiguousarray(qas)
 
     cdef int valid_num_scenes = qas.shape[0]
     # allocate memory for rec_cg
@@ -325,7 +367,7 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     cdef output_nrtmodel* nrt_model = <output_nrtmodel*> PyMem_Malloc(sizeof(t3))
     cdef int nrt_mode = 0
     # initiate minimum rmse
-    min_rmse = np.full(7, 0, dtype=np.short)
+    min_rmse = np.full(NRT_BAND, 0, dtype=np.short)
 
     # memory view
     cdef long [:] dates_view = dates
@@ -349,9 +391,25 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
+    if b_output_cm == True:
+        if starting_date == 0:
+           starting_date = dates[0]
+        if n_cm == 0:
+           n_cm = math.ceil((dates[valid_num_scenes-1] - starting_date + 1) / cm_output_interval)
+        cm_outputs = np.full(n_cm, -9999, dtype=np.short)
+        cm_outputs_date = np.full(n_cm, -9999, dtype=np.short)
+    # set the length to 1 to save memory, as they won't be assigned values
+    else:  
+        cm_outputs = np.full(1, -9999, dtype=np.short)
+        cm_outputs_date = np.full(1, -9999, dtype=np.short)
+        
+    cdef short [:] cm_outputs_view = cm_outputs  # memory view
+    cdef short [:] cm_outputs_date_view = cm_outputs_date  # memory view
+
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, rec_cg,
-                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0])
+                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], cm_output_interval, starting_date,
+                  &cm_outputs_view[0] , &cm_outputs_date_view[0])
     if result != 0:
         raise RuntimeError("S-CCD function fails for pos = {} ".format(pos))
     else:
@@ -362,12 +420,17 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
                 output_rec_cg = np.asarray(<Output_sccd[:num_fc]>rec_cg)
             else:
                 output_rec_cg = np.array([])
+                
 
-            if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
+            if nrt_mode == 1 or nrt_mode == 4:  # monitor mode
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                   np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([]))
+            elif nrt_mode == 3:  # new change
+                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                  np.asarray(<output_nrtmodel[:1]>nrt_model),
+                                  np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
 
-            elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
+            elif nrt_mode == 2 or nrt_mode == 5:  # queue mode
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                   np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
             elif nrt_mode == 0:  # void mode
@@ -424,9 +487,12 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     cdef output_nrtmodel[:] nrt_model_view
     cdef output_nrtmodel* nrt_model
     cdef output_nrtmodel[:] nrt_model_view_old
-    # cdef np.ndarray[output_nrtmodel, ndim=1] nrt_model_copy = sccd_pack_copy.nrt_model.copy()
-
-    # need to extend memory for c if has values
+    cdef int  cm_output_interval = 99999   
+    cdef int starting_date = 0
+    cdef int n_cm = 1
+    cdef short [:] min_rmse_view
+    
+    # grab inputs from the input
     if num_fc > 0:
         rec_cg_view = sccd_pack.rec_cg  # int[:] is a python object (a typed memory view) so it can be passed to a python function
         rec_cg = <Output_sccd*> PyMem_Realloc(&rec_cg_view[0], NUM_FC * sizeof(t))   # &rec_cg_view[0] is used to take the address of the buffer of the memory view
@@ -439,15 +505,16 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     else:
         nrt_queue = <output_nrtqueue*> PyMem_Malloc(NUM_nrt_queue * sizeof(t2))
 
-    if nrt_mode == 1 or nrt_mode == 3:
+    if nrt_mode == 1 or nrt_mode == 4:
         nrt_model_view = sccd_pack_copy.nrt_model # copy memory view
         nrt_model = &nrt_model_view[0]
         # nrt_model = <output_nrtmodel*> PyMem_Realloc(&nrt_model_view[0], 2 * sizeof(t3))
     else:
         nrt_model = <output_nrtmodel*> PyMem_Malloc(sizeof(t3))
+    min_rmse = sccd_pack_copy.min_rmse
 
     # memory view
-    cdef short [:] min_rmse_view = sccd_pack_copy.min_rmse
+    min_rmse_view = min_rmse
     cdef long [:] dates_view = dates
     cdef long [:] ts_b_view = ts_b
     cdef long [:] ts_g_view = ts_g
@@ -458,8 +525,7 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     cdef long [:] ts_t_view = ts_t
     cdef long [:] qas_view = qas
 
-
-
+    # assert the length
     assert ts_b_view.shape[0] == dates_view.shape[0]
     assert ts_g_view.shape[0] == dates_view.shape[0]
     assert ts_r_view.shape[0] == dates_view.shape[0]
@@ -469,9 +535,16 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
+    # use an extreme value to enable only one cm output
+    cm_outputs = np.full(1, -9999, dtype=np.short)
+    cm_outputs_date = np.full(1, -9999, dtype=np.short)
+    cdef short [:] cm_outputs_view = cm_outputs  # memory view
+    cdef short [:] cm_outputs_date_view = cm_outputs_date  # memory view    
+    
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, rec_cg,
-                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0])
+                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], cm_output_interval, starting_date,
+                  &cm_outputs_view[0], &cm_outputs_date_view[0])
     if result != 0:
         raise RuntimeError("sccd_update function fails for pos = {} ".format(pos))
     else:
@@ -483,15 +556,20 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
             else:
                 output_rec_cg = np.array([])
 
-            if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
-                return SccdOutput(pos, output_rec_cg, sccd_pack.min_rmse, nrt_mode,
-                                  sccd_pack_copy.nrt_model, np.array([]))
+            if nrt_mode == 1 or nrt_mode == 4:  # monitor mode
+                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                  np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([]))
+            elif nrt_mode == 3:  # new change
+                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                  np.asarray(<output_nrtmodel[:1]>nrt_model),
+                                  np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
 
-            elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
-                return SccdOutput(pos, output_rec_cg, sccd_pack.min_rmse, nrt_mode,
-                                  np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
+            elif nrt_mode == 2 or nrt_mode == 5:  # queue mode
+                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                  np.array([]), np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
             elif nrt_mode == 0:  # void mode
-                return SccdOutput(pos, np.array([]), sccd_pack.min_rmse, nrt_mode, np.array([]),
+                return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
                                   np.array([]))
+
 
 

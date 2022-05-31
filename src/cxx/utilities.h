@@ -59,24 +59,24 @@ void quick_sort_index (int arr[], int *index,  int left, int right);
 int partition_buf (int arr[], short int **buf, short int *fmask_buf, int left, int right);
 int partition_buf_sensor (int arr[], short int **buf, short int *fmask_buf, short int *sensor, int left, int right);
 
-int get_variables
-(
-    int argc,              /* I: number of cmd-line args                    */
-    char *argv[],          /* I: string of cmd-line args                    */
-    int *mode,              /* O: 1 - pixel-based; 2 - scanline-based;       */
-                           /*    3 - wholescene                             */
-    char *in_path,         /* O: directory locaiton for input data          */
-    char *out_path,        /* O: directory location for output files        */
-    int *n_cores,            /* O: number of cores                            */
-    int *row,              /* O: (required for mode 1 and mode 2)           */
-                           /*    row number for the pixel                   */
-    int *col,              /* O: (required for mode 1)                      */
-                           /* O: col number for the pixel                   */
-    int *task,
-    char *user_mask_path,   /* O: directory location for user_mask           */
-    bool *b_fastmode,
-    bool *b_outputCSV
-);
+//int get_variables
+//(
+//    int argc,              /* I: number of cmd-line args                    */
+//    char *argv[],          /* I: string of cmd-line args                    */
+//    int *mode,              /* O: 1 - pixel-based; 2 - scanline-based;       */
+//                           /*    3 - wholescene                             */
+//    char *in_path,         /* O: directory locaiton for input data          */
+//    char *out_path,        /* O: directory location for output files        */
+//    int *n_cores,            /* O: number of cores                            */
+//    int *row,              /* O: (required for mode 1 and mode 2)           */
+//                           /*    row number for the pixel                   */
+//    int *col,              /* O: (required for mode 1)                      */
+//                           /* O: col number for the pixel                   */
+//    int *task,
+//    char *user_mask_path,   /* O: directory location for user_mask           */
+//    bool *b_fastmode,
+//    bool *b_outputCSV
+//);
 
 //int get_args
 //(
@@ -96,29 +96,11 @@ int get_variables
 //    bool *b_outputCSV
 //);
 
-int get_classificationconfig
-(
-    char* var_path,
-    char *xgboost_model_path,
-    int *specific_label,
-    char *auxiliary_var1
-);
 
 int find_index_clrx(
     int *clrx,
     int end,
     int input_ordinal_date
-);
-
-int get_coldparameters
-(
-    int *n_rows,
-    int *n_cols,
-    int *n_block_x,
-    int *n_block_y,
-    int *CM_OUTPUT_INTERVAL,
-    float *probability_threshold,
-    int *conse
 );
 
 int usage_message ();
@@ -144,5 +126,11 @@ int preprocessing
     bool b_c2
 );
 
+double angle_decaying
+(
+    double input,
+    double lowbound,
+    double highbound
+);
 
 #endif /* UTILITIES_H */

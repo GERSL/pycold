@@ -6,7 +6,6 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <stdlib.h>
-#include <omp.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include "defines.h"
@@ -19,9 +18,124 @@
 #include "misc.h"
 #include "s_ccd.h"
 
+
+
+/******************************************************************************
+MODULE:  get_coldparameters
+PURPOSE:  Gets the parameters from yaml
+RETURN VALUE:
+Type = int
+Value           Description
+-----           -----------
+FAILURE         Error Can't locate yaml file
+SUCCESS         No errors encountered
+SOURCE: https://stackoverflow.com/questions/49785153/c-reading-from-txt-file-into-struct
+HISTORY:
+Date        Programmer       Reason
+--------    ---------------  -------------------------------------
+09/01/2021  Su Ye            orginal develop
+******************************************************************************/
+int get_coldparameters
+(
+    int *n_rows,
+    int *n_cols,
+    int *n_block_x,
+    int *n_block_y,
+    int *CM_OUTPUT_INTERVAL,
+    float *probability_threshold,
+    int *conse
+)
+{
+    char cwd[MAX_STR_LEN]; // current directory path
+    // char var_path[MAX_STR_LEN];
+    FILE *var_fp;
+    char line[MAX_STR_LEN];
+    char var_path[MAX_STR_LEN];
+    char errmsg[MAX_STR_LEN];      /* error message   */
+    char *token;
+    const char deli[] = ":";
+    char FUNC_NAME[] = "get_coldparameters";
+    char s1[] = "n_rows";
+    char s2[] = "n_cols";
+    char s3[] = "n_block_x";
+    char s4[] = "n_block_y";
+    char s5[] = "CM_OUTPUT_INTERVAL";
+    char s6[] = "probability_threshold";
+    char s7[] = "conse";
+
+    getcwd(cwd, sizeof(cwd));
+    //printf("getvariable");
+    sprintf(var_path, "%s/%s", cwd, "config.yaml");
+
+    var_fp = fopen(var_path, "r");
+
+    if(var_fp == NULL)
+    {
+        sprintf(errmsg, "no config.yaml was found in %s \n", cwd);
+        RETURN_ERROR(errmsg, FUNC_NAME, ERROR);
+    }
+
+    while (true)
+    {
+        if (fscanf(var_fp, " %[^\n]", line) != EOF){
+          token = strtok(line, deli);
+          if (strcmp(token, s1) == 0){
+              token = strtok(NULL, deli);
+              *n_rows = atoi(token);
+          }
+          else if (strcmp(token, s2) == 0){
+              token = strtok(NULL, deli);
+              *n_cols = atoi(token);
+          }
+          else if (strcmp(token, s3) == 0){
+              token = strtok(NULL, deli);
+              *n_block_x = atoi(token);
+          }
+          else if (strcmp(token, s4) == 0){
+              token = strtok(NULL, deli);
+              *n_block_y = atoi(token);
+          }
+          else if(strcmp(token, s5) == 0){
+              token = strtok(NULL, deli);
+              *CM_OUTPUT_INTERVAL = atoi(token);
+          }
+          else if(strcmp(token, s6) == 0){
+              token = strtok(NULL, deli);
+              *probability_threshold = atof(token);
+          }
+          else if(strcmp(token, s7) == 0){
+              token = strtok(NULL, deli);
+              *conse = atoi(token);
+          }
+        }else{
+            break;//end of file
+        }
+    }
+
+    fclose(var_fp);
+
+    if (*n_rows == 0)
+        RETURN_ERROR("n_rows is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*n_cols == 0)
+        RETURN_ERROR("n_cols is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*n_block_x == 0)
+        RETURN_ERROR("n_block_x is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*n_block_y == 0)
+        RETURN_ERROR("n_block_y is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*CM_OUTPUT_INTERVAL == 0)
+        RETURN_ERROR("CM_OUTPUT_INTERVAL is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*probability_threshold == 0)
+        RETURN_ERROR("probability_threshold is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    if (*conse == 0)
+        RETURN_ERROR("conse is missing in the parameter.yaml", FUNC_NAME, ERROR);
+    return SUCCESS;
+
+}
+
+
 int getnrtstructurefromtxt(char* nrtoutput_affix,  Output_sccd *s_rec_cg, output_nrtmodel *nrt_model,
                            output_nrtqueue *obs_queue, int *nrt_mode, int *num_fc,
-                           int *num_obs_queue, int *pos, short int *min_rmse)
+                           int *num_obs_queue, int *pos, short *min_rmse)
 {
     char line[100000];
     // read nrt mode
@@ -142,7 +256,7 @@ int main(int argc, char *argv[])
 
     time_t now;                  /* For logging the start, stop, and some     */
 
-    int num_fc;                        /* the number of functional curve        */
+    int num_fc = 0;                        /* the number of functional curve        */
     char out_filename[MAX_STR_LEN];
     //block_num = (int)meta->lines / threads;
 
@@ -167,7 +281,7 @@ int main(int argc, char *argv[])
     double tcg;
     int n_cm_maps = 0;
     short int* CM_outputs;
-    unsigned char* CM_outputs_date;
+    short int* CM_outputs_date;
     unsigned char* CMdirection_outputs;
     // bool b_singleline = FALSE;
     int num_breakdatemaps;
@@ -210,7 +324,8 @@ int main(int argc, char *argv[])
     output_nrtqueue *obs_queue;
     int nrt_mode = 0;
     int pos;
-    short int min_rmse[TOTAL_IMAGE_BANDS] = {0,0,0,0,0,0,0};
+    short min_rmse[TOTAL_IMAGE_BANDS] = {0,0,0,0,0,0,0};
+    int cm_output_interval;
 
 
     /**************************************************************/
@@ -223,6 +338,7 @@ int main(int argc, char *argv[])
         method = COLD;
     }else if(argv[1][0] == 's'){
         method = SCCD;
+        cm_output_interval = 60;
     }
     else if (argv[1][0] =='c'){
         method = COLD;
@@ -230,9 +346,11 @@ int main(int argc, char *argv[])
     else if (argv[1][0] == 'o'){
         b_outputCM = TRUE;
         method = COLD;
+        cm_output_interval = 60;
     }
     else if (argv[1][0] == 't'){
         method = SCCDONLINE;
+        cm_output_interval = 99999;  // assigned an extreme to the interval as only one cm is saved
     }
     else
         RETURN_ERROR("The second input parameter has to be r, s, o or c", FUNC_NAME, FAILURE);
@@ -354,7 +472,7 @@ int main(int argc, char *argv[])
     }
     fclose(sampleFile);
 
-    n_cm_maps = (sdate[valid_scene_count - 1] - sdate[0]) / CM_OUTPUT_INTERVAL + 1;
+    n_cm_maps = (sdate[valid_scene_count - 1] - sdate[0]) / cm_output_interval + 1;
     starting_date = sdate[0];
 
 
@@ -382,7 +500,7 @@ int main(int argc, char *argv[])
          RETURN_ERROR("ERROR allocating CM_outputs_date", FUNC_NAME, FAILURE);
     }
 
-    CM_outputs_date =  malloc(sizeof (unsigned char) * n_cm_maps);
+    CM_outputs_date =  malloc(sizeof (short int)* n_cm_maps);
     if(CM_outputs_date == NULL){
          RETURN_ERROR("ERROR allocating CM_outputs_date", FUNC_NAME, FAILURE);
     }
@@ -447,8 +565,8 @@ int main(int argc, char *argv[])
     if(SCCDONLINE == method)
     {
        result = getnrtstructurefromtxt(argv[4], s_rec_cg, nrt_model,
-               obs_queue, &nrt_mode, &num_fc,
-               &num_obs_queue, &pos, min_rmse);
+                                       obs_queue, &nrt_mode, &num_fc,
+                                       &num_obs_queue, &pos, min_rmse);
     }
 
 
@@ -548,8 +666,7 @@ int main(int argc, char *argv[])
                     }
                     for(i = 0; i < n_cm_maps; i++){
                         CM_outputs[i] = NA_VALUE;
-                        CM_outputs_date[i] = 255;
-                        CMdirection_outputs[i] = 255;
+                        CM_outputs_date[i] = NA_VALUE;
                     }
 
         //                printf("temporal success2 with processid %d\n", process_id);
@@ -557,7 +674,7 @@ int main(int argc, char *argv[])
         //                       valid_scene_count_scanline[i_col], i_col, original_row, probability_threshold);
                     result = cold(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, sdate, valid_scene_count,
                                   i_col + 1, tcg, conse, b_outputCM, starting_date, rec_cg, &num_fc, CM_OUTPUT_INTERVAL, CM_outputs,
-                                  CMdirection_outputs, CM_outputs_date);
+                                  CM_outputs_date);
 
                     // snprintf (msg_str, sizeof(msg_str), "pixel %d COLD calculation finished\n", i_col+1);
                     // LOG_MESSAGE (msg_str, FUNC_NAME)
@@ -569,11 +686,6 @@ int main(int argc, char *argv[])
 
                     if(b_outputCM == TRUE){
                         nvals = fwrite (CM_outputs, sizeof(int16), n_cm_maps, fhoutput_cm);
-                        if (nvals != n_cm_maps)
-                        {
-                            RETURN_ERROR("Incorrect amount of data written", FUNC_NAME, ERROR);
-                        }
-                        nvals = fwrite (CMdirection_outputs, sizeof(int8), n_cm_maps, fhoutput_cm_direction);
                         if (nvals != n_cm_maps)
                         {
                             RETURN_ERROR("Incorrect amount of data written", FUNC_NAME, ERROR);
@@ -592,9 +704,14 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    result = sccd(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, sdate,
-                                  valid_scene_count, tcg, &num_fc, &nrt_mode,
-                                  s_rec_cg, nrt_model, &num_obs_queue, obs_queue, min_rmse);
+                    for(i = 0; i < n_cm_maps; i++){
+                        CM_outputs[i] = NA_VALUE;
+                        CM_outputs_date[i] = NA_VALUE;
+                    }
+                    result = sccd(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, sdate, valid_scene_count,
+                                  tcg, &num_fc, &nrt_mode, s_rec_cg, nrt_model, &num_obs_queue, obs_queue, min_rmse, cm_output_interval,
+                                  starting_date, CM_outputs, CM_outputs_date);
+
                     //printf("free stage 9 \n");
                     for(i = 0; i < num_fc; i++)
                     {
