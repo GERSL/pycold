@@ -3,7 +3,6 @@ warnings.filterwarnings("ignore") # mainly to filter out lzma warnings
 import numpy as np
 import pandas as pd
 import os
-import gdal
 # import datetime
 from cv2 import floodFill
 import cv2 as cv2
@@ -12,13 +11,11 @@ from astropy.convolution import convolve
 from scipy import stats
 from scipy.stats import chi2
 from os.path import join, exists
-from pycold.utils import gdal_save_file_1band, get_block_x, get_block_y, read_blockdata, get_rowcol_intile
+from pycold.utils import get_block_x, get_block_y, read_blockdata, get_rowcol_intile
 from pycold.app import defaults, logging
 from pycold import obcold_reconstruct
 from skimage.segmentation import slic
 from skimage.measure import label as sklabel
-from skimage.segmentation import quickshift
-from skimage import measure
 from skimage.segmentation import watershed
 
 logger = logging.getLogger(__name__)

@@ -77,7 +77,7 @@ int sccd
     float min_rmse_float[TOTAL_IMAGE_BANDS_HLS];
     int len_clrx;         /* length of clrx  */
 
-    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD))
+    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD)|(*nrt_mode  == NRT_NEWCHANGE))
         len_clrx = valid_num_scenes + *num_obs_queue;
     else if ((*nrt_mode  == NRT_MONITOR_SNOW)|(*nrt_mode  == NRT_MONITOR_STANDARD))
         len_clrx = valid_num_scenes + DEFAULT_CONSE - 1;
@@ -128,7 +128,7 @@ int sccd
     /*     initializing clrx and clry using existing obs in queue        */
     /*                                                                   */
     /*********************************************************************/
-    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD))
+    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD)|(*nrt_mode  == NRT_NEWCHANGE))
     {
         // if queue mode, will append old observation first
         for (i = 0; i < *num_obs_queue; i++){
@@ -203,7 +203,7 @@ int sccd
 
          /* need to calculate min_rmse at the beginning of the monitoring*/
          if (*num_fc == 0){
-             if((*nrt_mode == NRT_VOID) | (*nrt_mode == NRT_QUEUE_STANDARD) | (*nrt_mode == NRT_QUEUE_SNOW)){
+             if((*nrt_mode == NRT_VOID) | (*nrt_mode == NRT_QUEUE_STANDARD) | (*nrt_mode == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_NEWCHANGE)){
                  status = adjust_median_variogram(clrx, clry,TOTAL_IMAGE_BANDS_HLS, 0,
                                                   n_clr-1, &date_vario, &max_date_difference,
                                                   min_rmse_float, 1);
@@ -1686,7 +1686,8 @@ int step2_KF_ChangeDetection
     int starting_date,
     int cm_output_interval,
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    bool b_outputcm
 )
 {
     int i_b, b, m, k;
@@ -1705,7 +1706,7 @@ int step2_KF_ChangeDetection
     float *medium_v_dif;
     float max_rmse[TOTAL_IMAGE_BANDS_HLS];
     bool change_flag = TRUE;
-    float mean_angle_2;
+    float mean_angle_2 = 9999.0;
     float tmp;
     double vt;
     float rmse_band[TOTAL_IMAGE_BANDS_HLS];
@@ -1780,47 +1781,63 @@ int step2_KF_ChangeDetection
             }
         }
 
+        /* for fast computing*/
+        if(b_outputcm == FALSE)
+        {
+            if(v_dif_mag_norm[i_conse] < tcg)
+            {
+                change_flag = FALSE;
+                 break;
+            }
+        }
+
         if(v_dif_mag_norm[i_conse] < break_mag)
         {
             break_mag = v_dif_mag_norm[i_conse];
         }
     }
 
-
-    for (b = 0; b < NUM_LASSO_BANDS; b++)
+    if(change_flag == TRUE)
     {
-//            for(k = 0; k < conse; k++)
-//                printf("%d = %f \n", k, v_dif[b][k]);
+        for (b = 0; b < NUM_LASSO_BANDS; b++)
+        {
+    //            for(k = 0; k < conse; k++)
+    //                printf("%d = %f \n", k, v_dif[b][k]);
 
-        quick_sort_float(v_dif[b], 0, conse-1);
-        matlab_2d_float_median(v_dif, b, conse, &tmp);
-        medium_v_dif[b] = tmp;
+            quick_sort_float(v_dif[b], 0, conse-1);
+            matlab_2d_float_median(v_dif, b, conse, &tmp);
+            medium_v_dif[b] = tmp;
+        }
+
+        mean_angle_2 = angl_scatter_measure(medium_v_dif, v_dif, NUM_LASSO_BANDS, conse);
+        // mean_angle  = MeanAngl(v_dif, NUM_LASSO_BANDS, conse);
+
+
+        prob_angle = (float)angle_decaying(mean_angle_2, (double)NSIGN_sccd, 90.0);
+        // prob_MCM = Chi_Square_Distribution(break_mag, NUM_LASSO_BANDS);
+        current_CM_n = (clrx[cur_i] - starting_date) / cm_output_interval;
+        tmp = round(prob_angle * break_mag * 100);
+        if (tmp > 32767) // 32767 is upper limit of short 16
+            tmp = 32767;
+        tmp_CM = (short int) (tmp);
+        if (mean_angle_2 > NSIGN_sccd)
+        //if (mean_angle > NSIGN)
+        {
+            change_flag = FALSE;
+        }
     }
 
-    mean_angle_2 = angl_scatter_measure(medium_v_dif, v_dif, NUM_LASSO_BANDS, conse);
-    // mean_angle  = MeanAngl(v_dif, NUM_LASSO_BANDS, conse);
-
-
-    prob_angle = (float)angle_decaying(mean_angle_2, (double)NSIGN_sccd, 90.0);
-    // prob_MCM = Chi_Square_Distribution(break_mag, NUM_LASSO_BANDS);
-    current_CM_n = (clrx[cur_i] - starting_date) / cm_output_interval;
-    tmp = round(prob_angle * break_mag * 100);
-    if (tmp > 32767) // 32767 is upper limit of short 16
-        tmp = 32767;
-    tmp_CM = (short int) (tmp);
-
-    /*********************************************/
-    /*      change direction by majority vote    */
-    /*********************************************/
-    if(tmp_CM > cm_outputs[current_CM_n])
+    if(b_outputcm == TRUE)
     {
-        cm_outputs[current_CM_n] = tmp_CM;
-        cm_outputs_date[current_CM_n] = (short int)(clrx[cur_i] - JULIAN_LANDSAT4_LAUNCH);
+        if(tmp_CM > cm_outputs[current_CM_n])
+        {
+            cm_outputs[current_CM_n] = tmp_CM;
+            cm_outputs_date[current_CM_n] = (short int)(clrx[cur_i] - JULIAN_LANDSAT4_LAUNCH);
+        }
+
     }
 
-
-
-    if ((break_mag > tcg) && (mean_angle_2 < NSIGN_sccd))
+    if ((change_flag == TRUE) && (break_mag > tcg) && (mean_angle_2 < NSIGN_sccd))
     {
             /********************************/
             /*  changed has been detected   */
@@ -2373,9 +2390,18 @@ int sccd_standard
         /**************************************************************/
         else
         {
-            status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
-                                              cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed, starting_date,
-                                              cm_output_interval, cm_outputs, cm_outputs_date);
+            if(*nrt_mode == NRT_VOID)
+            {
+                status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
+                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed, starting_date,
+                                                  cm_output_interval, cm_outputs, cm_outputs_date, FALSE);
+            }
+            else
+            {
+                status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
+                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed, starting_date,
+                                                  cm_output_interval, cm_outputs, cm_outputs_date, TRUE);
+            }
             if(status == CHANGEDETECTED)
             {
                 rec_cg[*num_fc].t_start = t_start;
