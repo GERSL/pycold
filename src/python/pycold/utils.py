@@ -5,9 +5,20 @@ from os.path import join
 # import gdal
 import os
 import datetime as dt
+from collections import namedtuple
+from pycold.app import defaults
 
-NAN_VAL = -9999
-JULIAN_LANDSAT4_LAUNCH = 723742
+
+SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
+
+output_sccd = np.dtype([('t_start', np.int32), ('t_break', np.int32), ('num_obs', np.int32),
+                        ('coefs', np.float32, (6, 6)), ('rmse', np.float32, 6), ('magnitude', np.float32, 6)], align=True)
+
+output_nrtqueue = np.dtype([('clry', np.short, 6), ('clrx_since1982', np.short)], align=True)
+output_nrtmodel = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (6, 5)),
+                            ('obs_date_since1982', np.short, 5), ('covariance', np.float32, (6, 36)),
+                            ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
+                            ('cm_outputs', np.short), ('cm_outputs_date', np.short)], align=True)
 
 def get_block_y(block_id, n_block_x):
     """
@@ -104,7 +115,7 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
     elif prefix == 'CM_direction':
         output_type = np.uint8
 
-    cm_map_list = [np.full((config['n_rows'], config['n_cols']), NAN_VAL, dtype=output_type) for x in range(n_cm_maps)]
+    cm_map_list = [np.full((config['n_rows'], config['n_cols']), defaults['COMMON']['NAN_VAL'], dtype=output_type) for x in range(n_cm_maps)]
     for iblock in range(config['n_blocks']):
         current_block_y = int(np.floor(iblock / config['n_block_x'])) + 1
         current_block_x = iblock % config['n_block_y'] + 1
@@ -117,7 +128,7 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
 
         if prefix == 'CM_date':
             cm_block_copy = cm_block.copy()
-            cm_block = cm_block + JULIAN_LANDSAT4_LAUNCH
+            cm_block = cm_block + defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH']
             # we assign an extremely large value to original NA value (255)
             cm_block[cm_block_copy == -9999] = -9999
 
@@ -309,18 +320,53 @@ def matordinal2date(ordinal):
     return pd.Timestamp.fromordinal(ordinal)
 
 
-def save_nrtfiles(out_folder, outfile_prefix, sccd_plot, data_ext):
-    ## save all files for C debug
+def save_nrtfiles(out_folder, outfile_prefix, sccd_pack, data_ext):
+    """
+    save all files for C debug
+    :param out_folder: the outputted folder
+    :param outfile_prefix: the prefix of outputted files
+    :param sccd_pack: 
+    :param data_ext: 
+    :return: 
+    """
     data_ext.to_csv(join(out_folder, 'spectral_{}_extension.csv').format(outfile_prefix), index=False, header=False)
     # data_ini_current.to_csv(join(out_path, 'spectral_{}_ini.csv').format(pid), index=False, header=False)
-    np.asarray(sccd_plot.nrt_mode).tofile(join(out_folder, 'sccd_plot{}_nrt_mode').format(outfile_prefix))
-    sccd_plot.rec_cg.tofile(join(out_folder, 'sccd_plot{}_rec_cg').format(outfile_prefix))
-    sccd_plot.nrt_model.tofile(join(out_folder, 'sccd_plot{}_nrt_model').format(outfile_prefix))
-    sccd_plot.nrt_queue.tofile(join(out_folder, 'sccd_plot{}_nrt_queue').format(outfile_prefix))
-    sccd_plot.min_rmse.tofile(join(out_folder, 'sccd_plot{}_min_rmse').format(outfile_prefix))
+    np.asarray(sccd_pack.nrt_mode).tofile(join(out_folder, 'sccd_pack{}_nrt_mode').format(outfile_prefix))
+    sccd_pack.rec_cg.tofile(join(out_folder, 'sccd_pack{}_rec_cg').format(outfile_prefix))
+    sccd_pack.nrt_model.tofile(join(out_folder, 'sccd_pack{}_nrt_model').format(outfile_prefix))
+    sccd_pack.nrt_queue.tofile(join(out_folder, 'sccd_pack{}_nrt_queue').format(outfile_prefix))
+    sccd_pack.min_rmse.tofile(join(out_folder, 'sccd_pack{}_min_rmse').format(outfile_prefix))
 
 
 def save_obs2csv(out_path, data):
     data.to_csv(out_path, index=False, header=False)
+
+
+def index_sccdpack(sccd_pack_single):
+    """
+    convert list of sccdpack to namedtuple to facilitate parse,
+    :param sccd_pack_single:
+    :return:
+    """
+    if len(sccd_pack_single) != defaults['SCCD']['PACK_ITEM']:
+        raise Exception("the element number of sccd_pack_single must be {}".format(defaults['SCCD']['PACK_ITEM']))
+
+    # convert to named tuple
+    sccd_pack_single = SccdOutput(sccd_pack_single)
+
+    # replace the element to structured array
+    if len(sccd_pack_single.rec_cg) == 0:
+        sccd_pack_single = sccd_pack_single._replace(rec_cg=np.asarray(sccd_pack_single.rec_cg,
+                                                                       dtype=np.float64))
+    else:
+        sccd_pack_single = sccd_pack_single._replace(rec_cg=np.asarray(sccd_pack_single.rec_cg,
+                                                                       dtype=output_sccd))
+    if len(sccd_pack_single.nrt_model) > 0:
+        sccd_pack_single = sccd_pack_single._replace(nrt_model=np.asarray(sccd_pack_single.nrt_model,
+                                                                          dtype=output_nrtmodel))
+    if len(sccd_pack_single.nrt_queue) > 0:
+        sccd_pack_single = sccd_pack_single._replace(nrt_queue=np.asarray(sccd_pack_single.nrt_queue,
+                                                                          dtype=output_nrtqueue))
+    return sccd_pack_single
     
 

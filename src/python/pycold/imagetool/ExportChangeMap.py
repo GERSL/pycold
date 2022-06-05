@@ -102,8 +102,6 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
                    ('magnitude', np.float32, 7)])
 
 
-        sccd_dt = namedtuple('sccd_dt', 't_start t_break num_obs coefs rmse magnitude pos')
-
     if rank == 0:
         if not os.path.exists(out_path):
             os.makedirs(out_path)

@@ -23,7 +23,6 @@ from pycold.pyclassifier import PyClassifierHPC
 from pycold.app import defaults
 import pickle
 
-NAN_VAL = -9999
 
 
 def tileprocessing_report(result_log_path, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
@@ -299,15 +298,15 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                                                   img_tstack[pos, 4, :].astype(np.int64),
                                                   img_tstack[pos, 5, :].astype(np.int64),
                                                   img_tstack[pos, 6, :].astype(np.int64),
-                                                  img_tstack[pos, 7, :].astype(np.int64),
+                                                  np.asarray([0] * len(img_tstack[pos, 6, :])).astype(np.int64),
                                                   t_cg=threshold,
                                                   pos=config['n_cols'] * (original_row - 1) + original_col)
                         # replace structural array to list for saving storage space
-                        cold_result = cold_result._replace(rec_cg = cold_result.rec_cg.tolist())
+                        cold_result = cold_result._replace(rec_cg=cold_result.rec_cg.tolist())
                         if len(sccd_plot.nrt_model) > 0:
-                            cold_result = cold_result._replace(nrt_model = cold_result.nrt_model.tolist())
+                            cold_result = cold_result._replace(nrt_model=cold_result.nrt_model.tolist())
                         if len(sccd_plot.nrt_queue) > 0:
-                            cold_result = cold_result._replace(nrt_queue = cold_result.nrt_queue.tolist())
+                            cold_result = cold_result._replace(nrt_queue=cold_result.nrt_queue.tolist())
                     else:
                         cold_result = cold_detect(img_dates_sorted,
                                                   img_tstack[pos, 0, :].astype(np.int64),

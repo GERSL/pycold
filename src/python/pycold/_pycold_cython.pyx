@@ -487,10 +487,11 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     cdef output_nrtmodel[:] nrt_model_view
     cdef output_nrtmodel* nrt_model
     cdef output_nrtmodel[:] nrt_model_view_old
+
+    # use an extreme value to enable only one cm output
     cdef int  cm_output_interval = 99999   
     cdef int starting_date = 0
     cdef int n_cm = 1
-    cdef short [:] min_rmse_view
     
     # grab inputs from the input
     if num_fc > 0:
@@ -514,7 +515,7 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     min_rmse = sccd_pack_copy.min_rmse
 
     # memory view
-    min_rmse_view = min_rmse
+    cdef short [:] min_rmse_view = min_rmse
     cdef long [:] dates_view = dates
     cdef long [:] ts_b_view = ts_b
     cdef long [:] ts_g_view = ts_g
@@ -535,7 +536,6 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
-    # use an extreme value to enable only one cm output
     cm_outputs = np.full(1, -9999, dtype=np.short)
     cm_outputs_date = np.full(1, -9999, dtype=np.short)
     cdef short [:] cm_outputs_view = cm_outputs  # memory view
@@ -558,10 +558,10 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
 
             if nrt_mode == 1 or nrt_mode == 4:  # monitor mode
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                  np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([]))
+                                  sccd_pack_copy.nrt_model, np.array([]))
             elif nrt_mode == 3:  # new change
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                  np.asarray(<output_nrtmodel[:1]>nrt_model),
+                                  sccd_pack_copy.nrt_model,
                                   np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
 
             elif nrt_mode == 2 or nrt_mode == 5:  # queue mode

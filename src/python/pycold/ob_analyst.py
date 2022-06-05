@@ -85,11 +85,11 @@ def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keywor
     log10_size = np.log10(int(stats_lut_row['npixels']))
     intercept = 1
     if classification_map is None:
-        if log10_size * defaults['default_sizeslope'] + intercept < 2:
-            scale = log10_size * defaults['default_sizeslope'] + intercept
+        if log10_size * defaults['OBCOLD']['default_sizeslope'] + intercept < 2:
+            scale = log10_size * defaults['OBCOLD']['default_sizeslope'] + intercept
         else:
             scale = 2
-        if np.double(stats_lut_row[keyword]) * scale > defaults['default_threshold']:
+        if np.double(stats_lut_row[keyword]) * scale > defaults['OBCOLD']['default_threshold']:
             return True
         else:
             return False
@@ -107,91 +107,91 @@ def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keywor
         else:
             if int(stats_lut_row['mode']) == 255:
                 # intercept = 1 - config['default_sizeslope']
-                if log10_size * defaults['default_sizeslope'] + intercept < 2:
-                    scale = log10_size * defaults['default_sizeslope'] + intercept
+                if log10_size * defaults['OBCOLD']['default_sizeslope'] + intercept < 2:
+                    scale = log10_size * defaults['OBCOLD']['default_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > defaults['default_threshold']:
+                if float(stats_lut_row[keyword]) * scale > defaults['OBCOLD']['default_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 1:  # develop in LCMAP
                 # intercept = 1 - config['C1_sizeslope']
-                if log10_size * defaults['C1_sizeslope'] + intercept < 2:
-                    scale = log10_size * defaults['C1_sizeslope'] + intercept
+                if log10_size * defaults['OBCOLD']['C1_sizeslope'] + intercept < 2:
+                    scale = log10_size * defaults['OBCOLD']['C1_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > defaults['C1_threshold']:
+                if float(stats_lut_row[keyword]) * scale > defaults['OBCOLD']['C1_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 2:  # cropland in LCMAP
                 # intercept = 1 - config['C2_sizeslope']
-                if log10_size * defaults['C2_sizeslope'] + intercept < 2:
-                    scale = log10_size * defaults['C2_sizeslope'] + intercept
+                if log10_size * defaults['OBCOLD']['C2_sizeslope'] + intercept < 2:
+                    scale = log10_size * defaults['OBCOLD']['C2_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > defaults['C2_threshold']:
+                if float(stats_lut_row[keyword]) * scale > defaults['OBCOLD']['C2_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 3:  # grassland in LCMAP
                 # intercept = 1 - config['C3_sizeslope']
-                if log10_size * defaults['C3_sizeslope'] + intercept < 2:
-                    scale = log10_size * defaults['C3_sizeslope'] + intercept
+                if log10_size * defaults['OBCOLD']['C3_sizeslope'] + intercept < 2:
+                    scale = log10_size * defaults['OBCOLD']['C3_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > defaults['C3_threshold']:
+                if float(stats_lut_row[keyword]) * scale > defaults['OBCOLD']['C3_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 4:  # forest in LCMAP
                 # intercept = 1 - config['C4_sizeslope']
-                if log10_size * defaults['C4_sizeslope'] + intercept < 2:
-                    scale = log10_size * defaults['C4_sizeslope'] + intercept
+                if log10_size * defaults['OBCOLD']['C4_sizeslope'] + intercept < 2:
+                    scale = log10_size * defaults['OBCOLD']['C4_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > defaults['C4_threshold']:
+                if float(stats_lut_row[keyword]) * scale > defaults['OBCOLD']['C4_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 5:  # water in LCMAP
                 # intercept = 1 - config['C5_sizeslope']
-                if log10_size * defaults['C5_sizeslope'] + intercept < 2:
-                    scale = log10_size * defaults['C5_sizeslope'] + intercept
+                if log10_size * defaults['OBCOLD']['C5_sizeslope'] + intercept < 2:
+                    scale = log10_size * defaults['OBCOLD']['C5_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > defaults['C5_threshold']:
+                if float(stats_lut_row[keyword]) * scale > defaults['OBCOLD']['C5_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 6:  # wetland in LCMAP
                 # intercept = 1 - config['C6_sizeslope']
-                if log10_size * defaults['C6_sizeslope'] + intercept < 2:
-                    scale = log10_size * defaults['C6_sizeslope'] + intercept
+                if log10_size * defaults['OBCOLD']['C6_sizeslope'] + intercept < 2:
+                    scale = log10_size * defaults['OBCOLD']['C6_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > defaults['C6_threshold']:
+                if float(stats_lut_row[keyword]) * scale > defaults['OBCOLD']['C6_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 7:  # ice in LCMAP
                 # intercept = 1 - config['C7_sizeslope']
-                if log10_size * defaults['C7_sizeslope'] + intercept < 2:
-                    scale = log10_size * defaults['C7_sizeslope'] + intercept
+                if log10_size * defaults['OBCOLD']['C7_sizeslope'] + intercept < 2:
+                    scale = log10_size * defaults['OBCOLD']['C7_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > defaults['C7_threshold']:
+                if float(stats_lut_row[keyword]) * scale > defaults['OBCOLD']['C7_threshold']:
                     return True
                 else:
                     return False
             elif int(stats_lut_row['mode']) == 8:  # barren in LCMAP
                 # intercept = 1 - config['C8_sizeslope']
-                if log10_size * defaults['C8_sizeslope'] + intercept < 2:
-                    scale = log10_size * defaults['C8_sizeslope'] + intercept
+                if log10_size * defaults['OBCOLD']['C8_sizeslope'] + intercept < 2:
+                    scale = log10_size * defaults['OBCOLD']['C8_sizeslope'] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > defaults['C8_threshold']:
+                if float(stats_lut_row[keyword]) * scale > defaults['OBCOLD']['C8_threshold']:
                     return True
                 else:
                     return False
@@ -277,19 +277,19 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None,
     peak_threshold = chi2.ppf(0.90, 5)
     [n_rows, n_cols] = cm_array.shape
     if floodfill_ratio is None:
-        floodfill_ratio = defaults['floodfill_thres']
+        floodfill_ratio = defaults['OBCOLD']['floodfill_thres']
     if cm_array_l1 is None:
-        cm_array_l1 = np.full((n_rows, n_cols), defaults['NAN_VAL'], dtype=np.int16)
+        cm_array_l1 = np.full((n_rows, n_cols), defaults['COMMON']['NAN_VAL'], dtype=np.int16)
     if cm_array_l1_date is None:
-        cm_array_l1_date = np.full((n_rows, n_cols), defaults['NAN_VAL'], dtype=np.int32)
+        cm_array_l1_date = np.full((n_rows, n_cols), defaults['COMMON']['NAN_VAL'], dtype=np.int32)
     
     # assign valid CM values in the stack into current cm array where NA values are
-    cm_array_l1[cm_array_l1 < (chi2.ppf(0.90, 5)*defaults['cm_scale'])] = defaults['NAN_VAL']
-    cm_array[cm_array == defaults['NAN_VAL']] = cm_array_l1[cm_array == defaults['NAN_VAL']]
-    cm_array = cm_array.astype(float) / defaults['cm_scale']
+    cm_array_l1[cm_array_l1 < (chi2.ppf(0.90, 5)*defaults['OBCOLD']['cm_scale'])] = defaults['COMMON']['NAN_VAL']
+    cm_array[cm_array == defaults['COMMON']['NAN_VAL']] = cm_array_l1[cm_array == defaults['COMMON']['NAN_VAL']]
+    cm_array = cm_array.astype(float) / defaults['OBCOLD']['cm_scale']
 
-    cm_date_array[cm_date_array == defaults['NAN_VAL']] = \
-        cm_array_l1_date[cm_date_array == defaults['NAN_VAL']]
+    cm_date_array[cm_date_array == defaults['COMMON']['NAN_VAL']] = \
+        cm_array_l1_date[cm_date_array == defaults['COMMON']['NAN_VAL']]
     
     # free memory
     cm_array_l1 = None
@@ -305,7 +305,7 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None,
     # using gaussian kernel ( with 1 sigma value) to smooth images in hpc_preparation for floodfill
     kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
     cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary='extend', preserve_nan=True)
-    cm_array_gaussian_s1[np.isnan(cm_array)] = defaults['NAN_VAL']
+    cm_array_gaussian_s1[np.isnan(cm_array)] = defaults['COMMON']['NAN_VAL']
     cm_array = None
 
     # seed_index = peak_local_max(cm_array_gaussian_s1, threshold_abs=peak_threshold,
@@ -368,7 +368,7 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None,
     mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
     # mean_list = np.sqrt(np.bincount(ids_s1.astype(int),
     # weights=np.square(cm_array_gaussian_s1.astype(np.int64)).reshape(ids_s1.shape)) / count_s1)
-    mean_list[unq_s1 == 0] = defaults['NAN_VAL']  # force mean of unchanged objects to be -9999
+    mean_list[unq_s1 == 0] = defaults['COMMON']['NAN_VAL']  # force mean of unchanged objects to be -9999
     s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
     object_map_s2 = object_map_s1.copy()
     object_map_s2[object_map_s2 > 0] = 1
@@ -411,21 +411,21 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
     """
 
     if low_bound is None:
-        low_bound = chi2.ppf(defaults['gate_probability'], 5)
+        low_bound = chi2.ppf(defaults['OBCOLD']['gate_probability'], 5)
     else:
         low_bound = low_bound
     [n_rows, n_cols] = cm_array.shape
     if cm_array_l1 is None:
-        cm_array_l1 = np.full((n_rows, n_cols), defaults['NAN_VAL'], dtype=np.int16)
+        cm_array_l1 = np.full((n_rows, n_cols), defaults['COMMON']['NAN_VAL'], dtype=np.int16)
     if cm_array_l1_date is None:
-        cm_array_l1_date = np.full((n_rows, n_cols), defaults['NAN_VAL'], dtype=np.int32)
+        cm_array_l1_date = np.full((n_rows, n_cols), defaults['COMMON']['NAN_VAL'], dtype=np.int32)
 
     # assign valid CM values in the stack into current cm array where NA values are
-    cm_array[cm_array == defaults['NAN_VAL']] = cm_array_l1[cm_array == defaults['NAN_VAL']]
-    cm_array = cm_array.astype(float) / defaults['cm_scale']
+    cm_array[cm_array == defaults['COMMON']['NAN_VAL']] = cm_array_l1[cm_array == defaults['COMMON']['NAN_VAL']]
+    cm_array = cm_array.astype(float) / defaults['OBCOLD']['cm_scale']
 
-    cm_date_array[cm_date_array == defaults['NAN_VAL']] = \
-        cm_array_l1_date[cm_date_array == defaults['NAN_VAL']]
+    cm_date_array[cm_date_array == defaults['COMMON']['NAN_VAL']] = \
+        cm_array_l1_date[cm_date_array == defaults['COMMON']['NAN_VAL']]
 
 
     #######################################################################################
@@ -437,7 +437,7 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
     # using gaussian kernel ( with 1 sigma value) to smooth images in hpc_preparation for floodfill
     kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
     cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary='extend', preserve_nan=True)
-    cm_array_gaussian_s1[np.isnan(cm_array)] = defaults['NAN_VAL']
+    cm_array_gaussian_s1[np.isnan(cm_array)] = defaults['COMMON']['NAN_VAL']
 
     mask = np.full_like(cm_array_gaussian_s1, fill_value=0)
     mask[cm_array_gaussian_s1 > low_bound] = 1
@@ -447,8 +447,8 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
     #     cm_date_min = np.min(cm_date_selected)
     #     cm_date_max = np.max(cm_date_selected)
     # else:
-    #     cm_date_min = defaults['NAN_VAL']
-    #     cm_date_max = defaults['NAN_VAL']
+    #     cm_date_min = defaults['COMMON']['NAN_VAL']
+    #     cm_date_max = defaults['COMMON']['NAN_VAL']
     cm_stack = cm_array_gaussian_s1
 
     n_segments = int(np.ceil(len(mask[mask == 1])/25))
@@ -468,7 +468,7 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
     unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
     mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
     # mean_list = np.sqrt(np.bincount(ids_s1.astype(int), weights=np.square(cm_array_gaussian_s1.astype(np.int64)).reshape(ids_s1.shape)) / count_s1)
-    mean_list[unq_s1 == 0] = defaults['NAN_VAL']  # force mean of unchanged objects to be -9999
+    mean_list[unq_s1 == 0] = defaults['COMMON']['NAN_VAL']  # force mean of unchanged objects to be -9999
     s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
     #######################################################################################
     #                                 Scale 2: change patch                              #
@@ -534,21 +534,21 @@ def segmentation_watershed(cm_array, cm_date_array, cm_array_l1=None, cm_array_l
     """
 
     if low_bound is None:
-        low_bound = chi2.ppf(defaults['gate_probability'], 5)
+        low_bound = chi2.ppf(defaults['OBCOLD']['gate_probability'], 5)
     else:
         low_bound = low_bound
     [n_rows, n_cols] = cm_array.shape
     if cm_array_l1 is None:
-        cm_array_l1 = np.full((n_rows, n_cols), defaults['NAN_VAL'], dtype=np.int16)
+        cm_array_l1 = np.full((n_rows, n_cols), defaults['COMMON']['NAN_VAL'], dtype=np.int16)
     if cm_array_l1_date is None:
-        cm_array_l1_date = np.full((n_rows, n_cols), defaults['NAN_VAL'], dtype=np.int32)
+        cm_array_l1_date = np.full((n_rows, n_cols), defaults['COMMON']['NAN_VAL'], dtype=np.int32)
 
     # assign valid CM values in the stack into current cm array where NA values are
-    cm_array[cm_array == defaults['NAN_VAL']] = cm_array_l1[cm_array == defaults['NAN_VAL']]
-    cm_array = cm_array.astype(float) / defaults['cm_scale']
+    cm_array[cm_array == defaults['COMMON']['NAN_VAL']] = cm_array_l1[cm_array == defaults['COMMON']['NAN_VAL']]
+    cm_array = cm_array.astype(float) / defaults['OBCOLD']['cm_scale']
 
-    cm_date_array[cm_date_array == defaults['NAN_VAL']] = \
-         cm_array_l1_date[cm_date_array == defaults['NAN_VAL']]
+    cm_date_array[cm_date_array == defaults['COMMON']['NAN_VAL']] = \
+         cm_array_l1_date[cm_date_array == defaults['COMMON']['NAN_VAL']]
 
     #######################################################################################
     #                               Scale 1: change superpixel                            #
@@ -559,7 +559,7 @@ def segmentation_watershed(cm_array, cm_date_array, cm_array_l1=None, cm_array_l
     # using gaussian kernel ( with 1 sigma value) to smooth images in hpc_preparation for floodfill
     kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
     cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary='extend', preserve_nan=True)
-    cm_array_gaussian_s1[np.isnan(cm_array)] = defaults['NAN_VAL']
+    cm_array_gaussian_s1[np.isnan(cm_array)] = defaults['COMMON']['NAN_VAL']
 
     mask = np.full_like(cm_array_gaussian_s1, fill_value=0)
     mask[cm_array_gaussian_s1 > low_bound] = 1
@@ -573,7 +573,7 @@ def segmentation_watershed(cm_array, cm_date_array, cm_array_l1=None, cm_array_l
     #                                          properties=['label', 'mean_intensity']))
     unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
     mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
-    mean_list[unq_s1 == 0] = defaults['NAN_VAL']  # force mean of unchanged objects to be -9999
+    mean_list[unq_s1 == 0] = defaults['COMMON']['NAN_VAL']  # force mean of unchanged objects to be -9999
     s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
     #######################################################################################
     #                                 Scale 2: change patch                              #
@@ -647,7 +647,7 @@ def object_analysis(object_map_s1, object_map_s2, s1_info, classification_map=No
 
 
 class ObjectAnalystHPC:
-    def __init__(self, config, stack_path, result_path, starting_date, cmmap_path=None, obia_path=None,
+    def __init__(self, config, stack_path, result_path, starting_date, band_num=7, cmmap_path=None, obia_path=None,
                  obcold_recg_path=None, thematic_path=None):
         """
         Args:
@@ -680,6 +680,7 @@ class ObjectAnalystHPC:
         self.stack_path = stack_path
         self.starting_date = starting_date
         self.year_lowbound = pd.Timestamp.fromordinal(starting_date).year
+        self.band_num = band_num
 
     @staticmethod
     def _check_inputs(config, stack_path, result_path, cmmap_path, obia_path, obcold_recg_path,
@@ -883,7 +884,7 @@ class ObjectAnalystHPC:
         if img_stack is None and img_dates_sorted is None:
             block_folder = join(self.stack_path, 'block_x{}_y{}'.format(block_x, block_y))
             img_stack, img_dates_sorted = read_blockdata(block_folder, self.config['n_cols']*self.config['n_rows'],
-                                                         defaults['TOTAL_IMAGE_BANDS']+1)
+                                                         self.band_num+1)
         obia_breaks = self.get_allobiaresult_asarray(block_x, block_y)
         result_collect = []
         for pos in range(self.config['block_width'] * self.config['block_height']):

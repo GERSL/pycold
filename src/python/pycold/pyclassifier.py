@@ -59,7 +59,7 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, n_features_perb
                         for n in range(n_features_perband):
                             if n == 0:
                                 features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
-                                                     ordinal_day / defaults['SLOPE_SCALE']
+                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
                                 if np.isnan(features[n][index]):
                                     features[n][index] = 0
                             else:
@@ -84,7 +84,7 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, n_features_perb
                             if n == 0:
                                 # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
                                 features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
-                                                     ordinal_day / defaults['SLOPE_SCALE']
+                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
                                 if np.isnan(features[n][index]):
                                     features[n][index] = 0
                             else:
@@ -133,7 +133,7 @@ def get_features(path):
 
 
 class PyClassifier:
-    def __init__(self, config, n_features=None, logger=None):
+    def __init__(self, config, n_features=None, logger=None, band_num=7):
         """
         Parameters
         ----------
@@ -145,9 +145,9 @@ class PyClassifier:
         self.config['block_height'] = int(self.config['n_rows'] / self.config['n_block_y'])
         self.config['n_blocks'] = self.config['n_block_x'] * self.config['n_block_y']
         if n_features is None:
-            self.n_features = defaults['TOTAL_IMAGE_BANDS'] * defaults['N_FEATURES']
+            self.n_features = band_num * defaults['CLASSIFIER']['N_FEATURES']
         else:
-            self.n_features = defaults['TOTAL_IMAGE_BANDS'] * n_features
+            self.n_features = band_num * n_features
         if logger is None:
             logging.basicConfig(level=logging.DEBUG,
                                 format='%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s',
@@ -155,6 +155,7 @@ class PyClassifier:
             self.logger = logging.getLogger(__name__)
         else:
             self.logger = logger
+        self.band_num = band_num
 
     def predict_features(self, block_id, cold_block, year_lowbound, year_uppbound, ismat=False):
         """
@@ -181,7 +182,7 @@ class PyClassifier:
         block_features = np.full(((year_uppbound - year_lowbound + 1),
                                   self.config['block_width'] * self.config['block_height'],
                                   self.n_features),
-                                 defaults['NAN_VAL'], dtype=np.float32)
+                                 defaults['COMMON']['NAN_VAL'], dtype=np.float32)
         ordinal_day_list = [pd.Timestamp.toordinal(dt.date(year, 7, 1)) for year
                             in range(year_lowbound, year_uppbound + 1)]
         if len(cold_block) == 0:
@@ -198,12 +199,12 @@ class PyClassifier:
                                   get_block_y(block_id, self.config['n_block_x']),
                                   self.config['block_height'])
 
-            for band in range(defaults['TOTAL_IMAGE_BANDS']):
-                feature_row = extract_features(element, band, ordinal_day_list, defaults['NAN_VAL'],
-                                               int(self.n_features / defaults['TOTAL_IMAGE_BANDS']), ismat)
-                for index in range(int(self.n_features / defaults['TOTAL_IMAGE_BANDS'])):
+            for band in range(self.band_num):
+                feature_row = extract_features(element, band, ordinal_day_list, defaults['COMMON']['NAN_VAL'],
+                                               int(self.n_features / self.band_num), ismat)
+                for index in range(int(self.n_features / self.band_num)):
                     block_features[:, i_row * self.config['block_width'] + i_col, 
-                                   int(band * self.n_features / defaults['TOTAL_IMAGE_BANDS']) + index] \
+                                   int(band * self.n_features / self.band_num) + index] \
                         = feature_row[index]
 
         return block_features
@@ -221,10 +222,10 @@ class PyClassifier:
             a sklearn random forest model
         """
         assert label.shape == (self.config['n_rows'], self.config['n_cols'])
-        samplecount = generate_sample_num(label, defaults)
+        samplecount = generate_sample_num(label, defaults['CLASSIFIER'])
         index_list = []
         label_list = []
-        for i in range(defaults['total_landcover_category']):
+        for i in range(defaults['CLASSIFIER']['total_landcover_category']):
             index = np.argwhere(label == i + 1)
             np.random.seed(42)  # set random seed to reproduce the same result
             index_sample = index[np.random.choice(len(index), int(samplecount[i]), replace=False)]
@@ -248,9 +249,8 @@ class PyClassifier:
         -------
             cmap, the feature temp array file for block_id and year
         """
-        # image_flat = np.zeros((parameters['n_rows'] * parameters['n_cols'], parameters['TOTAL_IMAGE_BANDS']))
         cmap = rf_model.predict(tmp_feature).reshape(self.config['block_height'], self.config['block_width'])
-        mask = np.all(tmp_feature == defaults['NAN_VAL'], axis=1).reshape(self.config['block_height'],
+        mask = np.all(tmp_feature == defaults['COMMON']['NAN_VAL'], axis=1).reshape(self.config['block_height'],
                                                                           self.config['block_width'])
         cmap[mask] = 255
         return cmap
@@ -267,8 +267,8 @@ class PyClassifierHPC(PyClassifier):
     """
     this class adds IO functions based on the HPC environment for the base class
     """
-    def __init__(self, config, record_path, year_lowbound=1982, year_uppbound=2021, tmp_path=None, output_path=None,
-                 n_features=defaults['N_FEATURES'], seedmap_path=None, rf_path=None, logger=None):
+    def __init__(self, config, record_path, band_num=7, year_lowbound=1982, year_uppbound=2021, tmp_path=None, output_path=None,
+                 n_features=defaults['CLASSIFIER']['N_FEATURES'], seedmap_path=None, rf_path=None, logger=None):
         """
         Parameters
         ----------
@@ -315,7 +315,7 @@ class PyClassifierHPC(PyClassifier):
         else:
             self.output_path = tmp_path
 
-        self.n_features = defaults['TOTAL_IMAGE_BANDS'] * n_features
+        self.n_features = band_num * n_features
 
         self.year_lowbound = year_lowbound
         self.year_uppbound = year_uppbound
@@ -332,6 +332,8 @@ class PyClassifierHPC(PyClassifier):
             self.logger = logging.getLogger(__name__)
         else:
             self.logger = logger
+
+        self.band_num = band_num
 
     @staticmethod
     def _check_inputs_thematic(config, record_path, year_lowbound, year_uppbound, tmp_path,  seedmap_path,
@@ -466,7 +468,7 @@ class PyClassifierHPC(PyClassifier):
         while not self._is_finished_step1_predict_features():
             time.sleep(5)
         if ref_year is None:
-            ref_year = defaults['classification_year']
+            ref_year = defaults['CLASSIFIER']['classification_year']
 
         full_feature_array = assemble_array(self.get_fullfeature_forcertainyear(ref_year),
                                             self.config['n_block_x'])
