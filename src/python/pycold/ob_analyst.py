@@ -12,13 +12,13 @@ from scipy import stats
 from scipy.stats import chi2
 from os.path import join, exists
 from pycold.utils import get_block_x, get_block_y, read_blockdata, get_rowcol_intile
-from pycold.app import defaults, logging
+from pycold.app import defaults
 from pycold import obcold_reconstruct
 from skimage.segmentation import slic
 from skimage.measure import label as sklabel
 from skimage.segmentation import watershed
-
-logger = logging.getLogger(__name__)
+import logging
+import sys
 
 
 def cmname_fromdate(ordinal_date):
@@ -859,16 +859,25 @@ class ObjectAnalystHPC:
                        for count, f in enumerate(files_date_zip)]
         return np.vstack(obia_tstack)
 
-    def reconstruct_reccg(self, block_id, img_stack=None, img_dates_sorted=None):
+    def reconstruct_reccg(self, block_id, img_stack=None, img_dates_sorted=None, logger=None):
         """
         the third step of OBCOLD, it reconstructs the new temporal segment based on the new spatially adjusted break
         Args:
             block_id: the block id to be processed
             img_stack: time series block-based dataset
             img_dates_sorted: the new break dates from obiaresult_{}.npy
+            logger: logger handle
         Returns:
             change records
         """
+        if logger is None:
+            logging.basicConfig(level=logging.DEBUG,
+                                format='%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s',
+                                stream=sys.stdout)
+            logger = logging.getLogger(__name__)
+        else:
+            logger = logger
+
         block_y = get_block_y(block_id, self.config['n_block_x'])
         block_x = get_block_x(block_id, self.config['n_block_x'])
         if img_stack is None and img_dates_sorted is None:

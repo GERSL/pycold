@@ -39,13 +39,13 @@ VERSION = parse_version('src/python/pycold/__init__.py')  # needs to be a global
 
 if __name__ == '__main__':
     setup(
-        package_dir={'': 'src/python/'},
+        package_dir={'pycold': 'src/python/'},
         name="pycold",
         version=VERSION,
         description="python implementation of COntinuous monitoring of Land disturbances algorithm",
         install_requires=[
             # See requirements.txt for a more complete list
-            'numpy >= 1.19.2',
+            'numpy >= 1.20.1'
         ],
         # ext_modules = cythonize([sccd_extension]),
         # include_dirs=[numpy.get_include()],

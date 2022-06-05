@@ -9,7 +9,6 @@ import datetime as dt
 NAN_VAL = -9999
 JULIAN_LANDSAT4_LAUNCH = 723742
 
-
 def get_block_y(block_id, n_block_x):
     """
     Parameters
@@ -213,6 +212,19 @@ def get_time_now(tz):
     return datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
 
 
+def get_ymd_now(tz):
+    """
+    Parameters
+    ----------
+    tz: string
+
+    Returns
+    -------
+    datatime format of current time
+    """
+    return datetime.now(tz).strftime('%Y-%m-%d')
+
+
 def get_doy(ordinal_date):
     """
     Parameters
@@ -310,3 +322,5 @@ def save_nrtfiles(out_folder, outfile_prefix, sccd_plot, data_ext):
 
 def save_obs2csv(out_path, data):
     data.to_csv(out_path, index=False, header=False)
+    
+

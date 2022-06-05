@@ -12,16 +12,7 @@ source: https://github.com/repository-preservation/lcmap-pyclass/blob/develop/py
 """
 
 import os
-import logging
 import yaml
-import sys
-import numpy as np
-
-__format = '%(asctime)s.%(msecs)03d %(module)s::%(funcName)-20s - %(message)s'
-logging.basicConfig(stream=sys.stdout,
-                    level=logging.DEBUG,
-                    format=__format,
-                    datefmt='%Y-%m-%d %H:%M:%S')
 
 
 class Defaults(dict):

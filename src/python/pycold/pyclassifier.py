@@ -7,13 +7,13 @@ import datetime as dt
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 from sklearn.ensemble import RandomForestClassifier
 from os.path import join, exists
-from pycold.app import defaults, logging
+from pycold.app import defaults
 from pycold.utils import get_block_y, get_block_x, get_col_index, get_row_index, assemble_array
 import joblib
 import time
 from osgeo import gdal_array
-
-logger = logging.getLogger(__name__)
+import logging
+import sys
 
 
 def extract_features(cold_plot, band, ordinal_day_list, nan_val, n_features_perband, ismat=False):
@@ -133,7 +133,7 @@ def get_features(path):
 
 
 class PyClassifier:
-    def __init__(self, config, n_features=None):
+    def __init__(self, config, n_features=None, logger=None):
         """
         Parameters
         ----------
@@ -148,6 +148,13 @@ class PyClassifier:
             self.n_features = defaults['TOTAL_IMAGE_BANDS'] * defaults['N_FEATURES']
         else:
             self.n_features = defaults['TOTAL_IMAGE_BANDS'] * n_features
+        if logger is None:
+            logging.basicConfig(level=logging.DEBUG,
+                                format='%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s',
+                                stream=sys.stdout)
+            self.logger = logging.getLogger(__name__)
+        else:
+            self.logger = logger
 
     def predict_features(self, block_id, cold_block, year_lowbound, year_uppbound, ismat=False):
         """
@@ -178,7 +185,7 @@ class PyClassifier:
         ordinal_day_list = [pd.Timestamp.toordinal(dt.date(year, 7, 1)) for year
                             in range(year_lowbound, year_uppbound + 1)]
         if len(cold_block) == 0:
-            logger.warning('the rec_cg file for block_id'.format(block_id))
+            self.logger.warning('the rec_cg file for block_id has no records'.format(block_id))
             return block_features
 
         cold_block_split = np.split(cold_block, np.argwhere(np.diff(cold_block['pos']) != 0)[:, 0] + 1)
@@ -261,7 +268,7 @@ class PyClassifierHPC(PyClassifier):
     this class adds IO functions based on the HPC environment for the base class
     """
     def __init__(self, config, record_path, year_lowbound=1982, year_uppbound=2021, tmp_path=None, output_path=None,
-                 n_features=defaults['N_FEATURES'], seedmap_path=None, rf_path=None):
+                 n_features=defaults['N_FEATURES'], seedmap_path=None, rf_path=None, logger=None):
         """
         Parameters
         ----------
@@ -282,6 +289,7 @@ class PyClassifierHPC(PyClassifier):
                 Note that intercept for each year is adjusted by slope, i.e., intercept + slope * date
         seedmap_path: the path for the seed map to produce rf model
         rf_path: the path for existing random forest forest
+        logger: the logger handler
         """
         try:
             self._check_inputs_thematic(config, record_path, year_lowbound, year_uppbound, tmp_path,
@@ -316,6 +324,14 @@ class PyClassifierHPC(PyClassifier):
             self.rf_path = join(self.output_path, 'rf.model')  # default path
         else:
             self.rf_path = rf_path
+
+        if logger is None:
+            logging.basicConfig(level=logging.DEBUG,
+                                format='%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s',
+                                stream=sys.stdout)
+            self.logger = logging.getLogger(__name__)
+        else:
+            self.logger = logger
 
     @staticmethod
     def _check_inputs_thematic(config, record_path, year_lowbound, year_uppbound, tmp_path,  seedmap_path,
@@ -409,7 +425,7 @@ class PyClassifierHPC(PyClassifier):
         tmp_feature_filenames = [file for file in os.listdir(self.tmp_path)
                                  if file.startswith('tmp_feature_year{}'.format(year))]
         if len(tmp_feature_filenames) < self.config['n_blocks']:
-            logger.warning('tmp features are incomplete! should have {}; but actually have {} feature images'.
+            self.logger.warning('tmp features are incomplete! should have {}; but actually have {} feature images'.
                            format(self.config['n_blocks'], len(tmp_feature_filenames)))
 
         tmp_feature_filenames.sort(
