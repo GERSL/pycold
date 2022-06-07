@@ -17,12 +17,12 @@ import click
 import time
 from pycold import cold_detect, sccd_detect
 from scipy.stats import chi2
-from pycold.utils import assemble_cmmaps, get_rowcol_intile, get_time_now, get_doy
+from pycold.utils import assemble_cmmaps, get_rowcol_intile, get_time_now, get_doy, unindex_sccdpack
 from pycold.ob_analyst import ObjectAnalystHPC
 from pycold.pyclassifier import PyClassifierHPC
 from pycold.app import defaults
 import pickle
-
+from dateutil.parser import parse
 
 
 def tileprocessing_report(result_log_path, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
@@ -160,11 +160,22 @@ def is_finished_assemble_cmmaps(cmmap_path, n_cm, starting_date, cm_interval):
     return True
 
 
-def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_datebound=0):
+def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_datebound=0, nband=8):
+    """
+    :param config: configure file
+    :param block_x: block id at x axis
+    :param block_y: block id at y axis
+    :param stack_path: stack path
+    :param low_datebound: ordinal data of low bounds of selection date range
+    :param high_datebound: ordinal data of upper bounds of selection date range
+    :return:
+        img_tstack, img_dates_sorted
+        img_tstack - 3-d array (block_width * block_height, nband, nimage)
+    """
     block_width = int(config['n_cols'] / config['n_block_x'])  # width of a block
     block_height = int(config['n_rows'] / config['n_block_y'])  # height of a block
     block_folder = join(stack_path, 'block_x{}_y{}'.format(block_x, block_y))
-    img_files = [f for f in os.listdir(block_folder) if f.startswith('L')]
+    img_files = [f for f in os.listdir(block_folder) if f.startswith('L') or f.startswith('S')]
     if len(img_files) == 0:
         return None, None
     # sort image files by dates
@@ -180,8 +191,7 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
     files_date_zip = sorted(zip(img_dates, img_files))
     img_files_sorted = [x[1] for x in files_date_zip]
     img_dates_sorted = np.asarray([x[0] for x in files_date_zip])
-    img_tstack = np.dstack([np.load(join(block_folder, f)).reshape(block_width * block_height,
-                                                                   config['band_num'])
+    img_tstack = np.dstack([np.load(join(block_folder, f)).reshape(block_width * block_height, nband)
                             for f in img_files_sorted])
     return img_tstack, img_dates_sorted
 
@@ -196,11 +206,25 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
 @click.option('--seedmap_path', type=str, default=None, help='an existing label map path; '
                                                              'none means not using thematic info')
 @click.option('--method', type=click.Choice(['COLD', 'OBCOLD', 'SCCDOFFLINE']), help='COLD, OBCOLD, SCCD-OFFLINE')
-@click.option('--low_datebound', type=int, default=0, help='low date bound of image selection for processing')
-@click.option('--upper_datebound', type=int, default=0, help='upper date bound of image selection for processing')
+@click.option('--low_datebound', type=str, default=None, help='low date bound of image selection for processing. '
+                                                              'Example - 2015-01-01')
+@click.option('--upper_datebound', type=str, default=None, help='upper date bound of image selection for processing.'
+                                                                'Example - 2021-12-31')
 def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path, low_datebound, upper_datebound):
     tz = timezone('US/Eastern')
     start_time = datetime.now(tz)
+
+    if low_datebound is None:
+        low_datebound = 0
+    else:
+        low_datebound = pd.Timestamp.toordinal(parse(low_datebound))
+    print(low_datebound)
+
+    if upper_datebound is None:
+        upper_datebound = 0
+    else:
+        upper_datebound = pd.Timestamp.toordinal(parse(upper_datebound))
+    print(upper_datebound)
 
     # Reading config
     with open(yaml_path, 'r') as yaml_obj:
@@ -232,7 +256,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         if method == 'OBCOLD':
             if not os.path.exists(join(result_path, 'cm_maps')):
                 os.makedirs(join(result_path, 'cm_maps'))
-        print("The per-pixel COLD algorithm begins: {}".format(start_time.strftime('%Y-%m-%d %H:%M:%S')))
+        print("The per-pixel time series processing begins: {}".format(start_time.strftime('%Y-%m-%d %H:%M:%S')))
 
         if not os.path.exists(stack_path):
             print("Failed to locate stack folders. The program ends: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
@@ -297,16 +321,18 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                                                   img_tstack[pos, 3, :].astype(np.int64),
                                                   img_tstack[pos, 4, :].astype(np.int64),
                                                   img_tstack[pos, 5, :].astype(np.int64),
+                                                  # np.asarray([0] * len(img_tstack[pos, 5, :])).astype(np.int64),
                                                   img_tstack[pos, 6, :].astype(np.int64),
-                                                  np.asarray([0] * len(img_tstack[pos, 6, :])).astype(np.int64),
+                                                  img_tstack[pos, 7, :].astype(np.int64),
                                                   t_cg=threshold,
                                                   pos=config['n_cols'] * (original_row - 1) + original_col)
                         # replace structural array to list for saving storage space
-                        cold_result = cold_result._replace(rec_cg=cold_result.rec_cg.tolist())
-                        if len(sccd_plot.nrt_model) > 0:
-                            cold_result = cold_result._replace(nrt_model=cold_result.nrt_model.tolist())
-                        if len(sccd_plot.nrt_queue) > 0:
-                            cold_result = cold_result._replace(nrt_queue=cold_result.nrt_queue.tolist())
+                        # cold_result = cold_result._replace(rec_cg=cold_result.rec_cg.tolist())
+                        # if len(sccd_plot.nrt_model) > 0:
+                        #     cold_result = cold_result._replace(nrt_model=cold_result.nrt_model.tolist())
+                        # if len(sccd_plot.nrt_queue) > 0:
+                        #    cold_result = cold_result._replace(nrt_queue=cold_result.nrt_queue.tolist())
+                        cold_result = unindex_sccdpack(cold_result)
                     else:
                         cold_result = cold_detect(img_dates_sorted,
                                                   img_tstack[pos, 0, :].astype(np.int64),
@@ -426,9 +452,9 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         #########################################################################
         #                      object-based image analysis                      #
         #########################################################################
-        if ob_analyst.is_finished_object_analysis(np.arange(starting_date,
-                                                            starting_date+config['CM_OUTPUT_INTERVAL']*n_cm_maps,
-                                                            config['CM_OUTPUT_INTERVAL'])) == False:
+        if not ob_analyst.is_finished_object_analysis(np.arange(starting_date,
+                                                                starting_date+config['CM_OUTPUT_INTERVAL']*n_cm_maps,
+                                                      config['CM_OUTPUT_INTERVAL'])):
             n_map_percore = int(np.ceil(n_cm_maps / n_cores))
             max_date = starting_date + (n_cm_maps - 1) * config['CM_OUTPUT_INTERVAL']
             for i in range(n_map_percore):

@@ -342,17 +342,34 @@ def save_obs2csv(out_path, data):
     data.to_csv(out_path, index=False, header=False)
 
 
+def unindex_sccdpack(sccd_pack_single):
+    """
+    remove index of sccdpack to save memory
+    sccd_pack_single: a namedtuple SccdOutput
+    :return: a nested list
+    """
+    sccd_pack_single = sccd_pack_single._replace(rec_cg=sccd_pack_single.rec_cg.tolist())
+
+    if len(sccd_pack_single.nrt_model) > 0:
+        sccd_pack_single = sccd_pack_single._replace(nrt_model=sccd_pack_single.nrt_model.tolist())
+
+    if len(sccd_pack_single.nrt_queue) > 0:
+        sccd_pack_single = sccd_pack_single._replace(nrt_queue=sccd_pack_single.nrt_queue.tolist())
+
+    return list(sccd_pack_single)
+
+
 def index_sccdpack(sccd_pack_single):
     """
     convert list of sccdpack to namedtuple to facilitate parse,
-    :param sccd_pack_single:
-    :return:
+    :param sccd_pack_single: a nested list
+    :return: a namedtuple SccdOutput
     """
     if len(sccd_pack_single) != defaults['SCCD']['PACK_ITEM']:
         raise Exception("the element number of sccd_pack_single must be {}".format(defaults['SCCD']['PACK_ITEM']))
 
     # convert to named tuple
-    sccd_pack_single = SccdOutput(sccd_pack_single)
+    sccd_pack_single = SccdOutput(*sccd_pack_single)
 
     # replace the element to structured array
     if len(sccd_pack_single.rec_cg) == 0:
@@ -368,5 +385,9 @@ def index_sccdpack(sccd_pack_single):
         sccd_pack_single = sccd_pack_single._replace(nrt_queue=np.asarray(sccd_pack_single.nrt_queue,
                                                                           dtype=output_nrtqueue))
     return sccd_pack_single
+
+
+
+
     
 

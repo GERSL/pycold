@@ -239,6 +239,8 @@ def single_image_stacking_hls(source_dir, out_dir, folder, logger, config, is_pa
                                          "{}.B06.tif".format(folder)))
                 B6 = gdal_array.LoadFile(join(join(source_dir, folder),
                                          "{}.B07.tif".format(folder)))
+                B7 = np.full(B6.shape, 0)  # assign zero
+
             except ValueError as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
                 logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
@@ -257,6 +259,7 @@ def single_image_stacking_hls(source_dir, out_dir, folder, logger, config, is_pa
                                               "{}.B11.tif".format(folder)))
                 B6 = gdal_array.LoadFile(join(join(source_dir, folder),
                                               "{}.B12.tif".format(folder)))
+                B7 = np.full(B6.shape, 0)
 
             except ValueError as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
@@ -302,6 +305,11 @@ def single_image_stacking_hls(source_dir, out_dir, folder, logger, config, is_pa
                                                         strides=(config['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
                                                                  config['n_cols'] * bytesize, bytesize))
+            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(config['n_block_y'],
+                                                        config['n_block_x'], b_height, b_width),
+                                                        strides=(config['n_cols'] * b_height * bytesize,
+                                                                 b_width * bytesize,
+                                                                 config['n_cols'] * bytesize, bytesize))
             QA_blocks = np.lib.stride_tricks.as_strided(QA_band_unpacked,
                                                         shape=(config['n_block_y'],
                                                                config['n_block_x'], b_height,
@@ -326,10 +334,10 @@ def single_image_stacking_hls(source_dir, out_dir, folder, logger, config, is_pa
                     block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
                     np.save(join(join(out_dir, block_folder), file_name),
                             np.dstack([B1_blocks[i][j], B2_blocks[i][j], B3_blocks[i][j], B4_blocks[i][j],
-                                       B5_blocks[i][j], B6_blocks[i][j], QA_blocks[i][j]]))
+                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j], QA_blocks[i][j]]))
 
         else:
-            np.save(join(out_dir, file_name), np.dstack([B1, B2, B3, B4, B5, B6, QA_band_unpacked]))
+            np.save(join(out_dir, file_name), np.dstack([B1, B2, B3, B4, B5, B6, B7, QA_band_unpacked]))
         # scene_list.append(folder_name)
     else:
         # logger.info('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
@@ -1082,8 +1090,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                 break
             folder = folder_list[new_rank]
             single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger,
-                                    config, is_partition=is_partition, low_year_bound=low_year_bound,
-                                    upp_year_bound=upp_year_bound)
+                                  config, is_partition=is_partition, low_year_bound=low_year_bound,
+                                  upp_year_bound=upp_year_bound)
     elif collection == 'HLS':
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
@@ -1091,10 +1099,9 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             if new_rank > (len(folder_list) - 1):  # means that all folder has been processed
                 break
             folder = folder_list[new_rank]
-            single_image_stacking_hls(source_dir, out_dir, folder, clear_threshold, logger, config,
-                                        is_partition=is_partition, low_year_bound=low_year_bound,
-                                        upp_year_bound=upp_year_bound)
-
+            single_image_stacking_hls(source_dir, out_dir, folder, logger, config,
+                                      is_partition=is_partition, low_year_bound=low_year_bound,
+                                      upp_year_bound=upp_year_bound)
     # create an empty file for signaling the core that has been finished
     with open(os.path.join(out_dir, 'rank{}_finished.txt'.format(rank)), 'w') as fp:
         pass
