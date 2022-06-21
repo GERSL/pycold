@@ -6,18 +6,14 @@ import pandas as pd
 import gdal
 import click
 import datetime as datetime
-import yaml
 from mpi4py import MPI
 from osgeo import gdal_array
 import pickle
 from collections import namedtuple
+from pycold.app import defaults
+from pycold.utils import index_sccdpack, unindex_sccdpack
+import yaml
 
-POS_ID = 0
-RECCG_ID = 1
-MINRMSE_ID = 2
-NRTMODE_ID = 3
-NRTMODEL_ID = 4
-NRTQUEUE_ID = 5
 
 def getcategory_cold(cold_plot, i_curve):
     t_c = -200
@@ -58,49 +54,64 @@ def getcategory_obcold(cold_plot, i_curve, last_dist_type):
             return 1  # land disturbance
 
 
+# for sccd we won't consider afforestation
+def getcategory_sccd(cold_plot, i_curve):
+    t_c = -200
+    if cold_plot[i_curve]['magnitude'][3] > t_c and cold_plot[i_curve]['magnitude'][2] < -t_c and \
+            cold_plot[i_curve]['magnitude'][4] < -t_c:
+        return 2  # regrowth
+    else:
+        return 1  # land disturbance
+
+
 @click.command()
 @click.option('--reccg_path', type=str, help='rec_cg folder')
 @click.option('--reference_path', type=str, help='image path used to provide georeference for output images')
 @click.option('--out_path', type=str, help='output folder for saving image')
-@click.option('--method', type=click.Choice(['COLD', 'OBCOLD']), default='COLD', help='the algorithm used for processing')
+@click.option('--method', type=click.Choice(['COLD', 'OBCOLD', 'SCCDOFFLINE']), default='COLD', help='the algorithm used for processing')
 @click.option('--yaml_path', type=str, help='path for yaml file')
 @click.option('--year_lowbound', type=int, default=1982, help='the starting year for exporting')
 @click.option('--year_uppbound', type=int, default=2020, help='the ending year for exporting')
 def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbound, yaml_path):
     # reference_path = '/Users/coloury/Dropbox/UCONN/spatial/test_results/h016v010/recentdist_map_COLD.tif'
-    # method = 'COLD'
-    # reccg_path ='/Users/coloury/Dropbox/UCONN/spatial/test_results/h030v006/july_version'
-    # mode = 'r'
-    # out_path = '/Users/coloury/tmp'
-    # targeted_year = 0
-    # results_block = np.full(cols, -9999, dtype=np.int32)
-    # threads = 1
-    # is_mat = False
-    # singlerow_execution(reccg_path, filename, dt, cols, method, mode, targeted_year, t_c, bias, i_row, results_block)
+    # method = 'SCCDOFFLINE'
+    # yaml_path = '/home/coloury/Dropbox/Documents/PyCharmProjects/HLS_NRT/config_hls.yaml'
+    # reccg_path ='/home/coloury'
+    # out_path = '/home/coloury'
+    # year_lowbound = 1982
+    # year_uppbound = 2020
 
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     n_process = comm.Get_size()
-    bias = 0
     if method == 'OBCOLD':
         reccg_path = os.path.join(reccg_path, 'obcold')
         out_path = os.path.join(out_path, 'obcold_maps')
     elif method == 'COLD':
         out_path = os.path.join(out_path, 'cold_maps')
+    elif method == 'SCCDOFFLINE':
+        out_path = os.path.join(out_path, 'sccd_maps')
 
     # outname'obcold':
     # outname = 'breakyear_cold_h11v9_{}_{}_{}'.format(lower_year, upper_year, method)
-    dt = np.dtype([('t_start', np.int32),
-                   ('t_end', np.int32),
-                   ('t_break', np.int32),
-                   ('pos', np.int32),
-                   ('num_obs', np.int32),
-                   ('category', np.short),
-                   ('change_prob', np.short),
-                   ('coefs', np.float32, (7, 8)),   # note that the slope coefficient was scaled up by 10000
-                   ('rmse', np.float32, 7),
-                   ('magnitude', np.float32, 7)])
-
+    if method == 'SCCDOFFLINE':
+        dt = np.dtype([('t_start', np.int32),
+                       ('t_break', np.int32),
+                       ('num_obs', np.int32),
+                       ('coefs', np.float32, (6, 6)),  # note that the slope coefficient was scaled up by 10000
+                       ('rmse', np.float32, 6),
+                       ('magnitude', np.float32, 6)])
+    else:
+        dt = np.dtype([('t_start', np.int32),
+                       ('t_end', np.int32),
+                       ('t_break', np.int32),
+                       ('pos', np.int32),
+                       ('num_obs', np.int32),
+                       ('category', np.short),
+                       ('change_prob', np.short),
+                       ('coefs', np.float32, (7, 8)),   # note that the slope coefficient was scaled up by 10000
+                       ('rmse', np.float32, 7),
+                       ('magnitude', np.float32, 7)])
 
     if rank == 0:
         if not os.path.exists(out_path):
@@ -142,17 +153,29 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
             filename = 'record_change_x{}_y{}_obcold.npy'.format(current_block_x, current_block_y)
         elif method == 'COLD':
             filename = 'record_change_x{}_y{}_cold.npy'.format(current_block_x, current_block_y)
+        elif method == 'SCCDOFFLINE':
+            filename = 'record_change_x{}_y{}_sccd.npy'.format(current_block_x, current_block_y)
 
         results_block = [np.full((config['block_height'], config['block_width']), -9999, dtype=np.int32)
                          for t in range(year_uppbound - year_lowbound + 1)]
+
+        print('processing the rec_cg file {}'.format(os.path.join(reccg_path, filename)))
         if not os.path.exists(os.path.join(reccg_path, filename)):
+            # reccg_path = '/home/coloury'
             print('the rec_cg file {} is missing'.format(os.path.join(reccg_path, filename)))
             for year in range(year_lowbound, year_uppbound+1):
                 outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
                 np.save(outfile, results_block[year - year_lowbound])
             continue
-
-        cold_block = np.array(np.load(os.path.join(reccg_path, filename)), dtype=dt)
+        if method == 'SCCDOFFLINE':
+            file = open(os.path.join(reccg_path, filename), 'rb')
+            cold_block = pickle.load(file)
+            cold_block = [index_sccdpack(cold_block[i * defaults['SCCD']['PACK_ITEM']:
+                                                    (i+1) * defaults['SCCD']['PACK_ITEM']])
+                            for i in range(int(len(cold_block) / defaults['SCCD']['PACK_ITEM']))]
+            file = None
+        else:
+            cold_block = np.array(np.load(os.path.join(reccg_path, filename)), dtype=dt)
         # cold_block = [np.array(element, dtype=dt) for element in cold_block]
         # if len(cold_block) == 0:
         #     print('the rec_cg file {} is missing'.format(dat_pth))
@@ -160,39 +183,57 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
         #         outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
         #         np.save(outfile, results_block[year - year_lowbound])
         #     continue
-        cold_block.sort(order='pos')
-        current_processing_pos = cold_block[0]['pos']
-        current_dist_type = 0
-        for count, curve in enumerate(cold_block):
-            if curve['pos'] != current_processing_pos:
-                current_processing_pos = curve['pos']
-                current_dist_type = 0
+        if method == 'SCCDOFFLINE':
+            for count, plot in enumerate(cold_block):
+                for i_count, curve in enumerate(plot.rec_cg):
+                    if curve['t_break'] == 0 or count == (len(cold_block) - 1):  # last segment
+                        continue
 
-            if method != 'SCCD':
+                    i_col = int((plot.position  - 1) % config['n_cols']) - \
+                            (current_block_x - 1) * config['block_width']
+                    i_row = int((plot.position  - 1) / config['n_cols']) - \
+                            (current_block_y - 1) * config['block_height']
+                    if i_col < 0:
+                        print('Processing {} failed: i_row={}; i_col={} for {}'.format(filename,
+                                                                                       i_row, i_col, filename))
+                        # return
+                    current_dist_type = getcategory_sccd(plot.rec_cg, i_count)
+                    break_year = pd.Timestamp.fromordinal(curve['t_break']).year
+                    if break_year < year_lowbound or break_year > year_uppbound:
+                        continue
+                    results_block[break_year -
+                                  year_lowbound][i_row][i_col] = current_dist_type * 1000 + curve['t_break'] - \
+                                                                 (pd.Timestamp.toordinal(datetime.date(break_year, 1, 1))) + 1
+        else:
+            cold_block.sort(order='pos')
+            current_processing_pos = cold_block[0]['pos']
+            current_dist_type = 0
+            for count, curve in enumerate(cold_block):
+                if curve['pos'] != current_processing_pos:
+                    current_processing_pos = curve['pos']
+                    current_dist_type = 0
+
                 if curve['change_prob'] < 100 or curve['t_break'] == 0 or count == (len(cold_block) - 1):  # last segment
                     continue
-            else:
-                if curve['t_break'] == 0 or count == (len(cold_block) - 1):  # last segment
+
+                i_col = int((curve["pos"] - 1) % config['n_cols']) - \
+                        (current_block_x - 1) * config['block_width']
+                i_row = int((curve["pos"] - 1) / config['n_cols']) - \
+                        (current_block_y - 1) * config['block_height']
+                if i_col < 0:
+                    print('Processing {} failed: i_row={}; i_col={} for {}'.format(filename,
+                                                                                      i_row, i_col, dat_pth))
+                    return
+
+                if method == 'OBCOLD':
+                    current_dist_type = getcategory_obcold(cold_block, count, current_dist_type)
+                else:
+                    current_dist_type = getcategory_cold(cold_block, count)
+                break_year = pd.Timestamp.fromordinal(curve['t_break']).year
+                if break_year < year_lowbound or break_year > year_uppbound:
                     continue
-
-            i_col = int((curve["pos"] - 1) % config['n_cols']) - \
-                    (current_block_x - 1) * config['block_width']
-            i_row = int((curve["pos"] - 1) / config['n_cols']) - \
-                    (current_block_y - 1) * config['block_height']
-            if i_col < 0:
-                print('Processing {} failed: i_row={}; i_col={} for {}'.format(filename,
-                                                                                  i_row, i_col, dat_pth))
-                return
-
-            if method == 'OBCOLD':
-                current_dist_type = getcategory_obcold(cold_block, count, current_dist_type)
-            else:
-                current_dist_type = getcategory_cold(cold_block, count)
-            break_year = pd.Timestamp.fromordinal(curve['t_break']).year
-            if break_year < year_lowbound or break_year > year_uppbound:
-                continue
-            results_block[break_year - year_lowbound][i_row][i_col] = current_dist_type * 1000 + curve['t_break'] - \
-                (pd.Timestamp.toordinal(datetime.date(break_year, 1, 1)) + bias) + 1
+                results_block[break_year - year_lowbound][i_row][i_col] = current_dist_type * 1000 + curve['t_break'] - \
+                    (pd.Timestamp.toordinal(datetime.date(break_year, 1, 1))) + 1
             # e.g., 1315 means that disturbance happens at doy of 315
 
         # save the temp dataset out

@@ -21,6 +21,7 @@ int cold
     int conse,                  /* I: consecutive observation number   */
     bool b_outputCM,            /* I: indicate if outputting change magnitudes for object-based cold, for cold only, it is the false */
     int starting_date,          /* I: (optional) the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
+    bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band due to the current low quality  */
     Output_t *rec_cg,           /* O: outputted structure for CCDC results    */
     int *num_fc,                /* O: number of fitting curves                   */
     int CM_OUTPUT_INTERVAL,     /* I: the interval of days of outputting change maganitude                   */
@@ -88,6 +89,7 @@ int obcold_reconstruction_procedure
     long *break_dates, /*an array of break dates with a fixed length of num_year, '0' means no breaks */
     int break_date_len,       /*I: the number of focused years */
     int pos,              /*I: the position of the pixel */
+    bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band due to the current low quality  */
     int conse,
     Output_t *rec_cg,    /* O: Initialize NUM of Functional Curves    */
     int *num_fc

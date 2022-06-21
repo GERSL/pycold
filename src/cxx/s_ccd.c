@@ -53,6 +53,7 @@ int sccd
     short int *min_rmse,       /* O: adjusted rmse for the pixel    */
     int cm_output_interval,
     int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
+    bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band due to the current low quality  */
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 )
@@ -100,7 +101,7 @@ int sccd
 
     status = preprocessing(buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
                            fmask_buf, &valid_num_scenes, id_range, &clear_sum,
-                           &water_sum, &shadow_sum, &sn_sum, &cloud_sum, TRUE);
+                           &water_sum, &shadow_sum, &sn_sum, &cloud_sum, b_c2);
 
     if (status != SUCCESS)
     {

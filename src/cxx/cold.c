@@ -145,13 +145,13 @@ int cold
     int conse,                  /* I: consecutive observation number   */
     bool b_outputCM,            /* I: indicate if outputting change magnitudes for object-based cold, for cold only, it is the false */
     int starting_date,          /* I: (optional) the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
+    bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band due to the current low quality  */
     Output_t *rec_cg,           /* O: outputted structure for CCDC results    */
     int *num_fc,                /* O: number of fitting curves                   */
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: (optional) maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 //    unsigned char* CMdirection_outputs,      /* I/O: direction of change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     short int* CM_outputs_date        /* I/O: (optional) dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-
 )
 {
     int clear_sum = 0;      /* Total number of clear cfmask pixels          */
@@ -180,7 +180,7 @@ int cold
 
     status = preprocessing(buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
                            fmask_buf, &valid_num_scenes, id_range, &clear_sum,
-                           &water_sum, &shadow_sum, &sn_sum, &cloud_sum, FALSE);
+                           &water_sum, &shadow_sum, &sn_sum, &cloud_sum, b_c2);
     // printf("preprocessing finished \n");
 
     if (status != SUCCESS)
@@ -4673,9 +4673,7 @@ int stand_procedure
                 k_new++;
             }
             end = k_new;
-         }else{
-            *num_fc = *num_fc - 1;
-        }
+         }
 
          if ((end - i_start + 1) >= LASSO_MIN)     // 09/28/2018 SY delete equal sign //11/15/2018 put back equal sign
          {
@@ -5423,6 +5421,7 @@ int obcold_reconstruction_procedure
     long *break_dates, /*an array of break dates with a fixed length of num_year, '0' means no breaks */
     int break_date_len,       /*I: the length of break_dates */
     int pos,              /*I: the position of the pixel */
+    bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band due to the current low quality  */
     int conse,
     Output_t *rec_cg,    /* O: Initialize NUM of Functional Curves    */
     int *num_fc
@@ -5540,7 +5539,7 @@ int obcold_reconstruction_procedure
 
     status = preprocessing(buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
                            fmask_buf, &valid_num_scenes, id_range, &clear_sum,
-                           &water_sum, &shadow_sum, &sn_sum, &cloud_sum, FALSE);
+                           &water_sum, &shadow_sum, &sn_sum, &cloud_sum, b_c2);
     if (status != SUCCESS)
     {
         RETURN_ERROR("Error for preprocessing.", FUNC_NAME, ERROR);

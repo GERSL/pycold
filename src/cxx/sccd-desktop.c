@@ -342,6 +342,7 @@ int main(int argc, char *argv[])
     }
     else if (argv[1][0] =='c'){
         method = COLD;
+        cm_output_interval = 60;
     }
     else if (argv[1][0] == 'o'){
         b_outputCM = TRUE;
@@ -444,7 +445,7 @@ int main(int argc, char *argv[])
     int row_count = 0;
     while (fgets(csv_row, 255, sampleFile) != NULL)
     {
-        if(row_count != -1) // we skip first line because it is a header
+        if(row_count != 0) // we skip first line because it is a header
         {
             sdate[valid_scene_count] = atoi(strtok(csv_row, ","));
             buf[0][valid_scene_count] = (long)atoi(strtok(NULL, ","));
@@ -668,6 +669,7 @@ int main(int argc, char *argv[])
                         CM_outputs[i] = NA_VALUE;
                         CM_outputs_date[i] = NA_VALUE;
                     }
+                    conse = 4;
 
         //                printf("temporal success2 with processid %d\n", process_id);
         //                printf("valid_scene_count_scanline[i_col] is %d;i_col is %d; original_row is %d; probability threshold is %f\n",

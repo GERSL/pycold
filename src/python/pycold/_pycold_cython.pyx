@@ -84,14 +84,15 @@ cdef output_nrtmodel t3
 cdef extern from "../../cxx/cold.h":
     cdef int cold(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2,
                   long *buf_t, long *fmask_buf, long *valid_date_array, int valid_num_scenes, int pos, 
-                  double tcg, int conse, bool b_output_cm, int starting_date, Output_t *rec_cg,
+                  double tcg, int conse, bool b_output_cm, int starting_date, bool b_c2, Output_t *rec_cg,
                   int *num_fc, int cm_output_interval, short int *cm_outputs, 
                   short int *cm_outputs_date);
 
 
 cdef extern from "../../cxx/cold.h":
-    cdef int obcold_reconstruction_procedure(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2, long *buf_t,  
-long *fmask_buf, long *valid_date_array, int valid_num_scenes, long *break_dates, int break_date_len, int pos, int conse, Output_t *rec_cg, int *num_fc)
+    cdef int obcold_reconstruction_procedure(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1,
+    long *buf_s2, long *buf_t,  long *fmask_buf, long *valid_date_array, int valid_num_scenes, long *break_dates,
+    int break_date_len, int pos, bool b_c2, int conse, Output_t *rec_cg, int *num_fc)
 
 
 
@@ -99,7 +100,8 @@ cdef extern from "../../cxx/s_ccd.h":
     cdef int sccd(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2, long *buf_t,
                   long *fmask_buf, long *valid_date_array, int valid_num_scenes, double tcg, int *num_fc, int *nrt_mode,
                   Output_sccd *rec_cg, output_nrtmodel *nrt_model, int *num_nrt_queue, output_nrtqueue *nrt_queue,
-                  short int *min_rmse, int cm_output_interval, int starting_date, short int* cm_outputs, short int* cm_outputs_date)
+                  short int *min_rmse, int cm_output_interval, int starting_date, bool b_c2,
+                  short int* cm_outputs, short int* cm_outputs_date)
 
 
 # @cython.dataclasses.dataclass
@@ -134,7 +136,7 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
                 np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
                 double t_cg = 15.0863, int pos=1, int conse=6, bint b_output_cm=False,
-                int starting_date=0, int n_cm=0, int cm_output_interval=0):
+                int starting_date=0, int n_cm=0, int cm_output_interval=0, bint b_c2=False):
     """
     Helper function to do COLD algorithm.
 
@@ -155,6 +157,7 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     	b_output_cm: bool, 'True' means outputting change magnitude and change magnitude dates, only for object-based COLD
     	starting_date: the starting date of the whole dataset to enable reconstruct CM_date,
                    	all pixels for a tile should have the same date, only for b_output_cm is True
+        b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to the current low quality
     	cm_output_interval: the temporal interval of outputting change magnitudes
     	Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
     	Returns
@@ -227,7 +230,7 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
 
     result = cold(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0], &ts_t_view[0],
                  &qas_view[0], &dates_view[0], valid_num_scenes, pos, t_cg, conse, b_output_cm,
-                 starting_date, rec_cg, &num_fc, cm_output_interval, &cm_outputs_view[0], &cm_outputs_date_view[0])
+                 starting_date, b_c2, rec_cg, &num_fc, cm_output_interval, &cm_outputs_view[0], &cm_outputs_date_view[0])
     if result != 0:
         raise RuntimeError("cold function fails for pos = {} ".format(pos))
     else:
@@ -243,8 +246,8 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
 
 def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
                 np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
-                np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas, np.ndarray[np.int64_t, ndim=1] break_dates, 
-                int pos=1, int conse=6):
+                np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
+                np.ndarray[np.int64_t, ndim=1] break_dates, int pos=1, int conse=6, bint b_c2=False):
     """
     Helper function to do COLD algorithm.
 
@@ -261,6 +264,7 @@ def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64
     	qas: 1d array, the QA cfmask bands. '0' - clear; '1' - water; '2' - shadow; '3' - snow; '4' - cloud
     	break_dates: 1d array, the break dates obtained from other procedures such as obia
     	conse: consecutive observation number (for calculating change magnitudes)
+    	b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to its current low quality
     	Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
     	Returns
     	----------
@@ -294,7 +298,9 @@ def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
-    result = obcold_reconstruction_procedure(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0], &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, &break_dates_view[0], break_date_len, pos, conse, rec_cg, &num_fc)
+    result = obcold_reconstruction_procedure(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0],
+     &ts_s2_view[0], &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, &break_dates_view[0], break_date_len,
+      pos, b_c2, conse, rec_cg, &num_fc)
     if result != 0:
         raise RuntimeError("cold function fails for pos = {} ".format(pos))
     else:
@@ -307,7 +313,8 @@ def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64
 def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
                 np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
-                bint b_output_cm=False, int starting_date=0, int n_cm=0, int cm_output_interval=60, double t_cg = 15.0863, int pos=1, int conse=6):
+                bint b_output_cm=False, int starting_date=0, int n_cm=0, int cm_output_interval=60, double t_cg = 15.0863, int pos=1,
+                int conse=6, bint b_c2=False):
     """
     S-CCD processing. It is required to be done before near real time monitoring
 
@@ -328,6 +335,7 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     	t_cg: threshold of change magnitude, default is chi2.ppf(0.99,5)
         pos: position id of the pixel
     	conse: consecutive observation number
+    	b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to its current low quality
     	Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
     	Returns
     	----------
@@ -408,7 +416,7 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
 
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, rec_cg,
-                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], cm_output_interval, starting_date,
+                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], cm_output_interval, starting_date, b_c2,
                   &cm_outputs_view[0] , &cm_outputs_date_view[0])
     if result != 0:
         raise RuntimeError("S-CCD function fails for pos = {} ".format(pos))
@@ -443,7 +451,7 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
                 np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t,
                 np.ndarray[np.int64_t, ndim=1] qas,
-                double t_cg = 15.0863, int pos=1, int conse=6):
+                double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False):
     """
     SCCD online update for new observations
        Parameters
@@ -458,8 +466,9 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
        ts_t: 1d array of shape(observation numbers), time series of thermal band
        qas: 1d array, the QA cfmask bands. '0' - clear; '1' - water; '2' - shadow; '3' - snow; '4' - cloud
        t_cg: threshold of change magnitude, default is chi2.ppf(0.99,5)
-        pos: position id of the pixel
+       pos: position id of the pixel
        conse: consecutive observation number
+       b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to its current low quality
        Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
        Returns
        ----------
@@ -543,7 +552,7 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, rec_cg,
-                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], cm_output_interval, starting_date,
+                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], cm_output_interval, starting_date, b_c2,
                   &cm_outputs_view[0], &cm_outputs_date_view[0])
     if result != 0:
         raise RuntimeError("sccd_update function fails for pos = {} ".format(pos))
