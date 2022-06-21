@@ -6,7 +6,20 @@ The base algorithms were mostly written using C wrapped in python, and have been
   2. Stochastic Continuous Change Detection (S-CCD, a near real-time implementation of COLD)
   3. Object-based COLD (OB-COLD, integrating spatial information into COLD by using a 'change object' view)
 ## 1. Pre-work: clone github repo to your local directory
-### Clone or pull the latest pycold git repo
+
+Clone repo for the first use:
+
+```
+git clone https://github.com/GERSL/pycold.git
+```
+
+Or you call pull the recent repo if you want to update the existing pycold repo:
+
+```
+git pull origin devel:devel
+```
+
+
 
 ## 2. installation
 
@@ -65,32 +78,11 @@ make
 >>> cold_result = cold_detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
 ```
 
-### 4. Examples
-#### 1) Running single pixel-based time series and plot time series:
-/tool/notebook/pycold_example.ipynb
-#### 2) A job-array script for converting original ARD to binary uncompressed stack data (preprocessing):
-```
-...
-#SBATCH --array 1-200  # define your job array core number
 
-module load your_modules
-python3 AutoPrepareDataARD.py --source_dir=$source_path --out_dir=$stack_path --rank=$SLURM_ARRAY_TASK_ID --n_cores=$SLURM_ARRAY_TASK_MAX --yaml_path=parameter.yaml
-```
-#### 3) A job-array script for  running tile-based COLD to produce change records based on the stack data:
-```
-...
-#SBATCH --array 1-200  # define your job array core number
-module load your modules
-python3 pycold_workflow.py --rank=$SLURM_ARRAY_TASK_ID --n_cores=$SLURM_ARRAY_TASK_MAX --result_path=$result_path --stack_path=$stack_path --yaml_path=parameter.yaml --method='COLD'
-```
-#### 4) Export disturbance maps from change records (using MPI):
-```
-mpirun python3 exportChangeMap.py --reccg_path=$reccg_path --reference_path=$reference_path --out_path=$out_path --method='COLD' --yaml_path=parameter.yaml
-```
 
 
 ### Q&A
-#### Q1: Has pycold been verified with original Matlab codes
+#### Q1: Has pycold been verified with original Matlab codes?
 Re: yes, multiple rounds of verification have been done. Comparison based on two testing tiles shows that pycold and Matlab version have smaller than <2% differences for breakpoint detection and <2% differences for harmonic coefficients; the accuracy of pycold was also tested against the same reference dataset used in the original COLD paper (Zhu et al., 2020), and pycold reached the same accuracy (27% omission and 28% commission) showing that the discrepancy doesn't hurt accuracy. The primary source for the discrepancy is mainly from the rounding: MATLAB uses float64 precision, while pycold chose float32 to save the run-time computing memory and boost efficiency. 
 
 #### Q2: how much time for production of a tile-based disturbance map (5000*5000 pixels) using pycold?
