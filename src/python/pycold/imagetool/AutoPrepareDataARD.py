@@ -182,7 +182,7 @@ def load_data(file_name, gdal_driver='GTiff'):
     return image_array, (geotransform, inDs)
 
 
-def single_image_stacking_hls(source_dir, out_dir, folder, logger, config, is_partition=True, clear_threshold=0,
+def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_partition=True, clear_threshold=0,
                               low_year_bound=1, upp_year_bound=9999):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy

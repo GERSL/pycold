@@ -7,18 +7,18 @@ import os
 import datetime as dt
 from collections import namedtuple
 from pycold.app import defaults
-
+import gdal
 
 SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
 
-output_sccd = np.dtype([('t_start', np.int32), ('t_break', np.int32), ('num_obs', np.int32),
+sccd_dt = np.dtype([('t_start', np.int32), ('t_break', np.int32), ('num_obs', np.int32),
                         ('coefs', np.float32, (6, 6)), ('rmse', np.float32, 6), ('magnitude', np.float32, 6)], align=True)
 
-output_nrtqueue = np.dtype([('clry', np.short, 6), ('clrx_since1982', np.short)], align=True)
-output_nrtmodel = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (6, 5)),
-                            ('obs_date_since1982', np.short, 5), ('covariance', np.float32, (6, 36)),
+nrtqueue_dt = np.dtype([('clry', np.short, 6), ('clrx_since1982', np.short)], align=True)
+nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (6, 4)),
+                            ('obs_date_since1982', np.short, 4), ('covariance', np.float32, (6, 36)),
                             ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
-                            ('cm_outputs', np.short), ('cm_outputs_date', np.short)], align=True)
+                            ('cm_outputs', np.short), ('cm_outputs_date', np.short), ('change_prob', np.ubyte)], align=True)
 
 def get_block_y(block_id, n_block_x):
     """
@@ -155,13 +155,13 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
             os.remove(join(result_path, file))
 
 
-def get_rowcol_intile(pos, block_width, block_height, block_x, block_y):
+def get_rowcol_intile(id, block_width, block_height, block_x, block_y):
     """
     calculate row and col in original images based on pos index and block location
     Parameters
     ----------
-    pos: integer
-        position id of the pixel (i.e., i_row * n_cols + i_col + 1)
+    id: integer
+        position id of the pixel (i.e., i_row * n_cols + i_col)
     block_width: integer
         the width of each block
     block_height: integer
@@ -175,9 +175,23 @@ def get_rowcol_intile(pos, block_width, block_height, block_x, block_y):
     (original_row, original_col)
     row and col number (starting from 1) in original image (e.g., Landsat ARD 5000*5000)
     """
-    original_row = int(pos / block_width + (block_y - 1) * block_height + 1)
-    original_col = int(pos % block_width + (block_x - 1) * block_width + 1)
+    original_row = int(id / block_width + (block_y - 1) * block_height + 1)
+    original_col = int(id % block_width + (block_x - 1) * block_width + 1)
     return original_row, original_col
+
+
+def get_id_inblock(pos, block_width, block_height, n_cols):
+    """
+    :param pos:
+    :param block_width:
+    :param block_height:
+    :param block_x:
+    :param block_y:
+    :return: pixel id in the bloack, starting from 0
+    """
+    row_inblock = int(int((pos - 1) / n_cols) % block_height)
+    col_inblock = (pos - 1) % n_cols % block_width
+    return row_inblock * block_width + col_inblock
 
 
 # def gdal_save_file_1band(out_path, array, gdal_type, trans, proj, cols, rows, image_format='GTiff'):
@@ -377,15 +391,32 @@ def index_sccdpack(sccd_pack_single):
                                                                        dtype=np.float64))
     else:
         sccd_pack_single = sccd_pack_single._replace(rec_cg=np.asarray(sccd_pack_single.rec_cg,
-                                                                       dtype=output_sccd))
+                                                                       dtype=sccd_dt))
     if len(sccd_pack_single.nrt_model) > 0:
         sccd_pack_single = sccd_pack_single._replace(nrt_model=np.asarray(sccd_pack_single.nrt_model,
-                                                                          dtype=output_nrtmodel))
+                                                                          dtype=nrtmodel_dt))
     if len(sccd_pack_single.nrt_queue) > 0:
         sccd_pack_single = sccd_pack_single._replace(nrt_queue=np.asarray(sccd_pack_single.nrt_queue,
-                                                                          dtype=output_nrtqueue))
+                                                                          dtype=nrtqueue_dt))
     return sccd_pack_single
 
+
+def save_1band_fromrefimage(array, ref_image_path, out_path, gtype=gdal.GDT_Int16):
+    ref_image = gdal.Open(ref_image_path, gdal.GA_ReadOnly)
+    trans = ref_image.GetGeoTransform()
+    proj = ref_image.GetProjection()
+    cols = ref_image.RasterXSize
+    rows = ref_image.RasterYSize
+
+    outdriver1 = gdal.GetDriverByName("GTiff")
+    outdata = outdriver1.Create(out_path, rows, cols, 1, gtype)
+    outdata.GetRasterBand(1).WriteArray(array)
+    outdata.FlushCache()
+    outdata.SetGeoTransform(trans)
+    outdata.FlushCache()
+    outdata.SetProjection(proj)
+    outdata.FlushCache()
+    ref_image = None
 
 
 

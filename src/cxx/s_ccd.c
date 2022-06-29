@@ -53,6 +53,7 @@ int sccd
     short int *min_rmse,       /* O: adjusted rmse for the pixel    */
     int cm_output_interval,
     int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
+    int conse,                  /* I: consecutive observation number for change detection   */
     bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band due to the current low quality  */
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
@@ -68,15 +69,16 @@ int sccd
     int *id_range;
     int i, k, i_b;
     char FUNC_NAME[] = "sccd";
-    int result;
+    int result = SUCCESS;
     int n_clr = 0;
     int *clrx;                  /* I: clear pixel curve in X direction (date)             */
     float **clry;               /* O: clear pixel curve in Y direction (spectralbands)    */
     bool b_snow;               // indicate if snow pixels
     float max_date_difference;   /* maximum difference between two neighbor dates        */
     float date_vario;           /* median date                                          */
-    float min_rmse_float[TOTAL_IMAGE_BANDS_HLS];
+    float min_rmse_float[TOTAL_IMAGE_BANDS_SCCD];
     int len_clrx;         /* length of clrx  */
+    int n_clr_record;
 
     if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD)|(*nrt_mode  == NRT_NEWCHANGE))
         len_clrx = valid_num_scenes + *num_obs_queue;
@@ -92,7 +94,7 @@ int sccd
         RETURN_ERROR ("Allocating clrx memory", FUNC_NAME, FAILURE);
     }
 
-    clry = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS_HLS, len_clrx,
+    clry = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, len_clrx,
                                          sizeof (float));
     if (clry == NULL)
     {
@@ -134,7 +136,7 @@ int sccd
         // if queue mode, will append old observation first
         for (i = 0; i < *num_obs_queue; i++){
             clrx[i] = obs_queue[i].clrx_since1982+ JULIAN_LANDSAT4_LAUNCH;
-            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                 clry[i_b][i] =  obs_queue[i].clry[i_b];
             n_clr++;
         }
@@ -142,7 +144,7 @@ int sccd
     {
         //  if monitor mode, will append output_nrtmodel default conse-1 obs
         for (k = 0; k < DEFAULT_CONSE - 1; k++){
-            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
             {
                 clry[i_b][k] = nrt_model->obs[i_b][k];
             }
@@ -151,6 +153,7 @@ int sccd
         }
      }
 
+    n_clr_record = n_clr;
 
 
      /**************************************************************/
@@ -176,7 +179,7 @@ int sccd
                  else
                  {
                      clrx[n_clr] = (int)valid_date_array[i];
-                     for (k = 0; k < TOTAL_IMAGE_BANDS_HLS; k++)
+                     for (k = 0; k < TOTAL_IMAGE_BANDS_SCCD; k++)
                      {
                          if (k == 0)
                              clry[k][n_clr] = (float)buf_b[i];
@@ -198,26 +201,28 @@ int sccd
              }
          }
 
-         // set the default starting_date is the first observation of the unprocessed array
-         if (starting_date == 0)
-             starting_date = clrx[0];
+         if (n_clr > n_clr_record)
+         {
+             // set the default starting_date is the first observation of the unprocessed array
+             if (starting_date == 0)
+                 starting_date = clrx[0];
 
-         /* need to calculate min_rmse at the beginning of the monitoring*/
-         if (*num_fc == 0){
-             if((*nrt_mode == NRT_VOID) | (*nrt_mode == NRT_QUEUE_STANDARD) | (*nrt_mode == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_NEWCHANGE)){
-                 status = adjust_median_variogram(clrx, clry,TOTAL_IMAGE_BANDS_HLS, 0,
-                                                  n_clr-1, &date_vario, &max_date_difference,
-                                                  min_rmse_float, 1);
-                 for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
-                     min_rmse[i_b] = (short int)min_rmse_float[i_b];
+             /* need to calculate min_rmse at the beginning of the monitoring*/
+             if (*num_fc == 0){
+                 if((*nrt_mode == NRT_VOID) | (*nrt_mode == NRT_QUEUE_STANDARD) | (*nrt_mode == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_NEWCHANGE)){
+                     status = adjust_median_variogram(clrx, clry,TOTAL_IMAGE_BANDS_SCCD, 0,
+                                                      n_clr-1, &date_vario, &max_date_difference,
+                                                      min_rmse_float, 1);
+                     for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                         min_rmse[i_b] = (short int)min_rmse_float[i_b];
+                 }
              }
+
+            result = sccd_standard(clrx, clry, n_clr, tcg, rec_cg, num_fc, nrt_mode, nrt_model,
+                                   num_obs_queue, obs_queue, min_rmse, cm_output_interval,
+                                   starting_date, conse, cm_outputs, cm_outputs_date);
+
          }
-
-
-
-        result = sccd_standard(clrx, clry, n_clr, tcg, rec_cg, num_fc, nrt_mode, nrt_model,
-                               num_obs_queue, obs_queue, min_rmse, cm_output_interval,
-                               starting_date, cm_outputs, cm_outputs_date);
     }
     else
     {
@@ -236,7 +241,7 @@ int sccd
                 else
                 {
                     clrx[n_clr] = (int) valid_date_array[i];
-                    for (k = 0; k < TOTAL_IMAGE_BANDS_HLS; k++)
+                    for (k = 0; k < TOTAL_IMAGE_BANDS_SCCD; k++)
                     {
                         if (k == 0)
                             clry[k][n_clr] = (float)buf_b[i];
@@ -258,8 +263,7 @@ int sccd
             }
         }
 
-        result = sccd_snow(clrx, clry, n_clr, rec_cg, num_fc,
-                           nrt_mode, nrt_model, num_obs_queue, obs_queue);
+        result = sccd_snow(clrx, clry, n_clr, nrt_mode, nrt_model, num_obs_queue, obs_queue);
 
     }
 
@@ -545,7 +549,7 @@ int step1_cold_initialize
     /*     allocac memory for variables                 */
     /*                                                  */
     /****************************************************/
-    rec_v_dif = (float **)allocate_2d_array(TOTAL_IMAGE_BANDS_HLS, *n_clr,
+    rec_v_dif = (float **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, *n_clr,
                                      sizeof (float));
     if (rec_v_dif == NULL)
     {
@@ -594,14 +598,14 @@ int step1_cold_initialize
         RETURN_ERROR("ERROR allocating v_dif memory", FUNC_NAME, FAILURE);
     }
 
-    tmp_v_dif = (float **)allocate_2d_array(TOTAL_IMAGE_BANDS_HLS, *n_clr,
+    tmp_v_dif = (float **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, *n_clr,
                                      sizeof (float));
     if (tmp_v_dif == NULL)
     {
         RETURN_ERROR ("Allocating tmp_v_dif memory",FUNC_NAME, FAILURE);
     }
 
-    v_dif_mag = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS_HLS, conse,
+    v_dif_mag = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, conse,
                 sizeof (float));
     if (v_dif_mag == NULL)
     {
@@ -609,7 +613,7 @@ int step1_cold_initialize
                                  FUNC_NAME, FAILURE);
     }
 
-    fit_cft = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_HLS, SCCD_NUM_C, sizeof (float));
+    fit_cft = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_SCCD, SCCD_NUM_C, sizeof (float));
     if (fit_cft == NULL)
     {
         RETURN_ERROR ("Allocating fit_cft memory", FUNC_NAME, FAILURE);
@@ -796,7 +800,7 @@ int step1_cold_initialize
     if (cpx == NULL)
         RETURN_ERROR("ERROR allocating cpx memory", FUNC_NAME, FAILURE);
 
-    cpy = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_HLS, *n_clr,
+    cpy = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_SCCD, *n_clr,
                      sizeof (float));
     if (cpy == NULL)
     {
@@ -818,7 +822,7 @@ int step1_cold_initialize
             continue;
         }
         cpx[k_new] = clrx[k];
-        for (b = 0; b < TOTAL_IMAGE_BANDS_HLS; b++)
+        for (b = 0; b < TOTAL_IMAGE_BANDS_SCCD; b++)
         {
             cpy[b][k_new] = clry[b][k];
         }
@@ -934,7 +938,7 @@ int step1_cold_initialize
     for (k = 0; k < *n_clr; k++)
     {
         clrx[k] = cpx[k];
-        for (m = 0; m < TOTAL_IMAGE_BANDS_HLS; m++)
+        for (m = 0; m < TOTAL_IMAGE_BANDS_SCCD; m++)
         {
             clry[m][k] = cpy[m][k];
         }
@@ -961,7 +965,7 @@ int step1_cold_initialize
 
     // update_num_c = MIN_NUM_C;
 
-    for (b = 0; b < TOTAL_IMAGE_BANDS_HLS; b++)
+    for (b = 0; b < TOTAL_IMAGE_BANDS_SCCD; b++)
     {
         /**********************************************/
         /*                                            */
@@ -1175,7 +1179,7 @@ int step1_cold_initialize
             for (i_conse = 1; i_conse < ini_conse + 1; i_conse++) // SY 09192018
             {
                 v_dif_norm = 0.0;
-                for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+                for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                 {
 
                     /**********************************/
@@ -1256,7 +1260,7 @@ int step1_cold_initialize
                 for (k = i_ini; k < *n_clr - 1; k++)
                 {
                     clrx[k] = clrx[k+1];
-                    for (b = 0; b < TOTAL_IMAGE_BANDS_HLS; b++)
+                    for (b = 0; b < TOTAL_IMAGE_BANDS_SCCD; b++)
                     {
                         clry[b][k] = clry[b][k+1];
                     }
@@ -1304,12 +1308,12 @@ int step1_cold_initialize
         /*                                            */
         /**********************************************/
         // printf("%d\n", conse);
-        fit_cft_tmp = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_HLS, SCCD_NUM_C, sizeof (float));
+        fit_cft_tmp = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_SCCD, SCCD_NUM_C, sizeof (float));
         if (fit_cft_tmp == NULL)
         {
             RETURN_ERROR ("Allocating fit_cft_tmp memory", FUNC_NAME, FAILURE);
         }
-        for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+        for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             if(*num_curve == 0)
                 status = auto_ts_fit_sccd(clrx, clry, i_b, i_b,  *i_dense, *i_start,
@@ -1327,7 +1331,7 @@ int step1_cold_initialize
 
         ini_conse = conse;
 
-        v_dif_magg = (float**) allocate_2d_array(TOTAL_IMAGE_BANDS_HLS,
+        v_dif_magg = (float**) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD,
                     ini_conse, sizeof (float));
         if (v_dif_magg == NULL)
         {
@@ -1339,7 +1343,7 @@ int step1_cold_initialize
         for (i_conse = 1; i_conse < ini_conse + 1; i_conse++) // SY 09192018
         {
             v_dif_norm = 0.0;
-            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
             {
                 auto_ts_predict_float(clrx, fit_cft, MIN_NUM_C, i_b, *i_start-i_conse,
                                 *i_start-i_conse, &ts_pred_temp);
@@ -1364,7 +1368,7 @@ int step1_cold_initialize
         rec_cg[*num_curve].num_obs = *i_start - *prev_i_break;  //SY 09182018
         *prev_i_break = *i_start;
 
-        for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+        for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             quick_sort_float(v_dif_magg[i_b], 0, ini_conse-1);
             matlab_2d_float_median(v_dif_magg, i_b, ini_conse,
@@ -1374,7 +1378,7 @@ int step1_cold_initialize
             //rec_cg[*num_curve].magnitude[i_b] = -v_dif_mean;
         }
 
-        for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+        for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             for (k = 0; k < SCCD_NUM_C; k++)
             {
@@ -1705,12 +1709,12 @@ int step2_KF_ChangeDetection
     int RETURN_VALUE;
     // double c0, c1;
     float *medium_v_dif;
-    float max_rmse[TOTAL_IMAGE_BANDS_HLS];
+    float max_rmse[TOTAL_IMAGE_BANDS_SCCD];
     bool change_flag = TRUE;
     float mean_angle_2 = 9999.0;
     float tmp;
     double vt;
-    float rmse_band[TOTAL_IMAGE_BANDS_HLS];
+    float rmse_band[TOTAL_IMAGE_BANDS_SCCD];
     bool steady = FALSE;
     float break_mag = 9999.0;
     float prob_angle;
@@ -1725,7 +1729,7 @@ int step2_KF_ChangeDetection
                       FUNC_NAME, FAILURE);
     }
 
-    v_dif_mag = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS_HLS, conse,
+    v_dif_mag = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, conse,
                 sizeof (float));
     if (v_dif_mag == NULL)
     {
@@ -1754,19 +1758,20 @@ int step2_KF_ChangeDetection
     }
 
 
-    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         rmse_band[i_b] = sum_square_vt[i_b] / (*num_obs_processed - SCCD_NUM_C);
 
 
     /* sccd examine i to be break or not so current obs is included in conse windw, while cold is not */
     for(i_conse = 0; i_conse < conse; i_conse++)
     {
-        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             KF_ts_predict_conse(&instance[i_b], clrx, cov_p[i_b], fit_cft, cur_i + i_conse, cur_i + i_conse,
                                 i_b, cur_i, &pred_y, &pred_y_f, FALSE);
             // max_rmse[i_b] = max(min_rmse[i_b], sqrtf(pred_y_f));
             max_rmse[i_b] = max(min_rmse[i_b], sqrtf(rmse_band[i_b]));
+            // max_rmse[i_b] = sqrtf(rmse_band[i_b]);
             v_dif_mag[i_b][i_conse] =  clry[i_b][cur_i + i_conse] - pred_y;
 //            if(cur_i == 138)
 //                printf("%d conse, b%d: pred_y_f = %f; pre_y = %f; clry = %f; "
@@ -1814,7 +1819,7 @@ int step2_KF_ChangeDetection
         // mean_angle  = MeanAngl(v_dif, NUM_LASSO_BANDS, conse);
 
 
-        prob_angle = (float)angle_decaying(mean_angle_2, (double)NSIGN_sccd, 90.0);
+        prob_angle = (float)angle_decaying(mean_angle_2, (double)NSIGN_sccd, NSIGN_sccd*2);
         // prob_MCM = Chi_Square_Distribution(break_mag, NUM_LASSO_BANDS);
         current_CM_n = (clrx[cur_i] - starting_date) / cm_output_interval;
         tmp = round(prob_angle * break_mag * 100);
@@ -1844,7 +1849,7 @@ int step2_KF_ChangeDetection
             /*  changed has been detected   */
             /********************************/
             /*fitting state variables and save to rec_cg)*/
-            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
             {
                 quick_sort_float(v_dif_mag[i_b], 0, conse-1);
                 matlab_2d_float_median(v_dif_mag, i_b, conse,
@@ -1867,12 +1872,8 @@ int step2_KF_ChangeDetection
 
                 /* kt = pt*zt */
                 rec_cg[*num_curve].rmse[i_b] = sqrtf((float)rmse_band[i_b]);
-    //            for(i_conse = 0; i_conse < conse; i_conse++)
-    //            {
-    //                printf("v_dif_mag for i_conse = %d for band = %d is %f \n", i_conse, i_b + 1,  v_dif_mag[i_b][i_conse]);
-    //            }
 
-            } //for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+            } //for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
 
             /* record break  */
             rec_cg[*num_curve].t_break = clrx[cur_i];
@@ -1897,7 +1898,7 @@ int step2_KF_ChangeDetection
         /*                                            */
         /**********************************************/
         if (steady == FALSE){
-            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
             {
                 KF_ts_filter_falsechange(&instance[i_b], clrx, cov_p[i_b], cur_i);
             }
@@ -1911,7 +1912,7 @@ int step2_KF_ChangeDetection
         for (m = cur_i; m < *n_clr-1; m++)
         {
             clrx[m] = clrx[m+1];
-            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                 clry[i_b][m] = clry[i_b][m+1];
         }
 
@@ -1924,7 +1925,7 @@ int step2_KF_ChangeDetection
         /*    need to update both p and fit_cft       */
         /*                                            */
         /**********************************************/
-        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             KF_ts_filter_regular(&instance[i_b], clrx, clry[i_b], cov_p[i_b],
                                  fit_cft,  cur_i, i_b, &vt, steady);
@@ -1997,12 +1998,15 @@ int step3_processing_end
     int t_start,
     int cm_output_interval,
     int starting_date,
+    int conse,
+    short int *min_rmse,
+    double tcg,                /* I: the change threshold  */
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 )
 {
     int k, k1, k2;
-    int i_b;
+    int i_b, b;
     int  status;
     char FUNC_NAME[] = "step3_processingn_end";
     int *bl_ids, *ids;
@@ -2013,21 +2017,40 @@ int step3_processing_end
     // double tmp_q;
     float** temp_v_dif;
     int istart_queue;
-    int current_CM_n = (clrx[cur_i - 1] - starting_date) / cm_output_interval;
+    int current_CM_n;
+    int id_last;
+    int i_conse, j;
+    float** v_diff_tmp;
+    float pred_y;
+    float pred_y_f;
+    float rmse_band[TOTAL_IMAGE_BANDS_SCCD];
+    float max_rmse;
+    float *v_dif_mag_norm;
+    float** v_dif;
+    float mean_angle_2 = 9999.0;
+    float tmp;
+    float *medium_v_dif;
+
+    if (cur_i == 0){
+        current_CM_n = 0;
+    }else{
+         current_CM_n = (clrx[cur_i - 1] - starting_date) / cm_output_interval;
+    }
+
 
 
     w = TWO_PI / AVE_DAYS_IN_A_YEAR;
     w2 = 2.0 * w;
 
 
-    temp_v_dif = (float **)allocate_2d_array(TOTAL_IMAGE_BANDS_HLS, *n_clr - i_start,
+    temp_v_dif = (float **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, *n_clr - i_start,
                                      sizeof (float));
     if (temp_v_dif == NULL)
     {
         RETURN_ERROR ("Allocating temp_v_dif memory",FUNC_NAME, FAILURE);
     }
 
-    rmse = (float *)malloc(TOTAL_IMAGE_BANDS_HLS * sizeof(float));
+    rmse = (float *)malloc(TOTAL_IMAGE_BANDS_SCCD * sizeof(float));
     if (rmse == NULL)
     {
         RETURN_ERROR ("Allocating rmse memory", FUNC_NAME, FAILURE);
@@ -2050,13 +2073,30 @@ int step3_processing_end
         RETURN_ERROR("ERROR allocating bl_ids memory", FUNC_NAME, FAILURE);
     }
 
+    v_dif = (float **) allocate_2d_array (NUM_LASSO_BANDS, conse - 1, sizeof (float));
+    if (v_dif == NULL)
+    {
+        RETURN_ERROR ("Allocating v_dif memory",
+                      FUNC_NAME, FAILURE);
+    }
+    v_dif_mag_norm = (float *)malloc((conse - 1) * sizeof(float));
+    if (v_dif_mag_norm == NULL)
+    {
+        RETURN_ERROR ("Allocating v_dif_mag_norm memory", FUNC_NAME, FAILURE);
+    }
+    medium_v_dif = (float *)malloc(NUM_LASSO_BANDS * sizeof(float));
+    if (medium_v_dif == NULL)
+    {
+        RETURN_ERROR ("Allocating v_dif_mag_norm memory", FUNC_NAME, FAILURE);
+    }
+
 
     if ((nrt_mode == NRT_MONITOR_STANDARD) | (nrt_mode == NRT_NEWCHANGE))
     {
         /****************************************************/
         /*   need to save nrt records for monitor mode      */
         /****************************************************/
-        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             /*   1. covariance matrix   */
              for(k1 = 0; k1 < DEFAULT_N_STATE; k1++)
@@ -2080,15 +2120,24 @@ int step3_processing_end
         /*     5. observations in tail       */
         for(k = 0; k < DEFAULT_CONSE - 1; k ++)
         {
-            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+            if (k < conse - 1)
             {
-                nrt_model->obs[i_b][k] = (short int)clry[i_b][cur_i + k];
+                for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                {
+                    nrt_model->obs[i_b][k] = (short int)clry[i_b][cur_i + k];
+                }
+                nrt_model->obs_date_since1982[k] = (short int)(clrx[cur_i+ k] - JULIAN_LANDSAT4_LAUNCH);
+            }else{
+                for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                {
+                    nrt_model->obs[i_b][k] = 0;
+                }
+                nrt_model->obs_date_since1982[k] = 0;
             }
-            nrt_model->obs_date_since1982[k] = (short int)(clrx[cur_i+ k] - JULIAN_LANDSAT4_LAUNCH);
         }
 
         /*     6. square adjust rmse, H, sum       */
-        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             // nrt_model->min_rmse[i_b] = (short int)min_rmse[i_b];
             nrt_model->H[i_b] = instance[i_b].H;
@@ -2097,6 +2146,79 @@ int step3_processing_end
         nrt_model->cm_outputs = cm_outputs[current_CM_n];
         nrt_model->cm_outputs_date = cm_outputs_date[current_CM_n];
 
+
+        /**********************************************************/
+        /*                                                        */
+        /* If no break, find at the end of the time series,       */
+        /* define probability of change based on adj_conse.       */
+        /*                                                        */
+        /**********************************************************/
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+            rmse_band[i_b] = sum_square_vt[i_b] / (num_obs_processed - SCCD_NUM_C);
+
+        for(i_conse = conse - 1 - 1; i_conse >= 0 ; i_conse--)
+        {
+            v_dif_mag_norm[i_conse] = 0;
+            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+            {
+                for (b = 0; b < NUM_LASSO_BANDS; b++)
+                {
+                    if (i_b == lasso_blist_sccd[b])
+                    {
+                        KF_ts_predict_conse(&instance[i_b], clrx, cov_p[i_b], fit_cft, *n_clr - 1 - i_conse, *n_clr - 1 - i_conse,
+                                            i_b, cur_i, &pred_y, &pred_y_f, FALSE);
+                        // max_rmse[i_b] = max(min_rmse[i_b], sqrtf(pred_y_f));
+                        max_rmse = max(min_rmse[i_b], sqrtf(rmse_band[i_b]));
+                        v_dif[b][i_conse] =  (clry[i_b][*n_clr - 1 - i_conse] - pred_y) / max_rmse;
+                        v_dif_mag_norm[i_conse] = v_dif_mag_norm[i_conse] + v_dif[b][i_conse] * v_dif[b][i_conse];
+                        break;
+                    }
+                }
+            }
+        }
+
+        id_last = conse - 1;
+        for (i_conse = 1; i_conse <= conse - 1; i_conse++)
+        {
+            v_diff_tmp =(float **) allocate_2d_array(NUM_LASSO_BANDS, i_conse, sizeof (float));
+            for (b = 0; b < NUM_LASSO_BANDS; b++)
+                for(j = 0; j < i_conse; j++)
+                  v_diff_tmp[b][j] = v_dif[b][conse - 1 - i_conse];
+
+            for (b = 0; b < NUM_LASSO_BANDS; b++)
+            {
+                quick_sort_float(v_diff_tmp[b], 0, i_conse-1);
+                matlab_2d_float_median(v_diff_tmp, b, i_conse-1, &tmp);
+                medium_v_dif[b] = tmp;
+            }
+
+            mean_angle_2 = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, i_conse);
+
+            if ((v_dif_mag_norm[conse - 1 - i_conse] <= tcg)||(mean_angle_2 >= NSIGN_sccd))
+            {
+                /**************************************************/
+                /*                                                */
+                /* The last stable ID.                            */
+                /*                                                */
+                /**************************************************/
+
+                id_last = i_conse - 1;
+                status = free_2d_array ((void **) v_diff_tmp);
+                if (status != SUCCESS)
+                {
+                    RETURN_ERROR ("Freeing memory: v_diff_tmp\n",
+                                  FUNC_NAME, FAILURE);
+                }
+                break;
+            }
+            status = free_2d_array ((void **) v_diff_tmp);
+            if (status != SUCCESS)
+            {
+                RETURN_ERROR ("Freeing memory: v_diff_tmp\n",
+                              FUNC_NAME, FAILURE);
+            }
+        }
+        nrt_model->change_prob = (unsigned char)((double)(id_last) * 100.0 / (double)conse) ;
     }
 
     if((nrt_mode == NRT_QUEUE_STANDARD) | (nrt_mode == NRT_NEWCHANGE))
@@ -2111,7 +2233,7 @@ int step3_processing_end
         for (k = 0; k < *num_obs_queue; k++)
         {
            obs_queue[k].clrx_since1982= (short int)(clrx[istart_queue + k] - JULIAN_LANDSAT4_LAUNCH);
-           for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+           for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                obs_queue[k].clry[i_b] = (short int)(clry[i_b][istart_queue + k]);
         }
     }
@@ -2128,6 +2250,15 @@ int step3_processing_end
     free(rm_ids);
     free(ids);
     free(bl_ids);
+    status = free_2d_array((void **)v_dif);
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR ("Freeing memory: v_dif\n", FUNC_NAME,
+                      FAILURE);
+    }
+    free(v_dif_mag_norm);
+    v_dif_mag_norm = NULL;
+    free(medium_v_dif);
     return SUCCESS;
 
 }
@@ -2147,6 +2278,7 @@ int sccd_standard
     short int *min_rmse,       /* O: adjusted rmse for the pixel    */
     int cm_output_interval,
     int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
+    int conse,
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 )
@@ -2170,30 +2302,30 @@ int sccd_standard
     int prev_i_break;
     float** rec_v_dif;
     int bl_train = 0;  // indicate both ccd and kalman filter initialization
-    int conse = DEFAULT_CONSE;
     float unadjusted_rmse;
-    unsigned int sum_square_vt[TOTAL_IMAGE_BANDS_HLS] = {0, 0, 0, 0, 0, 0};
+    unsigned int sum_square_vt[TOTAL_IMAGE_BANDS_SCCD] = {0, 0, 0, 0, 0, 0};
     int num_obs_processed = 0;  // num of clear observation already being processed for the current segment
     int i_start = 0;
     int i_dense = 0;
     int t_start;
     int num_fc_record = *num_fc;
+    int tt;
 
-    cov_p = (gsl_matrix **)allocate_2d_array(TOTAL_IMAGE_BANDS_HLS, 1, sizeof(gsl_matrix));
+    cov_p = (gsl_matrix **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, 1, sizeof(gsl_matrix));
     if (cov_p == NULL)
     {
         RETURN_ERROR ("Allocating cov_p memory", FUNC_NAME, FAILURE);
     }
 
     /* alloc memory for ssm matrix */
-    instance = malloc(TOTAL_IMAGE_BANDS_HLS * sizeof(ssmodel_constants));
+    instance = malloc(TOTAL_IMAGE_BANDS_SCCD * sizeof(ssmodel_constants));
     if(instance == NULL)
     {
        RETURN_ERROR ("Allocating instance memory", FUNC_NAME, FAILURE);
     }
 
     /* alloc memory for ssm instance */
-    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
     {
         instance[i_b].Z = gsl_vector_alloc(DEFAULT_N_STATE);
         if (instance[i_b].Z == NULL)
@@ -2218,19 +2350,19 @@ int sccd_standard
 
     }
 
-    fit_cft = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_HLS, SCCD_NUM_C, sizeof (float));
+    fit_cft = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_SCCD, SCCD_NUM_C, sizeof (float));
     if (fit_cft == NULL)
     {
         RETURN_ERROR ("Allocating fit_cft memory", FUNC_NAME, FAILURE);
     }
 
-    rmse_ini = (float *)malloc(TOTAL_IMAGE_BANDS_HLS * sizeof(float));
+    rmse_ini = (float *)malloc(TOTAL_IMAGE_BANDS_SCCD * sizeof(float));
     if (rmse_ini == NULL)
     {
         RETURN_ERROR ("Allocating rmse_ini memory", FUNC_NAME, FAILURE);
     }
 
-    rec_v_dif = (float **)allocate_2d_array(TOTAL_IMAGE_BANDS_HLS, n_clr,
+    rec_v_dif = (float **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, n_clr,
                                      sizeof (float));
     if (rec_v_dif == NULL)
     {
@@ -2242,7 +2374,7 @@ int sccd_standard
     {
         bl_train = 1;
         i = 0;
-        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             /*   1. covariance matrix   */
             for(k1 = 0; k1 < DEFAULT_N_STATE; k1++)
@@ -2264,7 +2396,7 @@ int sccd_standard
         num_obs_processed = nrt_model->num_obs;
 
         /*     5. adjust rmse, sum       */
-        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             sum_square_vt[i_b] = nrt_model->rmse_sum[i_b];
             /*     6. initialize state-space model coefficients       */
@@ -2343,7 +2475,7 @@ int sccd_standard
                 /*                                                            */
                 /**************************************************************/
 
-                for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+                for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                 {
 
                     status = auto_ts_fit_sccd(clrx, clry, i_b, i_b, i_start, i, SCCD_NUM_C,
@@ -2365,7 +2497,7 @@ int sccd_standard
                 }
 
 
-                for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+                for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                 {
                     unadjusted_rmse = rmse_ini[i_b] * rmse_ini[i_b];
                     initialize_ssmconstants(DEFAULT_N_STATE, unadjusted_rmse, &instance[i_b]);
@@ -2391,6 +2523,8 @@ int sccd_standard
         /**************************************************************/
         else
         {
+
+
             if(*nrt_mode == NRT_VOID)
             {
                 status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
@@ -2434,7 +2568,7 @@ int sccd_standard
     } /* n_clr for while (i < n_clr - conse) */
 
 //    int k1, k2;
-//    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+//    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
 //    {
 //         for(k1 = 0; k1 < DEFAULT_N_STATE; k1++)
 //         {
@@ -2458,13 +2592,13 @@ int sccd_standard
     status = step3_processing_end(instance, cov_p, fit_cft, clrx, clry, i, &n_clr, *nrt_mode,
                                   i_start, prev_i_break, nrt_model, num_obs_queue,
                                   obs_queue, sum_square_vt, num_obs_processed, t_start,
-                                  cm_output_interval, starting_date,
+                                  cm_output_interval, starting_date, conse, min_rmse,tcg,
                                   cm_outputs, cm_outputs_date);
 
 
 
 
-    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
     {
         gsl_vector_free(instance[i_b].Z);
         //(&instance[i_b])->Z = NULL;
@@ -2510,8 +2644,6 @@ int sccd_snow
     int *clrx,                  /* I: clear pixel curve in X direction (date)             */
     float **clry,               /* I: clear pixel curve in Y direction (spectralbands)    */
     int n_clr,
-    Output_sccd *rec_cg,     /* O: offline change records */
-    int *num_fc,               /* O: intialize NUM of Functional Curves    */
     int *nrt_status,             /* O: 1 - monitor mode; 2 - queue mode    */
     output_nrtmodel *nrt_model,       /* O: nrt records    */
     int *num_obs_queue,             /* O: the number of multispectral observations    */
@@ -2527,31 +2659,31 @@ int sccd_snow
     float* rmse;
     float **fit_cft;                 /* Fitted coefficients 2-D array.        */
     ssmodel_constants* instance;
-    unsigned sum_square_vt[TOTAL_IMAGE_BANDS_HLS] = {0, 0, 0, 0, 0, 0};
+    unsigned sum_square_vt[TOTAL_IMAGE_BANDS_SCCD] = {0, 0, 0, 0, 0, 0};
 
     gsl_vector** state_a;          /* a vector of a for current i,  multiple band */
     gsl_matrix** cov_p;
     
-    temp_v_dif = (float **)allocate_2d_array(TOTAL_IMAGE_BANDS_HLS, n_clr,
+    temp_v_dif = (float **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, n_clr,
                                      sizeof (float));
     if (temp_v_dif == NULL)
     {
         RETURN_ERROR ("Allocating temp_v_dif memory",FUNC_NAME, FAILURE);
     }
     
-    rmse = (float *)malloc(TOTAL_IMAGE_BANDS_HLS * sizeof(float));
+    rmse = (float *)malloc(TOTAL_IMAGE_BANDS_SCCD * sizeof(float));
     if (rmse == NULL)
     {
         RETURN_ERROR ("Allocating rmse memory", FUNC_NAME, FAILURE);
     }
     
-    state_a = (gsl_vector**) allocate_2d_array(TOTAL_IMAGE_BANDS_HLS, 1, sizeof(gsl_vector));
+    state_a = (gsl_vector**) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, 1, sizeof(gsl_vector));
     if (state_a == NULL)
     {
         RETURN_ERROR ("Allocating state_a memory", FUNC_NAME, FAILURE);
     }
 
-    cov_p = (gsl_matrix **)allocate_2d_array(TOTAL_IMAGE_BANDS_HLS, 1, sizeof(gsl_matrix));
+    cov_p = (gsl_matrix **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, 1, sizeof(gsl_matrix));
     if (cov_p == NULL)
     {
         RETURN_ERROR ("Allocating cov_p memory", FUNC_NAME, FAILURE);
@@ -2559,13 +2691,13 @@ int sccd_snow
     
 
     /* alloc memory for ssm matrix */
-    instance = malloc(TOTAL_IMAGE_BANDS_HLS * sizeof(ssmodel_constants));
+    instance = malloc(TOTAL_IMAGE_BANDS_SCCD * sizeof(ssmodel_constants));
     if(instance == NULL)
     {
        RETURN_ERROR ("Allocating instance memory", FUNC_NAME, FAILURE);
     }
 
-    fit_cft = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_HLS, SCCD_NUM_C, sizeof (float));
+    fit_cft = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_SCCD, SCCD_NUM_C, sizeof (float));
     if (fit_cft == NULL)
     {
         RETURN_ERROR ("Allocating fit_cft memory", FUNC_NAME, FAILURE);
@@ -2580,7 +2712,7 @@ int sccd_snow
         for (k = 0; k < n_clr; k++)
         {
            obs_queue[k].clrx_since1982= clrx[k] - JULIAN_LANDSAT4_LAUNCH;
-           for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+           for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                obs_queue[k].clry[i_b] = clry[k][i_b];
         }
         
@@ -2603,7 +2735,7 @@ int sccd_snow
     /*                                                        */
     /**********************************************************/
 
-    for (k = 0; k < TOTAL_IMAGE_BANDS_HLS; k++)  //
+    for (k = 0; k < TOTAL_IMAGE_BANDS_SCCD; k++)  //
     {
 
           status = auto_ts_fit_sccd(clrx, clry, k, k, 0, n_clr-1, MIN_NUM_C,
@@ -2621,7 +2753,7 @@ int sccd_snow
     /* step 1 - conti: initialize ssm models .                    */
     /*                                                            */
     /**************************************************************/
-    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
     {
         instance[i_b].Z = gsl_vector_alloc(DEFAULT_N_STATE);
         if (instance[i_b].Z == NULL)
@@ -2655,20 +2787,20 @@ int sccd_snow
 
     for(k = 0; k < DEFAULT_CONSE - 1; k ++)
     {
-        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             nrt_model[0].obs[i_b][k] = (short int)clry[i_b][n_clr - DEFAULT_CONSE  + k + 1];
         }
         nrt_model[0].obs_date_since1982[k] = (short int)(clrx[n_clr - DEFAULT_CONSE + k + 1] - JULIAN_LANDSAT4_LAUNCH);
     }
 
-    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
     {
         // nrt_model[0].min_rmse[i_b] = (short int)(rmse[i_b]);
         nrt_model[0].H[i_b] = instance[i_b].H;
     }
 
-    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
     {
          for(k1 = 0; k1 < DEFAULT_N_STATE; k1++){
              for(k2 = 0; k2 < DEFAULT_N_STATE; k2++){
@@ -2692,7 +2824,7 @@ int sccd_snow
     rmse = NULL;
    
 
-    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_HLS; i_b++)
+    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
     {
         gsl_vector_free(instance[i_b].Z);
         //(&instance[i_b])->Z = NULL;

@@ -67,52 +67,6 @@ void substr(char dest[], char src[], int offset, int len)
 }
 
 
-const char *check_parameter(int mode,char* in_path,char* out_path,int n_cores,
-                            int row, int col,int task,char* mask_path,double probability_threshold,
-                            int conse,int min_days_conse,int output_mode,
-                            int verbose){
-
-    if ((mode < 1 || mode > 4)){
-        return "unknown mode type";
-    }
-
-    struct stat st_tmp = {0};
-    if(mode != 4){
-        if (stat(in_path, &st_tmp) == -1)
-            return "in_path does not exists";
-    }else{
-       if(access(in_path, F_OK ) != 0)
-           return "in_path does not exists";
-    }
-
-
-    if (*mask_path != '\0'){
-        if(access(mask_path, F_OK ) != 0)
-            return "mask_path does not exists";
-    }
-
-    if (task != COLD &&
-        task != SCCD &&
-        task != OBCOLD &&
-        task != OBCOLD_RECONSTRUCT
-        )
-        return "unknown task type";
-
-    if (output_mode != 0 &&
-        output_mode != 1 &&
-        output_mode != 10 &&
-        output_mode != 11
-        )
-        return "unknown output_mode";
-
-
-
-    if ((probability_threshold < 0) || (probability_threshold > 1)) {
-        return "probability_threshold must be within 0 and 1";
-    }
-
-    return NULL;
-}
 
 
 /******************************************************************************
@@ -382,8 +336,6 @@ int stand_procedure_fixeddays
     float prob_angle; // change probability for angle
     int i_span_skip = 0;
     unsigned char tmp_direction;  // tmp variable for storing the directionality of change magnitude
-    int nega_count;  // used for change magnitude
-    int posi_count;
     int conse_min;
     int adj_conse_end;
 
@@ -2435,9 +2387,7 @@ int stand_procedure_fixeddays
                 k_new++;
             }
             end = k_new;
-         }else{
-            *num_fc = *num_fc - 1;
-        }
+         }
 
          if ((end - i_start + 1) >= LASSO_MIN)     // 09/28/2018 SY delete equal sign //11/15/2018 put back equal sign
          {
@@ -2758,9 +2708,6 @@ int stand_procedure
     int current_CM_n;
     float prob_angle; // change probability for angle
     int i_span_skip = 0;
-    unsigned char tmp_direction;  // tmp variable for storing the directionality of change magnitude
-    int nega_count;  // used for change magnitude
-    int posi_count;
 
     fit_cft = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS, LASSO_COEFFS,
                                          sizeof (float));
@@ -5476,7 +5423,6 @@ int obcold_reconstruction_procedure
 
     int break_num = 0;
     int i_last_break = 0;
-    int ini_date;
 
     int adj_conse = conse;
     float **v_dif_mag;

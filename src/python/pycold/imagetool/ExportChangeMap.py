@@ -9,10 +9,47 @@ import datetime as datetime
 from mpi4py import MPI
 from osgeo import gdal_array
 import pickle
-from collections import namedtuple
-from pycold.app import defaults
-from pycold.utils import index_sccdpack, unindex_sccdpack
 import yaml
+from collections import namedtuple
+
+PACK_ITEM = 6
+SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
+output_sccd = np.dtype([('t_start', np.int32), ('t_break', np.int32), ('num_obs', np.int32),
+                        ('coefs', np.float32, (6, 6)), ('rmse', np.float32, 6), ('magnitude', np.float32, 6)], align=True)
+
+output_nrtqueue = np.dtype([('clry', np.short, 6), ('clrx_since1982', np.short)], align=True)
+output_nrtmodel = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (6, 5)),
+                            ('obs_date_since1982', np.short, 5), ('covariance', np.float32, (6, 36)),
+                            ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
+                            ('cm_outputs', np.short), ('cm_outputs_date', np.short)], align=True)
+
+
+def index_sccdpack(sccd_pack_single):
+    """
+    convert list of sccdpack to namedtuple to facilitate parse,
+    :param sccd_pack_single: a nested list
+    :return: a namedtuple SccdOutput
+    """
+    if len(sccd_pack_single) != PACK_ITEM:
+        raise Exception("the element number of sccd_pack_single must be {}".format(PACK_ITEM))
+
+    # convert to named tuple
+    sccd_pack_single = SccdOutput(*sccd_pack_single)
+
+    # replace the element to structured array
+    if len(sccd_pack_single.rec_cg) == 0:
+        sccd_pack_single = sccd_pack_single._replace(rec_cg=np.asarray(sccd_pack_single.rec_cg,
+                                                                       dtype=np.float64))
+    else:
+        sccd_pack_single = sccd_pack_single._replace(rec_cg=np.asarray(sccd_pack_single.rec_cg,
+                                                                       dtype=output_sccd))
+    if len(sccd_pack_single.nrt_model) > 0:
+        sccd_pack_single = sccd_pack_single._replace(nrt_model=np.asarray(sccd_pack_single.nrt_model,
+                                                                          dtype=output_nrtmodel))
+    if len(sccd_pack_single.nrt_queue) > 0:
+        sccd_pack_single = sccd_pack_single._replace(nrt_queue=np.asarray(sccd_pack_single.nrt_queue,
+                                                                          dtype=output_nrtqueue))
+    return sccd_pack_single
 
 
 def getcategory_cold(cold_plot, i_curve):
@@ -84,6 +121,7 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     n_process = comm.Get_size()
+
     if method == 'OBCOLD':
         reccg_path = os.path.join(reccg_path, 'obcold')
         out_path = os.path.join(out_path, 'obcold_maps')
@@ -169,11 +207,13 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
             continue
         if method == 'SCCDOFFLINE':
             file = open(os.path.join(reccg_path, filename), 'rb')
-            cold_block = pickle.load(file)
-            cold_block = [index_sccdpack(cold_block[i * defaults['SCCD']['PACK_ITEM']:
-                                                    (i+1) * defaults['SCCD']['PACK_ITEM']])
-                            for i in range(int(len(cold_block) / defaults['SCCD']['PACK_ITEM']))]
-            file = None
+            cold_block = []
+            while True:
+                try:
+                    cold_block.append(index_sccdpack(pickle.load(file)))
+                except EOFError:
+                    break
+            file.close()
         else:
             cold_block = np.array(np.load(os.path.join(reccg_path, filename)), dtype=dt)
         # cold_block = [np.array(element, dtype=dt) for element in cold_block]

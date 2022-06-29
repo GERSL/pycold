@@ -176,7 +176,7 @@ int getnrtstructurefromtxt(char* nrtoutput_affix,  Output_sccd *s_rec_cg, output
     strcat(rmse_with_extension, rmse_ext);
     /* add the extension */
     ptr = fopen(rmse_with_extension,"rb");  // r for read, b for binary
-    if(fread(min_rmse, sizeof(short), 7, ptr)!=7)
+    if(fread(min_rmse, sizeof(short), TOTAL_IMAGE_BANDS_SCCD, ptr)!=TOTAL_IMAGE_BANDS_SCCD)
     {
         printf("reading minimum rmse fails \n");
     }
@@ -326,6 +326,11 @@ int main(int argc, char *argv[])
     int pos;
     short min_rmse[TOTAL_IMAGE_BANDS] = {0,0,0,0,0,0,0};
     int cm_output_interval;
+    bool b_c2 = FALSE;
+    bool b_header_csv = FALSE;
+    int headline = -1;
+    if (b_header_csv == TRUE)
+        headline = 0;   // skip the head line of csv
 
 
     /**************************************************************/
@@ -445,7 +450,7 @@ int main(int argc, char *argv[])
     int row_count = 0;
     while (fgets(csv_row, 255, sampleFile) != NULL)
     {
-        if(row_count != 0) // we skip first line because it is a header
+        if(row_count != headline) // we skip first line because it is a header
         {
             sdate[valid_scene_count] = atoi(strtok(csv_row, ","));
             buf[0][valid_scene_count] = (long)atoi(strtok(NULL, ","));
@@ -644,7 +649,7 @@ int main(int argc, char *argv[])
             }
             result = obcold_reconstruction_procedure(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, sdate,
                                                      valid_scene_count, breakdates_block, num_breakdatemaps,
-                                                     i_col + 1, conse, rec_cg, &num_fc);
+                                                     i_col + 1, conse, conse, rec_cg, &num_fc);
             // snprintf (msg_str, sizeof(msg_str), "col %d reconstruction calculation finished\n", i_col+1);
             // LOG_MESSAGE (msg_str, FUNC_NAME)
             for(i = 0; i < num_fc; i++)
@@ -669,13 +674,12 @@ int main(int argc, char *argv[])
                         CM_outputs[i] = NA_VALUE;
                         CM_outputs_date[i] = NA_VALUE;
                     }
-                    conse = 4;
 
         //                printf("temporal success2 with processid %d\n", process_id);
         //                printf("valid_scene_count_scanline[i_col] is %d;i_col is %d; original_row is %d; probability threshold is %f\n",
         //                       valid_scene_count_scanline[i_col], i_col, original_row, probability_threshold);
                     result = cold(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, sdate, valid_scene_count,
-                                  i_col + 1, tcg, conse, b_outputCM, starting_date, rec_cg, &num_fc, CM_OUTPUT_INTERVAL, CM_outputs,
+                                  i_col + 1, tcg, conse, b_outputCM, starting_date, b_c2, rec_cg, &num_fc, CM_OUTPUT_INTERVAL, CM_outputs,
                                   CM_outputs_date);
 
                     // snprintf (msg_str, sizeof(msg_str), "pixel %d COLD calculation finished\n", i_col+1);
@@ -712,7 +716,7 @@ int main(int argc, char *argv[])
                     }
                     result = sccd(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, sdate, valid_scene_count,
                                   tcg, &num_fc, &nrt_mode, s_rec_cg, nrt_model, &num_obs_queue, obs_queue, min_rmse, cm_output_interval,
-                                  starting_date, CM_outputs, CM_outputs_date);
+                                  starting_date, conse, b_c2, CM_outputs, CM_outputs_date);
 
                     //printf("free stage 9 \n");
                     for(i = 0; i < num_fc; i++)

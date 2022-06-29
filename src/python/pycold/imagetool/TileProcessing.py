@@ -291,89 +291,88 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                     CM_collect.append(np.full(n_cm_maps, -9999, dtype=np.short))
                     date_collect.append(np.full(n_cm_maps, -9999, dtype=np.short))
         else:
-            # start looping every pixel in the block
-            for pos in range(block_width * block_height):
-                original_row, original_col = get_rowcol_intile(pos, block_width,
-                                                               block_height, block_x, block_y)
-                try:
-                    if method == 'OBCOLD':
-                        [cold_result, CM, CM_date] = cold_detect(img_dates_sorted,
-                                                                               img_tstack[pos, 0, :].astype(np.int64),
-                                                                               img_tstack[pos, 1, :].astype(np.int64),
-                                                                               img_tstack[pos, 2, :].astype(np.int64),
-                                                                               img_tstack[pos, 3, :].astype(np.int64),
-                                                                               img_tstack[pos, 4, :].astype(np.int64),
-                                                                               img_tstack[pos, 5, :].astype(np.int64),
-                                                                               img_tstack[pos, 6, :].astype(np.int64),
-                                                                               img_tstack[pos, 7, :].astype(np.int64),
-                                                                               pos=config['n_cols'] * (original_row - 1) +
-                                                                               original_col,
-                                                                               conse=config['conse'],
-                                                                               starting_date=starting_date,
-                                                                               n_cm=n_cm_maps,
-                                                                               cm_output_interval=config['CM_OUTPUT_INTERVAL'],
-                                                                               b_output_cm=True)
-                    elif method == "SCCDOFFLINE":
-                        cold_result = sccd_detect(img_dates_sorted,
-                                                  img_tstack[pos, 0, :].astype(np.int64),
-                                                  img_tstack[pos, 1, :].astype(np.int64),
-                                                  img_tstack[pos, 2, :].astype(np.int64),
-                                                  img_tstack[pos, 3, :].astype(np.int64),
-                                                  img_tstack[pos, 4, :].astype(np.int64),
-                                                  img_tstack[pos, 5, :].astype(np.int64),
-                                                  # np.asarray([0] * len(img_tstack[pos, 5, :])).astype(np.int64),
-                                                  img_tstack[pos, 6, :].astype(np.int64),
-                                                  img_tstack[pos, 7, :].astype(np.int64),
-                                                  t_cg=threshold,
-                                                  pos=config['n_cols'] * (original_row - 1) + original_col)
-                        # replace structural array to list for saving storage space
-                        # cold_result = cold_result._replace(rec_cg=cold_result.rec_cg.tolist())
-                        # if len(sccd_plot.nrt_model) > 0:
-                        #     cold_result = cold_result._replace(nrt_model=cold_result.nrt_model.tolist())
-                        # if len(sccd_plot.nrt_queue) > 0:
-                        #    cold_result = cold_result._replace(nrt_queue=cold_result.nrt_queue.tolist())
-                        cold_result = unindex_sccdpack(cold_result)
-                    else:
-                        cold_result = cold_detect(img_dates_sorted,
-                                                  img_tstack[pos, 0, :].astype(np.int64),
-                                                  img_tstack[pos, 1, :].astype(np.int64),
-                                                  img_tstack[pos, 2, :].astype(np.int64),
-                                                  img_tstack[pos, 3, :].astype(np.int64),
-                                                  img_tstack[pos, 4, :].astype(np.int64),
-                                                  img_tstack[pos, 5, :].astype(np.int64),
-                                                  img_tstack[pos, 6, :].astype(np.int64),
-                                                  img_tstack[pos, 7, :].astype(np.int64),
-                                                  t_cg=threshold,
-                                                  conse=config['conse'],
-                                                  pos=config['n_cols'] * (original_row - 1) + original_col)
-                except RuntimeError:
-                    print("COLD fails at original_row {}, original_col {} ({})".format(original_row, original_col,
-                                                                                       datetime.now(tz)
-                                                                                       .strftime('%Y-%m-%d %H:%M:%S')))
-                except Exception as e:
-                    if method == 'OBCOLD':
-                        CM = np.full(n_cm_maps, -9999, dtype=np.short)
-                        CM_date = np.full(n_cm_maps, -9999, dtype=np.short)
-                else:
-                    result_collect.append(cold_result)
-                finally:
-                    if method == 'OBCOLD':
-                        CM_collect.append(CM)
-                        date_collect.append(CM_date)
-
-        # save the dataset
-        if method == "SCCDOFFLINE":
-            if len(result_collect) > 0:
-                f = open(join(result_path, 'record_change_x{}_y{}_sccd.npy'.format(block_x, block_y)), "wb")
-                pickle.dump(np.hstack(result_collect), f)
+            # for sccd, as the output is heterogeneous, we continuously save the sccd pack for each pixel
+            if method == "SCCDOFFLINE":
+                f = open(join(result_path, 'record_change_x{}_y{}_sccd.npy'.format(block_x, block_y)), "wb+")
+                # start looping every pixel in the block
+                for pos in range(block_width * block_height):
+                    original_row, original_col = get_rowcol_intile(pos, block_width,
+                                                                   block_height, block_x, block_y)
+                    sccd_result = sccd_detect(img_dates_sorted,
+                                              img_tstack[pos, 0, :].astype(np.int64),
+                                              img_tstack[pos, 1, :].astype(np.int64),
+                                              img_tstack[pos, 2, :].astype(np.int64),
+                                              img_tstack[pos, 3, :].astype(np.int64),
+                                              img_tstack[pos, 4, :].astype(np.int64),
+                                              img_tstack[pos, 5, :].astype(np.int64),
+                                              img_tstack[pos, 6, :].astype(np.int64),
+                                              img_tstack[pos, 7, :].astype(np.int64),
+                                              t_cg=threshold,
+                                              conse=config['conse'],
+                                              pos=config['n_cols'] * (original_row - 1) + original_col)
+                    # replace structural array to list for saving storage space
+                    pickle.dump(unindex_sccdpack(sccd_result), f)
                 f.close()
-        else:
-            if len(result_collect) > 0:
-                np.save(join(result_path, 'record_change_x{}_y{}_cold.npy'.format(block_x, block_y)), np.hstack(result_collect))
+            else:
+                # start looping every pixel in the block
+                for pos in range(block_width * block_height):
+                    original_row, original_col = get_rowcol_intile(pos, block_width,
+                                                                   block_height, block_x, block_y)
+                    try:
+                        if method == 'OBCOLD':
+                            [cold_result, CM, CM_date] = cold_detect(img_dates_sorted,
+                                                                     img_tstack[pos, 0, :].astype(np.int64),
+                                                                     img_tstack[pos, 1, :].astype(np.int64),
+                                                                     img_tstack[pos, 2, :].astype(np.int64),
+                                                                     img_tstack[pos, 3, :].astype(np.int64),
+                                                                     img_tstack[pos, 4, :].astype(np.int64),
+                                                                     img_tstack[pos, 5, :].astype(np.int64),
+                                                                     img_tstack[pos, 6, :].astype(np.int64),
+                                                                     img_tstack[pos, 7, :].astype(np.int64),
+                                                                     pos=config['n_cols'] * (original_row - 1) +
+                                                                         original_col,
+                                                                     conse=config['conse'],
+                                                                     starting_date=starting_date,
+                                                                     n_cm=n_cm_maps,
+                                                                     cm_output_interval=config['CM_OUTPUT_INTERVAL'],
+                                                                     b_output_cm=True)
+                        else:
+                            cold_result = cold_detect(img_dates_sorted,
+                                                      img_tstack[pos, 0, :].astype(np.int64),
+                                                      img_tstack[pos, 1, :].astype(np.int64),
+                                                      img_tstack[pos, 2, :].astype(np.int64),
+                                                      img_tstack[pos, 3, :].astype(np.int64),
+                                                      img_tstack[pos, 4, :].astype(np.int64),
+                                                      img_tstack[pos, 5, :].astype(np.int64),
+                                                      img_tstack[pos, 6, :].astype(np.int64),
+                                                      img_tstack[pos, 7, :].astype(np.int64),
+                                                      t_cg=threshold,
+                                                      conse=config['conse'],
+                                                      pos=config['n_cols'] * (original_row - 1) + original_col)
+                    except RuntimeError:
+                        print("COLD fails at original_row {}, original_col {} ({})".format(original_row, original_col,
+                                                                                           datetime.now(tz)
+                                                                                           .strftime(
+                                                                                               '%Y-%m-%d %H:%M:%S')))
+                    except Exception as e:
+                        if method == 'OBCOLD':
+                            CM = np.full(n_cm_maps, -9999, dtype=np.short)
+                            CM_date = np.full(n_cm_maps, -9999, dtype=np.short)
+                    else:
+                        result_collect.append(cold_result)
+                    finally:
+                        if method == 'OBCOLD':
+                            CM_collect.append(CM)
+                            date_collect.append(CM_date)
 
-        if method == 'OBCOLD':
-            np.save(join(result_path, 'CM_date_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(date_collect))
-            np.save(join(result_path, 'CM_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(CM_collect))
+                # save the dataset
+                if len(result_collect) > 0:
+                    np.save(join(result_path, 'record_change_x{}_y{}_cold.npy'.format(block_x, block_y)),
+                            np.hstack(result_collect))
+
+                if method == 'OBCOLD':
+                    np.save(join(result_path, 'CM_date_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(date_collect))
+                    np.save(join(result_path, 'CM_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(CM_collect))
 
         with open(join(result_path, 'COLD_block{}_finished.txt'.format(block_id)), 'w') as fp:
             pass

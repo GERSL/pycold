@@ -29,6 +29,7 @@ int sccd
     short int *min_rmse,         /* O: adjusted rmse for the pixel    */
     int cm_output_interval,
     int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
+    int conse,                  /* I: consecutive observation number for change detection   */
     bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel testdue to the current low quality  */
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
@@ -160,6 +161,9 @@ int step3_processing_end
     int t_start,
     int cm_output_interval,
     int starting_date,
+    int conse,
+    short int *min_rmse,
+    double tcg,                /* I: the change threshold  */
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 );
@@ -171,8 +175,6 @@ int sccd_snow
     int *clrx,                  /* I: clear pixel curve in X direction (date)             */
     float **clry,               /* I: clear pixel curve in Y direction (spectralbands)    */
     int n_clr,
-    Output_sccd *rec_cg,     /* O: offline change records */
-    int *num_fc,               /* O: intialize NUM of Functional Curves    */
     int *nrt_status,             /* O: 1 - monitor mode; 2 - queue mode    */
     output_nrtmodel *rec_nrt,       /* O: nrt records    */
     int *num_obs_queue,             /* O: the number of multispectral observations    */
@@ -195,6 +197,7 @@ int sccd_standard
     short int *min_rmse,       /* O: adjusted rmse for the pixel    */
     int cm_output_interval,
     int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
+    int conse,
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 );

@@ -5,7 +5,7 @@
 
 /* from ccdc.c */
 #define TOTAL_IMAGE_BANDS 7 /* Number of image bands, for loops.   */
-#define TOTAL_IMAGE_BANDS_HLS 6 /* Number of HLS image bands, for loops.   */
+#define TOTAL_IMAGE_BANDS_SCCD 6 /* Number of HLS image bands, for loops.   */
 #define TOTAL_INDICES 0 /* Number of image bands, for loops. */
 #define TOTAL_BANDS 8     /* Total image plus mask bands, for loops.  HLS */
 #define MIN_NUM_C 4       /* Minimum number of coefficients           */
@@ -25,7 +25,7 @@
 #define T_MAX_CG 30.8562  /* chi-square inversed T_max_cg (1e-5) for    */
                           /* last step noise removal                    */
                           /*  SY 11/19/2018: change from 35.8882 to 30.8562)                  */
-#define T_MAX_CG_SCCD 25.7448
+#define T_MAX_CG_SCCD 30.8562
 // #define T_MAX_CG_SCCD 20.515
 
 /* threshold (degree) of mean included angle                          */
@@ -105,7 +105,7 @@
 #define DEFAULT_COLD_TCG 15.0863
 
 
-#define INI_Q00 0.1   /* MATLAB default */
+#define INI_Q00 1   /* MATLAB default */
 #define INI_P 10000
 
 /* from ccd.c detection method*/
@@ -126,7 +126,7 @@
 
 #define N_FEATURE 7
 #define DEFAULT_PROBABILITY 0.99
-#define DEFAULT_CONSE 6
+#define DEFAULT_CONSE 5
 
 #define JULY1ST_DOY 183
 #define SLOPE_SCALE 10000 // the parameter to guarantee the precision for converting scale double slope to float slope

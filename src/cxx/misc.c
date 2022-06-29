@@ -3113,6 +3113,7 @@ float angl_scatter_measure
     float norm2;
     float* angle;
     float angle_sum = 0;
+    float interm;
     if (i_count > 3)
     {
         angle = (float *)malloc((i_count) * sizeof(float));
@@ -3129,7 +3130,10 @@ float angl_scatter_measure
                 norm2 += med_diff[j] * med_diff[j];
                 //printf("%f\n", med_diff[j]);
             }
-            angle[i] = (acos(product / (sqrt(norm1) * sqrt(norm2)))  * 180.0) / PI;
+            interm = (float)(product / (sqrt(norm1) * sqrt(norm2)));
+            if(interm > 1)
+                interm = 1;
+            angle[i] = (acos(interm)  * 180.0) / PI;
             angle_sum = angle_sum + angle[i];
             //printf("%f\n", angle[i]);
         }
