@@ -25,6 +25,7 @@
 #define T_MAX_CG 30.8562  /* chi-square inversed T_max_cg (1e-5) for    */
                           /* last step noise removal                    */
                           /*  SY 11/19/2018: change from 35.8882 to 30.8562)                  */
+//#define T_MAX_CG_SCCD 25.7448
 #define T_MAX_CG_SCCD 30.8562
 // #define T_MAX_CG_SCCD 20.515
 
@@ -105,7 +106,7 @@
 #define DEFAULT_COLD_TCG 15.0863
 
 
-#define INI_Q00 1   /* MATLAB default */
+#define INI_Q00 0.1   /* MATLAB default */
 #define INI_P 10000
 
 /* from ccd.c detection method*/

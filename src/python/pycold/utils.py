@@ -20,6 +20,7 @@ nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), 
                             ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
                             ('cm_outputs', np.short), ('cm_outputs_date', np.short), ('change_prob', np.ubyte)], align=True)
 
+
 def get_block_y(block_id, n_block_x):
     """
     Parameters
@@ -417,6 +418,38 @@ def save_1band_fromrefimage(array, ref_image_path, out_path, gtype=gdal.GDT_Int1
     outdata.SetProjection(proj)
     outdata.FlushCache()
     ref_image = None
+
+
+def generate_rowcolimage(ref_image_path, out_path):
+    """
+    a function to convert source image to index image (starting from 1, e.g., the first pixel is 10001)
+    :param ref_image_path: the path for reference images
+    :param out_path:  the path for output images
+    :return:
+    """
+    # ref_image_path = '/home/coloury/Dropbox/UCONN/HLS/HLS.L30.T18TYM.2022074T153249.v2.0.B10.tif'
+    ref_image = gdal.Open(ref_image_path, gdal.GA_ReadOnly)
+    trans = ref_image.GetGeoTransform()
+    proj = ref_image.GetProjection()
+    cols = ref_image.RasterXSize
+    rows = ref_image.RasterYSize
+
+    i, j = np.indices(ref_image.ReadAsArray().shape[:2])
+    index = (i + 1) * 10000 + j + 1
+
+    outdriver1 = gdal.GetDriverByName("GTiff")
+    outdata = outdriver1.Create(out_path, rows, cols, 1, gdal.GDT_Int32)
+    outdata.GetRasterBand(1).WriteArray(index)
+    outdata.FlushCache()
+    outdata.SetGeoTransform(trans)
+    outdata.FlushCache()
+    outdata.SetProjection(proj)
+    outdata.FlushCache()
+    ref_image = None
+
+
+
+
 
 
 

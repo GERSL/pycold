@@ -44,8 +44,8 @@ sccd_dt = np.dtype([('t_start', np.int32),
                         align=True)
 
 nrtqueue_dt = np.dtype([('clry', np.short, 6), ('clrx_since1982', np.short)], align=True)
-nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (6, 4)),
-                         ('obs_date_since1982', np.short, 4), ('covariance', np.float32, (6, 36)),
+nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (6, 5)),
+                         ('obs_date_since1982', np.short, 5), ('covariance', np.float32, (6, 36)),
                          ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
                          ('cm_outputs', np.short), ('cm_outputs_date', np.short), ('change_prob', np.ubyte)], align=True)
 
@@ -81,8 +81,8 @@ cdef extern from "../../cxx/output.h":
     ctypedef struct output_nrtmodel:
         short int t_start_since1982
         short int num_obs
-        short int obs[NRT_BAND][DEFAULT_CONSE-1]
-        short int obs_date_since1982[DEFAULT_CONSE-1]
+        short int obs[NRT_BAND][DEFAULT_CONSE]
+        short int obs_date_since1982[DEFAULT_CONSE]
         float covariance[NRT_BAND][36]
         float nrt_coefs[NRT_BAND][6]
         float H[NRT_BAND]

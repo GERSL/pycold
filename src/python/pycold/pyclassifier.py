@@ -95,6 +95,121 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, n_features_perb
     return features
 
 
+def extract_features_sccd(sccd_plot, band, ordinal_day_list, nan_val, n_features_perband, now_year):
+    """
+    generate features from sccd pack structure for classification based on a plot-based rec_cg
+    and a list of days to be predicted
+    Parameters
+    ----------
+    sccd_plot: nested array
+        plot-based rec_cg
+    band: integer
+        the predicted band number range from 0 to 6
+    ordinal_day_list: list
+        a list of days that this function will predict every days as a list as output
+    nan_val: integer
+        NA value assigned to the output
+    n_features_perband: integer
+        the number of features per band, 1, 3, 5, 7, 8.
+    Returns
+    -------
+        feature: a list (length = n_feature) of 1-array [len(ordinal_day_list)]
+    """
+    features = [np.full(len(ordinal_day_list), nan_val, dtype=np.double) for x in range(n_features_perband)]
+    features_now = [np.full(1, nan_val, dtype=np.double) for x in range(n_features_perband)]
+    for index, ordinal_day in enumerate(ordinal_day_list):
+        # print(index)
+        for idx, cold_curve in enumerate(sccd_plot.rec_cg):
+            if idx == len(sccd_plot.rec_cg) - 1:
+                max_days = sccd_plot.rec_cg[idx]['t_break']
+            else:
+                max_days = sccd_plot.rec_cg[idx + 1]['t_start']
+            if n_features_perband == 6:
+                if cold_curve['t_start'] <= ordinal_day < max_days:
+                    for n in range(n_features_perband):
+                        if n == 0:
+                            features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
+                                                 ordinal_day / defaults['COMMON']['SLOPE_SCALE']
+                            if np.isnan(features[n][index]):
+                                features[n][index] = 0
+                        else:
+                            features[n][index] = cold_curve['coefs'][band][n]
+                            if np.isnan(features[n][index]):
+                                features[n][index] = 0
+                    break
+
+            else:
+                if cold_curve['t_start'] <= ordinal_day < max_days:
+                    for n in range(n_features_perband):
+                        if n == 0:
+                            # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
+                            features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
+                                                 ordinal_day / defaults['COMMON']['SLOPE_SCALE']
+                            if np.isnan(features[n][index]):
+                                features[n][index] = 0
+                        else:
+                            features[n][index] = cold_curve['coefs'][band][n+1]  # n + 1 is because won't need slope as output
+                            if np.isnan(features[n][index]):
+                                features[n][index] = 0
+                    break
+
+        if sccd_plot.nrt_mode == 1 or sccd_plot.nrt_mode == 3 or sccd_plot.nrt_mode == 4:
+            if (sccd_plot.nrt_model['t_start_since1982']+defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH']) <= \
+                    ordinal_day < (sccd_plot.nrt_model['obs_date_since1982'][0][0]+defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH']):
+                if n_features_perband == 6:
+                    for n in range(n_features_perband):
+                        if n == 0:
+                            features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
+                                                 ordinal_day / defaults['COMMON']['SLOPE_SCALE']
+                            if np.isnan(features[n][index]):
+                                features[n][index] = 0
+                        else:
+                            features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n]
+                            if np.isnan(features[n][index]):
+                                features[n][index] = 0
+                    break
+                else:
+                    for n in range(n_features_perband):
+                        if n == 0:
+                            # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
+                            features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
+                                                 ordinal_day / defaults['COMMON']['SLOPE_SCALE']
+                            if np.isnan(features[n][index]):
+                                features[n][index] = 0
+                        else:
+                            features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n+1]  # n + 1 is because won't need slope as output
+                            if np.isnan(features[n][index]):
+                                features[n][index] = 0
+                    break
+
+    # for features of current years, only :xmonitor mode has cover type information
+    if sccd_plot.nrt_mode == 1 or sccd_plot.nrt_mode == 4:
+        ordinal_day_now = pd.Timestamp.toordinal(dt.date(now_year, 7, 1))
+        if n_features_perband == 6:
+            for n in range(n_features_perband):
+                if n == 0:
+                    features_now[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
+                                         ordinal_day_now / defaults['COMMON']['SLOPE_SCALE']
+                    if np.isnan(features[n][index]):
+                        features_now[n][index] = 0
+                else:
+                    features_now[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n]
+                    if np.isnan(features[n][index]):
+                        features_now[n][index] = 0
+        else:
+            for n in range(n_features_perband):
+                if n == 0:
+                    features_now[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
+                                         ordinal_day_now / defaults['COMMON']['SLOPE_SCALE']
+                    if np.isnan(features[n][index]):
+                        features_now[n][index] = 0
+                else:
+                    features_now[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n+1]  # n + 1 is because won't need slope as output
+                    if np.isnan(features[n][index]):
+                        features_now[n][index] = 0
+    return features, features_now
+
+
 def generate_sample_num(label, sample_parameters):
     """
     generate sample number for each land cover category using the method from 'Optimizing selection of training and
@@ -133,7 +248,7 @@ def get_features(path):
 
 
 class PyClassifier:
-    def __init__(self, config, n_features=None, logger=None, band_num=7):
+    def __init__(self, config, n_features_perband=None, logger=None, band_num=7):
         """
         Parameters
         ----------
@@ -147,7 +262,7 @@ class PyClassifier:
         if n_features is None:
             self.n_features = band_num * defaults['CLASSIFIER']['N_FEATURES']
         else:
-            self.n_features = band_num * n_features
+            self.n_features = band_num * n_features_perband
         if logger is None:
             logging.basicConfig(level=logging.DEBUG,
                                 format='%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s',
@@ -157,7 +272,7 @@ class PyClassifier:
             self.logger = logger
         self.band_num = band_num
 
-    def predict_features(self, block_id, cold_block, year_lowbound, year_uppbound, ismat=False):
+    def predict_features(self, block_id, cold_block, year_list_to_predict, ismat=False):
         """
         Parameters
         ----------
@@ -165,10 +280,8 @@ class PyClassifier:
             the block id
         cold_block: nested array of colddt datatype
             the block-based change records produced by cold algorithms
-        year_lowbound: integer
-            the lower bound of the analysis year range
-        year_uppbound: integer
-            the upper bound of the analysis year range
+        year_list_to_predict:
+            the list of classification years
             Note that the reason for not parsing cold_block to get year bounds is that the year ranges of blocks
             may vary from each other, so the year bounds are required to be defined from the tile level, not block level
             such as from 'starting_end_date.txt'
@@ -177,14 +290,14 @@ class PyClassifier:
 
         Returns
         -------
-        an array [year_uppbound-year_lowbound+1, block_width*block_height, n_features]
+        an array [len(year_list_to_predict), block_width*block_height, n_features]
         """
-        block_features = np.full(((year_uppbound - year_lowbound + 1),
+        block_features = np.full((len(year_list_to_predict),
                                   self.config['block_width'] * self.config['block_height'],
                                   self.n_features),
                                  defaults['COMMON']['NAN_VAL'], dtype=np.float32)
         ordinal_day_list = [pd.Timestamp.toordinal(dt.date(year, 7, 1)) for year
-                            in range(year_lowbound, year_uppbound + 1)]
+                            in year_list_to_predict]
         if len(cold_block) == 0:
             self.logger.warning('the rec_cg file for block_id has no records'.format(block_id))
             return block_features
@@ -267,18 +380,17 @@ class PyClassifierHPC(PyClassifier):
     """
     this class adds IO functions based on the HPC environment for the base class
     """
-    def __init__(self, config, record_path, band_num=7, year_lowbound=1982, year_uppbound=2021, tmp_path=None, output_path=None,
-                 n_features=defaults['CLASSIFIER']['N_FEATURES'], seedmap_path=None, rf_path=None, logger=None):
+    def __init__(self, config, record_path, band_num=7, year_list_to_predict=list(range(1982, 2022)),
+                 tmp_path=None, output_path=None, n_features_perband=defaults['CLASSIFIER']['N_FEATURES'],
+                 seedmap_path=None, rf_path=None, logger=None):
         """
         Parameters
         ----------
         config: configuration structure from config.yaml
         record_path: str
             the path that saves change records
-        year_lowbound: int, default = None
-            the lower bounds for the classification map outputs
-        year_uppbound: int, default = None
-            the upper bounds for the classification map outputs
+        year_list_to_predict:
+            the list of classification years
         tmp_path: string, default is None
             the path to save temporal folder, if None, will set /record_path/feature_maps
         output_path: string, default is None
@@ -292,12 +404,11 @@ class PyClassifierHPC(PyClassifier):
         logger: the logger handler
         """
         try:
-            self._check_inputs_thematic(config, record_path, year_lowbound, year_uppbound, tmp_path,
-                                         seedmap_path, rf_path)
+            self._check_inputs_thematic(config, record_path, tmp_path, seedmap_path, rf_path)
         except ValueError or FileExistsError as e:
             raise e
 
-        assert n_features in [1, 3, 5, 7, 8]
+        assert n_features_perband in [1, 3, 5, 7, 8]
         
         self.config = config
         self.config['block_width'] = int(self.config['n_cols'] / self.config['n_block_x'])
@@ -315,10 +426,9 @@ class PyClassifierHPC(PyClassifier):
         else:
             self.output_path = tmp_path
 
-        self.n_features = band_num * n_features
+        self.n_features = band_num * n_features_perband
 
-        self.year_lowbound = year_lowbound
-        self.year_uppbound = year_uppbound
+        self.year_list_to_predict = year_list_to_predict
         self.seedmap_path = seedmap_path
         if rf_path is None:
             self.rf_path = join(self.output_path, 'rf.model')  # default path
@@ -336,7 +446,7 @@ class PyClassifierHPC(PyClassifier):
         self.band_num = band_num
 
     @staticmethod
-    def _check_inputs_thematic(config, record_path, year_lowbound, year_uppbound, tmp_path,  seedmap_path,
+    def _check_inputs_thematic(config, record_path, tmp_path,  seedmap_path,
                                 rf_path):
         if type(config['n_rows']) != int or config['n_rows'] < 0:
             raise ValueError('n_rows must be positive integer')
@@ -370,10 +480,9 @@ class PyClassifierHPC(PyClassifier):
         -------
 
         '''
-        for i in range(block_features.shape[0]):
-            np.save(os.path.join(self.tmp_path, 'tmp_feature_year{}_block{}.npy').format(self.year_lowbound+i,
-                                                                                                  block_id),
-                    block_features[i, :, :])
+        for id, year in enumerate(self.year_list_to_predict):
+            np.save(os.path.join(self.tmp_path, 'tmp_feature_year{}_block{}.npy').format(year, block_id),
+                    block_features[id, :, :])
 
     def _is_finished_step1_predict_features(self):
         for iblock in range(self.config['n_blocks']):
@@ -459,7 +568,7 @@ class PyClassifierHPC(PyClassifier):
         cold_block = np.load(join(self.record_path, 'record_change_x{}_y{}_cold.npy').format(
                              get_block_x(block_id, self.config['n_block_x']),
                              get_block_y(block_id, self.config['n_block_x'])))
-        block_features = self.predict_features(block_id, cold_block, self.year_lowbound, self.year_uppbound)
+        block_features = self.predict_features(block_id, cold_block, self.year_list_to_predict)
         self._save_features(block_id, block_features)
         with open(join(self.tmp_path, 'tmp_step1_predict_{}_finished.txt'.format(block_id)), 'w') as fp:
             pass
@@ -467,8 +576,14 @@ class PyClassifierHPC(PyClassifier):
     def step2_train_rf(self, ref_year=None):
         while not self._is_finished_step1_predict_features():
             time.sleep(5)
+
         if ref_year is None:
-            ref_year = defaults['CLASSIFIER']['classification_year']
+            ref_year = defaults['CLASSIFIER']['training_year']
+
+        if ref_year not in self.year_list_to_predict:
+            raise Exception("Ref_year {} is not in year_list_to_predict {}. "
+                            "PLease included it and re-run step1_feature_generation".format(ref_year,
+                                                                                            self.year_list_to_predict))
 
         full_feature_array = assemble_array(self.get_fullfeature_forcertainyear(ref_year),
                                             self.config['n_block_x'])
@@ -484,7 +599,7 @@ class PyClassifierHPC(PyClassifier):
             raise ("Please double check your rf model file directory or generate random forest model first:"
                    " {}".format(e))
 
-        for year in range(self.year_lowbound, self.year_uppbound + 1):
+        for year in self.year_list_to_predict:
             tmp_feature_block = get_features(join(self.tmp_path, 'tmp_feature_year{}_block{}.npy'.format(year,
                                                                                                         block_id)))
             cmap = self.classification_block(rf_model, tmp_feature_block)
@@ -492,17 +607,53 @@ class PyClassifierHPC(PyClassifier):
         with open(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(block_id)), 'w') as fp:
             pass
 
+    def step3_classification_sccd(self, block_id):
+        while not self._is_finished_step2_train_rfmodel():
+            time.sleep(5)
+        try:
+            rf_model = self._get_rf_model()
+        except IOError as e:
+            raise ("Please double check your rf model file directory or generate random forest model first:"
+                   " {}".format(e))
+
+        for year in self.year_list_to_predict:
+            tmp_feature_block = get_features(join(self.tmp_path, 'tmp_feature_year{}_block{}.npy'.format(year,
+                                                                                                        block_id)))
+            cmap = self.classification_block(rf_model, tmp_feature_block)
+            self._save_yearlyclassification_maps(block_id, year, cmap)
+
+        tmp_feature_block = get_features(join(self.tmp_path, 'tmp_feature_now_block{}.npy'.format(block_id)))
+        cmap = self.classification_block(rf_model, tmp_feature_block)
+        self._save_yearlyclassification_maps(block_id, 'now', cmap)
+        with open(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(block_id)), 'w') as fp:
+            pass
+
     def step4_assemble(self):
         while not self._is_finished_step3_classification():
             time.sleep(5)
-        for year in range(self.year_lowbound, self.year_uppbound + 1):
+        for year in self.year_list_to_predict:
             full_yearlyclass_array = assemble_array(self._get_fullclassification_forcertainyear(year),
                                                     self.config['n_block_x'])[:, :, 0]
             self._save_covermaps(full_yearlyclass_array, year)
         self._clean()  # _clean all temp files
 
+    def step4_assemble_sccd(self):
+        while not self._is_finished_step3_classification():
+            time.sleep(5)
+
+        full_yearlyclass_array = assemble_array(self._get_fullclassification_forcertainyear('now'),
+                                                self.config['n_block_x'])[:, :, 0]
+        self._save_covermaps(full_yearlyclass_array, 'now')
+
+        for year in self.year_list_to_predict:
+            full_yearlyclass_array = assemble_array(self._get_fullclassification_forcertainyear(year),
+                                                    self.config['n_block_x'])[:, :, 0]
+            self._save_covermaps(full_yearlyclass_array, year)
+
+        self._clean()  # _clean all temp files
+
     def is_finished_step4_assemble(self):
-        for year in range(self.year_lowbound, self.year_uppbound + 1):
+        for year in self.year_list_to_predict:
             if not os.path.exists(join(self.output_path, 'yearlyclassification_{}.npy'.format(year))):
                 return False
         else:

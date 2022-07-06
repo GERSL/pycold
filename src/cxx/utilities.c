@@ -1191,7 +1191,7 @@ int preprocessing
         }
 
 
-        if ((buf_b[i] > 0) && (buf_b[i] < 10000) &&
+        if ((buf_b[i] > -200) && (buf_b[i] < 10000) &&
             (buf_g[i] > 0) && (buf_g[i] < 10000) &&
             (buf_r[i] > 0) && (buf_r[i] < 10000) &&
             (buf_n[i] > 0) && (buf_n[i] < 10000) &&

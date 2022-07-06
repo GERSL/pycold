@@ -19,10 +19,12 @@ from pycold import cold_detect, sccd_detect
 from scipy.stats import chi2
 from pycold.utils import assemble_cmmaps, get_rowcol_intile, get_time_now, get_doy, unindex_sccdpack
 from pycold.ob_analyst import ObjectAnalystHPC
-from pycold.pyclassifier import PyClassifierHPC
+from pycold.pyclassifier import PyClassifierHPC, extract_features_sccd
 from pycold.app import defaults
 import pickle
 from dateutil.parser import parse
+
+training_year = 2019
 
 
 def tileprocessing_report(result_log_path, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
@@ -67,22 +69,22 @@ def tileprocessing_report(result_log_path, stack_path, version, algorithm, confi
         file.write("Lower bound of year range: {}\n".format(year_lowbound))
         file.write("Upper bound of year range: {}\n".format(year_uppbound))
         file.write("Land-cover-specific config:\n")
-        file.write("  C1_threshold: {}\n".format(defaults['C1_threshold']))
-        file.write("  C1_sizeslope: {}\n".format(defaults['C1_sizeslope']))
-        file.write("  C2_threshold: {}\n".format(defaults['C2_threshold']))
-        file.write("  C2_sizeslope: {}\n".format(defaults['C2_sizeslope']))
-        file.write("  C3_threshold: {}\n".format(defaults['C3_threshold']))
-        file.write("  C3_sizeslope: {}\n".format(defaults['C3_sizeslope']))
-        file.write("  C4_threshold: {}\n".format(defaults['C4_threshold']))
-        file.write("  C4_sizeslope: {}\n".format(defaults['C4_sizeslope']))
-        file.write("  C5_threshold: {}\n".format(defaults['C5_threshold']))
-        file.write("  C5_sizeslope: {}\n".format(defaults['C5_sizeslope']))
-        file.write("  C6_threshold: {}\n".format(defaults['C6_threshold']))
-        file.write("  C6_sizeslope: {}\n".format(defaults['C6_sizeslope']))
-        file.write("  C7_threshold: {}\n".format(defaults['C7_threshold']))
-        file.write("  C7_sizeslope: {}\n".format(defaults['C7_sizeslope']))
-        file.write("  C8_threshold: {}\n".format(defaults['C8_threshold']))
-        file.write("  C8_sizeslope: {}\n".format(defaults['C8_sizeslope']))
+        file.write("  C1_threshold: {}\n".format(defaults['OBCOLD']['C1_threshold']))
+        file.write("  C1_sizeslope: {}\n".format(defaults['OBCOLD']['C1_sizeslope']))
+        file.write("  C2_threshold: {}\n".format(defaults['OBCOLD']['C2_threshold']))
+        file.write("  C2_sizeslope: {}\n".format(defaults['OBCOLD']['C2_sizeslope']))
+        file.write("  C3_threshold: {}\n".format(defaults['OBCOLD']['C3_threshold']))
+        file.write("  C3_sizeslope: {}\n".format(defaults['OBCOLD']['C3_sizeslope']))
+        file.write("  C4_threshold: {}\n".format(defaults['OBCOLD']['C4_threshold']))
+        file.write("  C4_sizeslope: {}\n".format(defaults['OBCOLD']['C4_sizeslope']))
+        file.write("  C5_threshold: {}\n".format(defaults['OBCOLD']['C5_threshold']))
+        file.write("  C5_sizeslope: {}\n".format(defaults['OBCOLD']['C5_sizeslope']))
+        file.write("  C6_threshold: {}\n".format(defaults['OBCOLD']['C6_threshold']))
+        file.write("  C6_sizeslope: {}\n".format(defaults['OBCOLD']['C6_sizeslope']))
+        file.write("  C7_threshold: {}\n".format(defaults['OBCOLD']['C7_threshold']))
+        file.write("  C7_sizeslope: {}\n".format(defaults['OBCOLD']['C7_sizeslope']))
+        file.write("  C8_threshold: {}\n".format(defaults['OBCOLD']['C8_threshold']))
+        file.write("  C8_sizeslope: {}\n".format(defaults['OBCOLD']['C8_sizeslope']))
     file.close()
 
 
@@ -196,7 +198,6 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
     return img_tstack, img_dates_sorted
 
 
-
 @click.command()
 @click.option('--rank', type=int, default=0, help='the rank id')
 @click.option('--n_cores', type=int, default=0, help='the total cores assigned')
@@ -218,13 +219,11 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         low_datebound = 0
     else:
         low_datebound = pd.Timestamp.toordinal(parse(low_datebound))
-    print(low_datebound)
 
     if upper_datebound is None:
         upper_datebound = 0
     else:
         upper_datebound = pd.Timestamp.toordinal(parse(upper_datebound))
-    print(upper_datebound)
 
     # Reading config
     with open(yaml_path, 'r') as yaml_obj:
@@ -293,11 +292,20 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         else:
             # for sccd, as the output is heterogeneous, we continuously save the sccd pack for each pixel
             if method == "SCCDOFFLINE":
+                ordinal_day_list = [pd.Timestamp.toordinal(dt.date(year, 7, 1)) for year
+                                    in [training_year]]
+                block_features = np.full((1, block_width * block_height,
+                                          defaults['SCCD']['NRT_BAND'] * defaults['SCCD']['N_FEATURES']),
+                                          defaults['COMMON']['NAN_VAL'], dtype=np.float32)
+                block_features_now = np.full((1, block_width * block_height,
+                                              defaults['SCCD']['NRT_BAND'] * defaults['SCCD']['N_FEATURES']),
+                                              defaults['COMMON']['NAN_VAL'], dtype=np.float32)
+                block_status = np.full((block_width, block_height), 0, dtype=np.int8)
+                block_last_change_date = np.full((block_width, block_height), 0, dtype=np.int32)
                 f = open(join(result_path, 'record_change_x{}_y{}_sccd.npy'.format(block_x, block_y)), "wb+")
                 # start looping every pixel in the block
                 for pos in range(block_width * block_height):
-                    original_row, original_col = get_rowcol_intile(pos, block_width,
-                                                                   block_height, block_x, block_y)
+                    original_row, original_col = get_rowcol_intile(pos, block_width, block_height, block_x, block_y)
                     sccd_result = sccd_detect(img_dates_sorted,
                                               img_tstack[pos, 0, :].astype(np.int64),
                                               img_tstack[pos, 1, :].astype(np.int64),
@@ -310,9 +318,48 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                                               t_cg=threshold,
                                               conse=config['conse'],
                                               pos=config['n_cols'] * (original_row - 1) + original_col)
+
+                    i_col = int((pos - 1) % block_width)
+                    i_row = int((pos - 1) / block_width)
+                    block_status[i_row][i_col] = sccd_result.nrt_mode
+                    if block_status[i_row][i_col] == defaults['SCCD']['NRT_QUEUE_STANDARD'] \
+                            or block_status[i_row][i_col] == defaults['SCCD']['NRT_QUEUE_SNOW']:  # queue status
+                        if len(sccd_result.rec_cg) > 0:
+                            block_last_change_date[i_row][i_col] = sccd_result.rec_cg[-1]['t_break']
+
+                    # save features for cover type training and prediction
+                    for band in range(defaults['SCCD']['NRT_BAND']):
+                        feature_row, feature_row_now = extract_features_sccd(sccd_result, band, ordinal_day_list,
+                                                                             defaults['COMMON']['NAN_VAL'],
+                                                                             defaults['SCCD']['N_FEATURES'],
+                                                                             now_year=2021)
+                        for index in range(defaults['SCCD']['N_FEATURES']):
+                            block_features[:, i_row * block_width + i_col, band * defaults['SCCD']['N_FEATURES'] +
+                                                                           index] \
+                                = feature_row[index]
+                            block_features_now[:, i_row * block_width + i_col, band * defaults['SCCD']['N_FEATURES'] + index] \
+                                = feature_row_now[index]
                     # replace structural array to list for saving storage space
                     pickle.dump(unindex_sccdpack(sccd_result), f)
                 f.close()
+                np.save(os.path.join(result_path, 'tmp_feature_year{}_block{}.npy').format(training_year, block_id),
+                        block_features[0, :, :])
+                np.save(os.path.join(result_path, 'tmp_feature_now_block{}.npy').format(block_id),
+                        block_features_now[0, :, :])
+                np.save(os.path.join(result_path, 'tmp_status_block{}.npy').format(block_id),
+                        block_status)
+                np.save(os.path.join(result_path, 'tmp_lastchangedate_block{}.npy').format(block_id),
+                        block_last_change_date)
+                with open(join(result_path, 'tmp_step1_predict_{}_finished.txt'.format(block_id)), 'w') as fp:
+                    pass
+
+                # free memory
+                del block_features
+                del block_features_now
+                del img_tstack
+                del img_dates_sorted
+                del block_status
+                del block_last_change_date
             else:
                 # start looping every pixel in the block
                 for pos in range(block_width * block_height):
@@ -383,9 +430,9 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
     # wait for all cores to be finished
     while not is_finished_cold_blockfinished(result_path, config['n_block_x'] * config['n_block_y']):
         time.sleep(30)
+
     if rank == 1:
         cold_timepoint = datetime.now(tz)
-        print("The per-pixel COLD algorithm ends: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
     #################################################################################
     #                        the below is object-based process                      #

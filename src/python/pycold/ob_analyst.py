@@ -292,8 +292,8 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None,
         cm_array_l1_date[cm_date_array == defaults['COMMON']['NAN_VAL']]
     
     # free memory
-    cm_array_l1 = None
-    cm_array_l1_date = None
+    del cm_array_l1
+    del cm_array_l1_date
 
     #######################################################################################
     #                               Scale 1: change superpixel                            #
@@ -306,7 +306,7 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None,
     kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
     cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary='extend', preserve_nan=True)
     cm_array_gaussian_s1[np.isnan(cm_array)] = defaults['COMMON']['NAN_VAL']
-    cm_array = None
+    del cm_array
 
     # seed_index = peak_local_max(cm_array_gaussian_s1, threshold_abs=peak_threshold,
     #                             exclude_border=False, min_distance=0)

@@ -83,7 +83,7 @@ int sccd
     if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD)|(*nrt_mode  == NRT_NEWCHANGE))
         len_clrx = valid_num_scenes + *num_obs_queue;
     else if ((*nrt_mode  == NRT_MONITOR_SNOW)|(*nrt_mode  == NRT_MONITOR_STANDARD))
-        len_clrx = valid_num_scenes + DEFAULT_CONSE - 1;
+        len_clrx = valid_num_scenes + DEFAULT_CONSE;
     else
        len_clrx = valid_num_scenes;
 
@@ -143,7 +143,7 @@ int sccd
     }else if ((*nrt_mode  == NRT_MONITOR_SNOW)|(*nrt_mode  == NRT_MONITOR_STANDARD))
     {
         //  if monitor mode, will append output_nrtmodel default conse-1 obs
-        for (k = 0; k < DEFAULT_CONSE - 1; k++){
+        for (k = 0; k < DEFAULT_CONSE; k++){
             for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
             {
                 clry[i_b][k] = nrt_model->obs[i_b][k];
@@ -2118,15 +2118,15 @@ int step3_processing_end
         nrt_model->num_obs = (short int)(num_obs_processed);
 
         /*     5. observations in tail       */
-        for(k = 0; k < DEFAULT_CONSE - 1; k ++)
+        for(k = 0; k < DEFAULT_CONSE; k ++)
         {
-            if (k < conse - 1)
+            if (k < conse)
             {
                 for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                 {
-                    nrt_model->obs[i_b][k] = (short int)clry[i_b][cur_i + k];
+                    nrt_model->obs[i_b][k] = (short int)clry[i_b][cur_i -1 + k];
                 }
-                nrt_model->obs_date_since1982[k] = (short int)(clrx[cur_i+ k] - JULIAN_LANDSAT4_LAUNCH);
+                nrt_model->obs_date_since1982[k] = (short int)(clrx[cur_i - 1 + k] - JULIAN_LANDSAT4_LAUNCH);
             }else{
                 for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                 {
@@ -2156,69 +2156,74 @@ int step3_processing_end
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
             rmse_band[i_b] = sum_square_vt[i_b] / (num_obs_processed - SCCD_NUM_C);
 
-        for(i_conse = conse - 1 - 1; i_conse >= 0 ; i_conse--)
-        {
-            v_dif_mag_norm[i_conse] = 0;
-            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+
+        if (nrt_mode == NRT_MONITOR_STANDARD){
+            for(i_conse = conse - 1 - 1; i_conse >= 0 ; i_conse--)
             {
-                for (b = 0; b < NUM_LASSO_BANDS; b++)
+                v_dif_mag_norm[i_conse] = 0;
+                for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                 {
-                    if (i_b == lasso_blist_sccd[b])
+                    for (b = 0; b < NUM_LASSO_BANDS; b++)
                     {
-                        KF_ts_predict_conse(&instance[i_b], clrx, cov_p[i_b], fit_cft, *n_clr - 1 - i_conse, *n_clr - 1 - i_conse,
-                                            i_b, cur_i, &pred_y, &pred_y_f, FALSE);
-                        // max_rmse[i_b] = max(min_rmse[i_b], sqrtf(pred_y_f));
-                        max_rmse = max(min_rmse[i_b], sqrtf(rmse_band[i_b]));
-                        v_dif[b][i_conse] =  (clry[i_b][*n_clr - 1 - i_conse] - pred_y) / max_rmse;
-                        v_dif_mag_norm[i_conse] = v_dif_mag_norm[i_conse] + v_dif[b][i_conse] * v_dif[b][i_conse];
-                        break;
+                        if (i_b == lasso_blist_sccd[b])
+                        {
+                            KF_ts_predict_conse(&instance[i_b], clrx, cov_p[i_b], fit_cft, *n_clr - 1 - i_conse, *n_clr - 1 - i_conse,
+                                                i_b, cur_i, &pred_y, &pred_y_f, FALSE);
+                            // max_rmse[i_b] = max(min_rmse[i_b], sqrtf(pred_y_f));
+                            max_rmse = max(min_rmse[i_b], sqrtf(rmse_band[i_b]));
+                            v_dif[b][i_conse] =  (clry[i_b][*n_clr - 1 - i_conse] - pred_y) / max_rmse;
+                            v_dif_mag_norm[i_conse] = v_dif_mag_norm[i_conse] + v_dif[b][i_conse] * v_dif[b][i_conse];
+                            break;
+                        }
                     }
                 }
             }
-        }
 
-        id_last = conse - 1;
-        for (i_conse = 1; i_conse <= conse - 1; i_conse++)
-        {
-            v_diff_tmp =(float **) allocate_2d_array(NUM_LASSO_BANDS, i_conse, sizeof (float));
-            for (b = 0; b < NUM_LASSO_BANDS; b++)
-                for(j = 0; j < i_conse; j++)
-                  v_diff_tmp[b][j] = v_dif[b][conse - 1 - i_conse];
-
-            for (b = 0; b < NUM_LASSO_BANDS; b++)
+            id_last = conse - 1;
+            for (i_conse = 1; i_conse <= conse - 1; i_conse++)
             {
-                quick_sort_float(v_diff_tmp[b], 0, i_conse-1);
-                matlab_2d_float_median(v_diff_tmp, b, i_conse-1, &tmp);
-                medium_v_dif[b] = tmp;
-            }
+                v_diff_tmp =(float **) allocate_2d_array(NUM_LASSO_BANDS, i_conse, sizeof (float));
+                for (b = 0; b < NUM_LASSO_BANDS; b++)
+                    for(j = 0; j < i_conse; j++)
+                      v_diff_tmp[b][j] = v_dif[b][conse - 1 - i_conse];
 
-            mean_angle_2 = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, i_conse);
+                for (b = 0; b < NUM_LASSO_BANDS; b++)
+                {
+                    quick_sort_float(v_diff_tmp[b], 0, i_conse-1);
+                    matlab_2d_float_median(v_diff_tmp, b, i_conse-1, &tmp);
+                    medium_v_dif[b] = tmp;
+                }
 
-            if ((v_dif_mag_norm[conse - 1 - i_conse] <= tcg)||(mean_angle_2 >= NSIGN_sccd))
-            {
-                /**************************************************/
-                /*                                                */
-                /* The last stable ID.                            */
-                /*                                                */
-                /**************************************************/
+                mean_angle_2 = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, i_conse);
 
-                id_last = i_conse - 1;
+                if ((v_dif_mag_norm[conse - 1 - i_conse] <= tcg)||(mean_angle_2 >= NSIGN_sccd))
+                {
+                    /**************************************************/
+                    /*                                                */
+                    /* The last stable ID.                            */
+                    /*                                                */
+                    /**************************************************/
+
+                    id_last = i_conse - 1;
+                    status = free_2d_array ((void **) v_diff_tmp);
+                    if (status != SUCCESS)
+                    {
+                        RETURN_ERROR ("Freeing memory: v_diff_tmp\n",
+                                      FUNC_NAME, FAILURE);
+                    }
+                    break;
+                }
                 status = free_2d_array ((void **) v_diff_tmp);
                 if (status != SUCCESS)
                 {
                     RETURN_ERROR ("Freeing memory: v_diff_tmp\n",
                                   FUNC_NAME, FAILURE);
                 }
-                break;
             }
-            status = free_2d_array ((void **) v_diff_tmp);
-            if (status != SUCCESS)
-            {
-                RETURN_ERROR ("Freeing memory: v_diff_tmp\n",
-                              FUNC_NAME, FAILURE);
-            }
+            nrt_model->change_prob = (unsigned char)((double)(id_last) * 100.0 / (double)conse) ;
+        }else{
+            nrt_model->change_prob = 100;   // for new change, probability = 100%
         }
-        nrt_model->change_prob = (unsigned char)((double)(id_last) * 100.0 / (double)conse) ;
     }
 
     if((nrt_mode == NRT_QUEUE_STANDARD) | (nrt_mode == NRT_NEWCHANGE))
@@ -2373,7 +2378,7 @@ int sccd_standard
     if (*nrt_mode  == NRT_MONITOR_STANDARD)
     {
         bl_train = 1;
-        i = 0;
+        i = 1;
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             /*   1. covariance matrix   */
@@ -2422,10 +2427,7 @@ int sccd_standard
     /**************************************************************/
     while (i + conse - 1 <= n_clr-1)
     {
-//        if (i > 0){
-//            printf("%d\n",clrx[i]);
-//            printf("%d\n", clrx[i_start]);
-//        }
+
         if(0 == bl_train)
         {
             /**********************************************************/
@@ -2563,8 +2565,8 @@ int sccd_standard
                 n_clr--;
                 i--;
             }
+            i++;
         }
-        i++;
     } /* n_clr for while (i < n_clr - conse) */
 
 //    int k1, k2;
@@ -2785,13 +2787,13 @@ int sccd_snow
     nrt_model[0].t_start_since1982 = (short int)(clrx[i_start] - JULIAN_LANDSAT4_LAUNCH);
     nrt_model[0].num_obs = (short int)(n_clr);
 
-    for(k = 0; k < DEFAULT_CONSE - 1; k ++)
+    for(k = 0; k < DEFAULT_CONSE; k++)
     {
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
-            nrt_model[0].obs[i_b][k] = (short int)clry[i_b][n_clr - DEFAULT_CONSE  + k + 1];
+            nrt_model[0].obs[i_b][k] = (short int)clry[i_b][n_clr - DEFAULT_CONSE  + k];
         }
-        nrt_model[0].obs_date_since1982[k] = (short int)(clrx[n_clr - DEFAULT_CONSE + k + 1] - JULIAN_LANDSAT4_LAUNCH);
+        nrt_model[0].obs_date_since1982[k] = (short int)(clrx[n_clr - DEFAULT_CONSE + k] - JULIAN_LANDSAT4_LAUNCH);
     }
 
     for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)

@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <sys/timeb.h>
 #include <sys/time.h>
-#include <omp.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <math.h>
