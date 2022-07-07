@@ -336,10 +336,8 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None,
         # the opencv mask only supports 8-bit, we hack it by updating the label value for every 255 object
         if remainder == 254:
             no = int(i / 255)
-            mask_label_s1[(mask_label_s1 == 0) & (mask_s1 > 0)] = mask_s1[
-                                                                      (mask_label_s1 == 0) & (mask_s1 > 0)].astype(
-                int) \
-                                                                  + no * 255
+            mask_label_s1[(mask_label_s1 == 0) & (mask_s1 > 0)] = mask_s1[(mask_label_s1 == 0)
+                                                                          & (mask_s1 > 0)].astype(int) + no * 255
         # flood_fill(cm_array_log, tuple(reversed(seed_index[i])), new_value=-np.ceil(floodfill_threshold)*2-i,
         #            tolerance=floodfill_threshold, connectivity=2, in_place=True)
 
@@ -352,9 +350,9 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None,
     object_map_s1 = mask_label_s1[1:n_rows + 1, 1:n_cols + 1].astype(np.int32)
     
     # free memory
-    cm_stack = None
-    mask_label_s1 = None
-    mask_s1 = None
+    del cm_stack
+    del mask_label_s1
+    del mask_s1
     #######################################################################################
     #                                 Scale 2: change patch                              #
     #######################################################################################

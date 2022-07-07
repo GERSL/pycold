@@ -31,7 +31,7 @@ CLASSIFIER:
   min_category_samples: 600
   max_category_samples: 8000
   total_samples: 20000
-  classification_year: 2001
+  training_year: 2001
   total_landcover_category: 8
   N_FEATURES: 3
 
@@ -40,9 +40,8 @@ SCCD:
   NRT_VOID: 0
   NRT_MONITOR_STANDARD: 1
   NRT_QUEUE_STANDARD: 2
-  NRT_NEWCHANGE: 3
-  NRT_MONITOR_SNOW: 4
-  NRT_QUEUE_SNOW: 5
+  NRT_MONITOR_SNOW: 3
+  NRT_QUEUE_SNOW: 4
   N_FEATURES: 1
   NRT_BAND: 6
 

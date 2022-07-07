@@ -446,15 +446,10 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
                 output_rec_cg = np.array([])
                 
 
-            if nrt_mode == 1 or nrt_mode == 4:  # monitor mode
+            if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                   np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([]))
-            elif nrt_mode == 3:  # new change
-                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                  np.asarray(<output_nrtmodel[:1]>nrt_model),
-                                  np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
-
-            elif nrt_mode == 2 or nrt_mode == 5:  # queue mode
+            elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                   np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
             elif nrt_mode == 0:  # void mode
@@ -594,15 +589,10 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
             else:
                 output_rec_cg = np.array([])
 
-            if nrt_mode == 1 or nrt_mode == 4:  # monitor mode
+            if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                   nrt_model_new, np.array([]))
-            elif nrt_mode == 3:  # new change
-                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                  nrt_model_new,
-                                  nrt_queue_new[0:num_nrt_queue])
-
-            elif nrt_mode == 2 or nrt_mode == 5:  # queue mode
+            elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                   np.array([]), nrt_queue_new[0:num_nrt_queue])
             elif nrt_mode == 0:  # void mode

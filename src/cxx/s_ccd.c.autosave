@@ -2586,7 +2586,7 @@ int sccd_standard
         *nrt_mode = NRT_MONITOR_STANDARD;
     else
         *nrt_mode = NRT_QUEUE_STANDARD;
-
+  
 
     status = step3_processing_end(instance, cov_p, fit_cft, clrx, clry, i, &n_clr, *nrt_mode,
                                   i_start, prev_i_break, nrt_model, num_obs_queue,

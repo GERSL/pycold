@@ -25,8 +25,8 @@
 #define T_MAX_CG 30.8562  /* chi-square inversed T_max_cg (1e-5) for    */
                           /* last step noise removal                    */
                           /*  SY 11/19/2018: change from 35.8882 to 30.8562)                  */
-//#define T_MAX_CG_SCCD 25.7448
-#define T_MAX_CG_SCCD 30.8562
+#define T_MAX_CG_SCCD 25.7448
+// #define T_MAX_CG_SCCD 30.8562
 // #define T_MAX_CG_SCCD 20.515
 
 /* threshold (degree) of mean included angle                          */
@@ -137,9 +137,8 @@
 #define NRT_VOID 0
 #define NRT_MONITOR_STANDARD 1
 #define NRT_QUEUE_STANDARD 2
-#define NRT_NEWCHANGE 3
-#define NRT_MONITOR_SNOW 4
-#define NRT_QUEUE_SNOW 5
+#define NRT_MONITOR_SNOW 3
+#define NRT_QUEUE_SNOW 4
 #define MAX_OBS_QUEUE 300 /* the maximum number of observations in queue (for NRT) */
 
 #define LANDSAT45_TM 4

@@ -95,7 +95,7 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, n_features_perb
     return features
 
 
-def extract_features_sccd(sccd_plot, band, ordinal_day_list, nan_val, n_features_perband, now_year):
+def extract_features_sccd(sccd_plot, band, nan_val, n_features_perband, now_year, ordinal_day_list=None):
     """
     generate features from sccd pack structure for classification based on a plot-based rec_cg
     and a list of days to be predicted
@@ -105,85 +105,87 @@ def extract_features_sccd(sccd_plot, band, ordinal_day_list, nan_val, n_features
         plot-based rec_cg
     band: integer
         the predicted band number range from 0 to 6
-    ordinal_day_list: list
-        a list of days that this function will predict every days as a list as output
     nan_val: integer
         NA value assigned to the output
     n_features_perband: integer
         the number of features per band, 1, 3, 5, 7, 8.
+    ordinal_day_list: list
+        a list of days that this function will predict every days as a list as output. If none, only for sccd_update
     Returns
     -------
         feature: a list (length = n_feature) of 1-array [len(ordinal_day_list)]
     """
-    features = [np.full(len(ordinal_day_list), nan_val, dtype=np.double) for x in range(n_features_perband)]
     features_now = [np.full(1, nan_val, dtype=np.double) for x in range(n_features_perband)]
-    for index, ordinal_day in enumerate(ordinal_day_list):
-        # print(index)
-        for idx, cold_curve in enumerate(sccd_plot.rec_cg):
-            if idx == len(sccd_plot.rec_cg) - 1:
-                max_days = sccd_plot.rec_cg[idx]['t_break']
-            else:
-                max_days = sccd_plot.rec_cg[idx + 1]['t_start']
-            if n_features_perband == 6:
-                if cold_curve['t_start'] <= ordinal_day < max_days:
-                    for n in range(n_features_perband):
-                        if n == 0:
-                            features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
-                                                 ordinal_day / defaults['COMMON']['SLOPE_SCALE']
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                        else:
-                            features[n][index] = cold_curve['coefs'][band][n]
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                    break
-
-            else:
-                if cold_curve['t_start'] <= ordinal_day < max_days:
-                    for n in range(n_features_perband):
-                        if n == 0:
-                            # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
-                            features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
-                                                 ordinal_day / defaults['COMMON']['SLOPE_SCALE']
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                        else:
-                            features[n][index] = cold_curve['coefs'][band][n+1]  # n + 1 is because won't need slope as output
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                    break
-
-        if sccd_plot.nrt_mode == 1 or sccd_plot.nrt_mode == 3 or sccd_plot.nrt_mode == 4:
-            if (sccd_plot.nrt_model['t_start_since1982']+defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH']) <= \
-                    ordinal_day < (sccd_plot.nrt_model['obs_date_since1982'][0][0]+defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH']):
-                if n_features_perband == 6:
-                    for n in range(n_features_perband):
-                        if n == 0:
-                            features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
-                                                 ordinal_day / defaults['COMMON']['SLOPE_SCALE']
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                        else:
-                            features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n]
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                    break
+    if ordinal_day_list is not None:
+        features = [np.full(len(ordinal_day_list), nan_val, dtype=np.double) for x in range(n_features_perband)]
+        for index, ordinal_day in enumerate(ordinal_day_list):
+            # print(index)
+            for idx, cold_curve in enumerate(sccd_plot.rec_cg):
+                if idx == len(sccd_plot.rec_cg) - 1:
+                    max_days = sccd_plot.rec_cg[idx]['t_break']
                 else:
-                    for n in range(n_features_perband):
-                        if n == 0:
-                            # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
-                            features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
-                                                 ordinal_day / defaults['COMMON']['SLOPE_SCALE']
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                        else:
-                            features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n+1]  # n + 1 is because won't need slope as output
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                    break
+                    max_days = sccd_plot.rec_cg[idx + 1]['t_start']
+                if n_features_perband == 6:
+                    if cold_curve['t_start'] <= ordinal_day < max_days:
+                        for n in range(n_features_perband):
+                            if n == 0:
+                                features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
+                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
+                            else:
+                                features[n][index] = cold_curve['coefs'][band][n]
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
+                        break
 
-    # for features of current years, only :xmonitor mode has cover type information
-    if sccd_plot.nrt_mode == 1 or sccd_plot.nrt_mode == 4:
+                else:
+                    if cold_curve['t_start'] <= ordinal_day < max_days:
+                        for n in range(n_features_perband):
+                            if n == 0:
+                                # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
+                                features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
+                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
+                            else:
+                                features[n][index] = cold_curve['coefs'][band][n+1]  # n + 1 is because won't need slope as output
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
+                        break
+
+            if sccd_plot.nrt_mode == defaults['SCCD']['NRT_MONITOR_STANDARD'] or sccd_plot.nrt_mode == defaults['SCCD']['NRT_MONITOR_SNOW']:
+                if (sccd_plot.nrt_model['t_start_since1982']+defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH']) <= \
+                        ordinal_day < (sccd_plot.nrt_model['obs_date_since1982'][0][0]+defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH']):
+                    if n_features_perband == 6:
+                        for n in range(n_features_perband):
+                            if n == 0:
+                                features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
+                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
+                            else:
+                                features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n]
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
+                        break
+                    else:
+                        for n in range(n_features_perband):
+                            if n == 0:
+                                # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
+                                features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
+                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
+                            else:
+                                features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n+1]  # n + 1 is because won't need slope as output
+                                if np.isnan(features[n][index]):
+                                    features[n][index] = 0
+                        break
+
+    # for features of current years, only monitor mode has cover type information
+    if sccd_plot.nrt_mode == defaults['SCCD']['NRT_MONITOR_STANDARD'] or sccd_plot.nrt_mode == defaults['SCCD']['NRT_MONITOR_SNOW']:
+        index = 0
         ordinal_day_now = pd.Timestamp.toordinal(dt.date(now_year, 7, 1))
         if n_features_perband == 6:
             for n in range(n_features_perband):
@@ -201,13 +203,16 @@ def extract_features_sccd(sccd_plot, band, ordinal_day_list, nan_val, n_features
                 if n == 0:
                     features_now[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
                                          ordinal_day_now / defaults['COMMON']['SLOPE_SCALE']
-                    if np.isnan(features[n][index]):
+                    if np.isnan(features_now[n][index]):
                         features_now[n][index] = 0
                 else:
                     features_now[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n+1]  # n + 1 is because won't need slope as output
-                    if np.isnan(features[n][index]):
+                    if np.isnan(features_now[n][index]):
                         features_now[n][index] = 0
-    return features, features_now
+    if ordinal_day_list is not None:
+        return features, features_now
+    else:
+        return features_now
 
 
 def generate_sample_num(label, sample_parameters):
@@ -628,16 +633,17 @@ class PyClassifierHPC(PyClassifier):
         with open(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(block_id)), 'w') as fp:
             pass
 
-    def step4_assemble(self):
+    def step4_assemble(self, clean=True):
         while not self._is_finished_step3_classification():
             time.sleep(5)
         for year in self.year_list_to_predict:
             full_yearlyclass_array = assemble_array(self._get_fullclassification_forcertainyear(year),
                                                     self.config['n_block_x'])[:, :, 0]
             self._save_covermaps(full_yearlyclass_array, year)
-        self._clean()  # _clean all temp files
+        if clean:
+            self._clean()  # _clean all temp files
 
-    def step4_assemble_sccd(self):
+    def step4_assemble_sccd(self, clean=True):
         while not self._is_finished_step3_classification():
             time.sleep(5)
 
@@ -649,8 +655,8 @@ class PyClassifierHPC(PyClassifier):
             full_yearlyclass_array = assemble_array(self._get_fullclassification_forcertainyear(year),
                                                     self.config['n_block_x'])[:, :, 0]
             self._save_covermaps(full_yearlyclass_array, year)
-
-        self._clean()  # _clean all temp files
+        if clean:
+            self._clean()  # _clean all temp files
 
     def is_finished_step4_assemble(self):
         for year in self.year_list_to_predict:

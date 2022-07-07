@@ -329,10 +329,9 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
 
                     # save features for cover type training and prediction
                     for band in range(defaults['SCCD']['NRT_BAND']):
-                        feature_row, feature_row_now = extract_features_sccd(sccd_result, band, ordinal_day_list,
-                                                                             defaults['COMMON']['NAN_VAL'],
+                        feature_row, feature_row_now = extract_features_sccd(sccd_result, band, defaults['COMMON']['NAN_VAL'],
                                                                              defaults['SCCD']['N_FEATURES'],
-                                                                             now_year=2021)
+                                                                             2021, ordinal_day_list=ordinal_day_list)
                         for index in range(defaults['SCCD']['N_FEATURES']):
                             block_features[:, i_row * block_width + i_col, band * defaults['SCCD']['N_FEATURES'] +
                                                                            index] \
