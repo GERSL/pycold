@@ -404,7 +404,8 @@ int main(int argc, char *argv[])
 
     // chi-square probability
     //tcg = X2(NUM_LASSO_BANDS, probability_threshold);
-    tcg = 15.086;
+    // tcg = 15.086;
+    tcg = 20.515;
 
     /**************************************************************/
     /*                                                            */

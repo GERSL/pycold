@@ -139,6 +139,7 @@
 #define NRT_QUEUE_STANDARD 2
 #define NRT_MONITOR_SNOW 3
 #define NRT_QUEUE_SNOW 4
+#define NRT_QUEUE_RECENT 5
 #define MAX_OBS_QUEUE 300 /* the maximum number of observations in queue (for NRT) */
 
 #define LANDSAT45_TM 4

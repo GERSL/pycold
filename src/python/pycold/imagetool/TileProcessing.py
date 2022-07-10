@@ -28,7 +28,7 @@ training_year = 2019
 
 
 def tileprocessing_report(result_log_path, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
-                          starting_date=0, n_cm_maps=0, year_lowbound=0, year_uppbound=0):
+                          n_cores, starting_date=0, n_cm_maps=0, year_lowbound=0, year_uppbound=0):
     """
     output tile-based processing report
     Parameters
@@ -42,6 +42,7 @@ def tileprocessing_report(result_log_path, stack_path, version, algorithm, confi
     config: dictionary structure
     startpoint: a time point, when the program starts
     tz: string, time zone
+    n_cores: the core number used
     starting_date: the first date of the total dataset
     n_cm_maps: the number of snapshots
     year_lowbound: the low bound of year range
@@ -59,6 +60,7 @@ def tileprocessing_report(result_log_path, stack_path, version, algorithm, confi
     file.write("Change probability threshold: {}\n".format(config['probability_threshold']))
     file.write("Conse: {}\n".format(config['conse']))
     file.write("stack_path: {}\n".format(stack_path))
+    file.write("The number of requested cores: {}\n".format(n_cores))
     file.write("The program starts at {}\n".format(startpoint.strftime('%Y-%m-%d %H:%M:%S')))
     file.write("The COLD ends at {}\n".format(cold_timepoint.strftime('%Y-%m-%d %H:%M:%S')))
     file.write("The program ends at {}\n".format(endpoint.strftime('%Y-%m-%d %H:%M:%S')))
@@ -300,8 +302,8 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 block_features_now = np.full((1, block_width * block_height,
                                               defaults['SCCD']['NRT_BAND'] * defaults['SCCD']['N_FEATURES']),
                                               defaults['COMMON']['NAN_VAL'], dtype=np.float32)
-                block_status = np.full((block_width, block_height), 0, dtype=np.int8)
-                block_last_change_date = np.full((block_width, block_height), 0, dtype=np.int32)
+                # block_status = np.full((block_width, block_height), 0, dtype=np.int8)
+                # block_last_change_date = np.full((block_width, block_height), 0, dtype=np.int32)
                 f = open(join(result_path, 'record_change_x{}_y{}_sccd.npy'.format(block_x, block_y)), "wb+")
                 # start looping every pixel in the block
                 for pos in range(block_width * block_height):
@@ -319,13 +321,13 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                                               conse=config['conse'],
                                               pos=config['n_cols'] * (original_row - 1) + original_col)
 
-                    i_col = int((pos - 1) % block_width)
-                    i_row = int((pos - 1) / block_width)
-                    block_status[i_row][i_col] = sccd_result.nrt_mode
-                    if block_status[i_row][i_col] == defaults['SCCD']['NRT_QUEUE_STANDARD'] \
-                            or block_status[i_row][i_col] == defaults['SCCD']['NRT_QUEUE_SNOW']:  # queue status
-                        if len(sccd_result.rec_cg) > 0:
-                            block_last_change_date[i_row][i_col] = sccd_result.rec_cg[-1]['t_break']
+                    i_col = int(pos % block_width)
+                    i_row = int(pos / block_width)
+                    # block_status[i_row][i_col] = sccd_result.nrt_mode
+                    # if block_status[i_row][i_col] == defaults['SCCD']['NRT_QUEUE_STANDARD'] \
+                    #         or block_status[i_row][i_col] == defaults['SCCD']['NRT_QUEUE_SNOW']:  # queue status
+                    #     if len(sccd_result.rec_cg) > 0:
+                    #         block_last_change_date[i_row][i_col] = sccd_result.rec_cg[-1]['t_break']
 
                     # save features for cover type training and prediction
                     for band in range(defaults['SCCD']['NRT_BAND']):
@@ -345,10 +347,10 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                         block_features[0, :, :])
                 np.save(os.path.join(result_path, 'tmp_feature_now_block{}.npy').format(block_id),
                         block_features_now[0, :, :])
-                np.save(os.path.join(result_path, 'tmp_status_block{}.npy').format(block_id),
-                        block_status)
-                np.save(os.path.join(result_path, 'tmp_lastchangedate_block{}.npy').format(block_id),
-                        block_last_change_date)
+                # np.save(os.path.join(result_path, 'tmp_status_block{}.npy').format(block_id),
+                #         block_status)
+                # np.save(os.path.join(result_path, 'tmp_lastchangedate_block{}.npy').format(block_id),
+                #         block_last_change_date)
                 with open(join(result_path, 'tmp_step1_predict_{}_finished.txt'.format(block_id)), 'w') as fp:
                     pass
 
@@ -357,8 +359,8 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 del block_features_now
                 del img_tstack
                 del img_dates_sorted
-                del block_status
-                del block_last_change_date
+                # del block_status
+                # del block_last_change_date
             else:
                 # start looping every pixel in the block
                 for pos in range(block_width * block_height):
@@ -535,10 +537,10 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         if method == 'OBCOLD':
             tileprocessing_report(join(result_path, 'tile_processing_report.log'),
                                   stack_path, pycold.__version__, method, config, start_time, cold_timepoint, tz,
-                                  starting_date, n_cm_maps, year_lowbound, year_uppbound)
+                                  n_cores, starting_date, n_cm_maps, year_lowbound, year_uppbound)
         else:
-            tileprocessing_report(join(result_path, 'tile_processing_report.log'),
-                                  stack_path, pycold.__version__, method, config, start_time, cold_timepoint, tz)
+            tileprocessing_report(join(result_path, 'tile_processing_report.log'), stack_path, pycold.__version__,
+                                  method, config, start_time, cold_timepoint, tz, n_cores)
         print("The whole procedure finished: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
 

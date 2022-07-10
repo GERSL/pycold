@@ -17,11 +17,11 @@ training_year = 2019
 @click.command()
 @click.option('--rank', type=int, default=0, help='the rank id')
 @click.option('--n_cores', type=int, default=0, help='the total cores assigned')
-@click.option('--result_path', type=str, default=None, help='the path for storing results')
+@click.option('--sccdpack_path', type=str, default=None, help='the path for storing results')
 @click.option('--yaml_path', type=str, default=None, help='YAML path')
 @click.option('--seedmap_path', type=str, default=None, help='an existing label map path; '
                                                              'none means not using thematic info')
-def main(rank, n_cores, result_path, yaml_path, seedmap_path):
+def main(rank, n_cores, sccdpack_path, yaml_path, seedmap_path):
     tz = timezone('US/Eastern')
     # Reading config
     with open(yaml_path, 'r') as yaml_obj:
@@ -36,10 +36,10 @@ def main(rank, n_cores, result_path, yaml_path, seedmap_path):
               'check your config yaml')
         exit()
 
-    pyclassifier = PyClassifierHPC(config, record_path=result_path, n_features_perband=defaults['SCCD']['N_FEATURES'],
+    pyclassifier = PyClassifierHPC(config, record_path=sccdpack_path, n_features_perband=defaults['SCCD']['N_FEATURES'],
                                    band_num=defaults['SCCD']['NRT_BAND'], year_list_to_predict=[training_year],
-                                   tmp_path=result_path,
-                                   output_path=result_path,
+                                   tmp_path=sccdpack_path,
+                                   output_path=sccdpack_path,
                                    seedmap_path=seedmap_path)
 
     if not pyclassifier.is_finished_step4_assemble():
@@ -52,6 +52,7 @@ def main(rank, n_cores, result_path, yaml_path, seedmap_path):
                 break
             pyclassifier.step3_classification_sccd(block_id=n_cores * i + rank)
 
+        # 1) output cover type map
         if rank == 1:  # serial mode for assemble
             pyclassifier.step4_assemble_sccd(clean=False)
 
@@ -62,30 +63,36 @@ def main(rank, n_cores, result_path, yaml_path, seedmap_path):
         print("Assemble classification map ends: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
         # assemble status map
         try:
-            tmp_map_blocks = [np.load(os.path.join(result_path, 'tmp_status_block{}.npy'.format(x + 1)))
+            tmp_map_blocks = [np.load(os.path.join(sccdpack_path, 'tmp_status_block{}.npy'.format(x + 1)))
                               for x in range(config['n_blocks'])]
         except Exception as e:
             print("Status blocks are incomplete: {} ({})".format(e, datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
         results = assemble_array(tmp_map_blocks, config['n_block_x'])
-        np.save(os.path.join(result_path, 'status_tile_now.npy'), results)
+        # 2) output status map
+        np.save(os.path.join(sccdpack_path, 'status_now.npy'), results)
 
         # assemble last change data map
         try:
-            tmp_map_blocks = [np.load(os.path.join(result_path, 'tmp_lastchangedate_block{}.npy'.format(x + 1)))
+            tmp_map_blocks = [np.load(os.path.join(sccdpack_path, 'tmp_lastchangedate_block{}.npy'.format(x + 1)))
                               for x in range(config['n_blocks'])]
         except Exception as e:
             print("Lastchangedate blocks are incomplete: {} ({})".format(e,
                                                                          datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
+        # 3) output last change date map
+        # lastchangedate_assemble = assemble_array(tmp_map_blocks, config['n_block_x'])
+        lastchangedate_tile = np.full((config['n_rows'], config['n_cols']), 0)
+        np.save(os.path.join(sccdpack_path, 'last_change_date.npy'), lastchangedate_tile)
 
-        lastchangedate_assemble = assemble_array(tmp_map_blocks, config['n_block_x'])
-        np.save(os.path.join(result_path, 'lastchangedate_assemble_tile.npy'), lastchangedate_assemble)
+        # 4) output object map
+        object_map = np.full((config['n_rows'], config['n_cols']), 0)
+        np.save(os.path.join(sccdpack_path, 'accumulated_oid.npy'), object_map)
 
         # clean
-        tmp_filenames = [file for file in os.listdir(result_path)
+        tmp_filenames = [file for file in os.listdir(sccdpack_path)
                          if file.startswith('tmp_')]
         for file in tmp_filenames:
-            os.remove(join(result_path, file))
+            os.remove(join(sccdpack_path, file))
 
 
 if __name__ == '__main__':

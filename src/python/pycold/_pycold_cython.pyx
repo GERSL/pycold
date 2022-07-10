@@ -452,6 +452,10 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
             elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                   np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
+            elif nrt_mode == 5:  # queue recent
+                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                  np.asarray(<output_nrtmodel[:1]>nrt_model),
+                                  np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
             elif nrt_mode == 0:  # void mode
                 return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
                                   np.array([]))
@@ -595,6 +599,10 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
             elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                   np.array([]), nrt_queue_new[0:num_nrt_queue])
+            elif nrt_mode == 5:  # queue recent
+                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                  nrt_model_new,
+                                  nrt_queue_new[0:num_nrt_queue])
             elif nrt_mode == 0:  # void mode
                 return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
                                   np.array([]))

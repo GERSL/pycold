@@ -81,6 +81,7 @@ def qabitval_array_HLS(packedint_array):
     """
     unpacked = np.full(packedint_array.shape, 0)
     QA_CLOUD_unpacked = geek.bitwise_and(packedint_array, 1 << 1)
+    QA_CLOUD_ADJ = geek.bitwise_and(packedint_array, 1 << 2)
     QA_SHADOW_unpacked = geek.bitwise_and(packedint_array, 1 << 3)
     QA_SNOW_unpacked = geek.bitwise_and(packedint_array, 1 << 4)
     QA_WATER_unpacked = geek.bitwise_and(packedint_array, 1 << 5)
@@ -88,6 +89,7 @@ def qabitval_array_HLS(packedint_array):
     unpacked[QA_WATER_unpacked > 0] = QA_WATER
     unpacked[QA_SNOW_unpacked > 0] = QA_SNOW
     unpacked[QA_SHADOW_unpacked > 0] = QA_SHADOW
+    unpacked[QA_CLOUD_ADJ > 0] = QA_CLOUD
     unpacked[QA_CLOUD_unpacked > 0] = QA_CLOUD
 
     return unpacked

@@ -402,22 +402,28 @@ def index_sccdpack(sccd_pack_single):
     return sccd_pack_single
 
 
-def save_1band_fromrefimage(array, ref_image_path, out_path, gtype=gdal.GDT_Int16):
-    ref_image = gdal.Open(ref_image_path, gdal.GA_ReadOnly)
-    trans = ref_image.GetGeoTransform()
-    proj = ref_image.GetProjection()
-    cols = ref_image.RasterXSize
-    rows = ref_image.RasterYSize
+def save_1band_fromrefimage(array, out_path, ref_image_path=None, gtype=gdal.GDT_Int16):
+    cols = array.shape[1]
+    rows = array.shape[0]
 
-    outdriver1 = gdal.GetDriverByName("GTiff")
-    outdata = outdriver1.Create(out_path, rows, cols, 1, gtype)
-    outdata.GetRasterBand(1).WriteArray(array)
-    outdata.FlushCache()
-    outdata.SetGeoTransform(trans)
-    outdata.FlushCache()
-    outdata.SetProjection(proj)
-    outdata.FlushCache()
-    ref_image = None
+    if ref_image_path is None:
+        outdriver1 = gdal.GetDriverByName("GTiff")
+        outdata = outdriver1.Create(out_path, rows, cols, 1, gtype)
+        outdata.GetRasterBand(1).WriteArray(array)
+        outdata.FlushCache()
+    else:
+        ref_image = gdal.Open(ref_image_path, gdal.GA_ReadOnly)
+        trans = ref_image.GetGeoTransform()
+        proj = ref_image.GetProjection()
+        outdriver1 = gdal.GetDriverByName("GTiff")
+        outdata = outdriver1.Create(out_path, rows, cols, 1, gtype)
+        outdata.GetRasterBand(1).WriteArray(array)
+        outdata.FlushCache()
+        outdata.SetGeoTransform(trans)
+        outdata.FlushCache()
+        outdata.SetProjection(proj)
+        outdata.FlushCache()
+        del ref_image
 
 
 def generate_rowcolimage(ref_image_path, out_path):

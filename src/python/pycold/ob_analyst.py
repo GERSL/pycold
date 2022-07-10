@@ -273,6 +273,11 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None,
         object_map_s2: object map for object level
         s1_info: a zipped list of id and average change magnitude in the superpixel level
     """
+    # cm_array = cm_tile
+    # cm_date_array = cmdate_tile
+    # cm_array_l1 = None
+    # cm_array_l1_date = None
+    # floodfill_ratio = None
 
     peak_threshold = chi2.ppf(0.90, 5)
     [n_rows, n_cols] = cm_array.shape
@@ -613,7 +618,7 @@ def object_analysis(object_map_s1, object_map_s2, s1_info, classification_map=No
     if classification_map is None:
         class_list = [255] * len(s1_info)
     else:
-        class_list = modeby(classification_map.reshape(ids_s2.shape), object_map_s1.reshape(ids_s2.shape))
+        class_list = modeby(classification_map.astype(np.int16).reshape(ids_s2.shape), object_map_s1.reshape(ids_s2.shape))
 
         # mode_list = mode_list[1:]
         # mode_list = regionprops_table(object_map_s1, classification_map, extra_properties=(pixelmode))

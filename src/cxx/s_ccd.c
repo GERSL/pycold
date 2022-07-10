@@ -80,7 +80,7 @@ int sccd
     int len_clrx;         /* length of clrx  */
     int n_clr_record;
 
-    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD))
+    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD)|(*nrt_mode  == NRT_QUEUE_RECENT))
         len_clrx = valid_num_scenes + *num_obs_queue;
     else if ((*nrt_mode  == NRT_MONITOR_SNOW)|(*nrt_mode  == NRT_MONITOR_STANDARD))
         len_clrx = valid_num_scenes + DEFAULT_CONSE;
@@ -131,7 +131,7 @@ int sccd
     /*     initializing clrx and clry using existing obs in queue        */
     /*                                                                   */
     /*********************************************************************/
-    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD))
+    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD)|(*nrt_mode  == NRT_QUEUE_RECENT))
     {
         // if queue mode, will append old observation first
         for (i = 0; i < *num_obs_queue; i++){
@@ -207,9 +207,9 @@ int sccd
              if (starting_date == 0)
                  starting_date = clrx[0];
 
-             /* need to calculate min_rmse at the beginning of the monitoring*/
+             /* need to calculate min_rmse at the beginning of the monitoring */
              if (*num_fc == 0){
-                 if((*nrt_mode == NRT_VOID) | (*nrt_mode == NRT_QUEUE_STANDARD) | (*nrt_mode == NRT_QUEUE_SNOW)){
+                 if(*nrt_mode == NRT_VOID){
                      status = adjust_median_variogram(clrx, clry,TOTAL_IMAGE_BANDS_SCCD, 0,
                                                       n_clr-1, &date_vario, &max_date_difference,
                                                       min_rmse_float, 1);
@@ -2091,7 +2091,7 @@ int step3_processing_end
     }
 
 
-    if (nrt_mode == NRT_MONITOR_STANDARD)
+    if ((nrt_mode == NRT_MONITOR_STANDARD)| (nrt_mode == NRT_QUEUE_RECENT))
     {
         /****************************************************/
         /*   need to save nrt records for monitor mode      */
@@ -2196,7 +2196,8 @@ int step3_processing_end
 
                 mean_angle_2 = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, i_conse);
 
-                if ((v_dif_mag_norm[conse - 1 - i_conse] <= tcg)||(mean_angle_2 >= NSIGN_sccd))
+                // NOTE THAT USE THE DEFAULT CHANGE THRESHOLD (0.99) TO CALCULATE PROBABILITY
+                if ((v_dif_mag_norm[conse - 1 - i_conse] <= DEFAULT_COLD_TCG)||(mean_angle_2 >= NSIGN_sccd))
                 {
                     /**************************************************/
                     /*                                                */
@@ -2220,13 +2221,15 @@ int step3_processing_end
                                   FUNC_NAME, FAILURE);
                 }
             }
-            nrt_model->change_prob = (unsigned char)((double)(id_last) * 100.0 / (double)conse) ;
+            nrt_model->change_prob = (unsigned char)((double)(id_last) * 100.0 / (double)conse);
+            if(nrt_model->change_prob == 100)  // it is possible to 100 as we used Default threshold while it may be inputted as 0.999 for change detection
+                nrt_model->change_prob = 99;
         }else{
             nrt_model->change_prob = 100;   // for new change, probability = 100%
         }
     }
 
-    if(nrt_mode == NRT_QUEUE_STANDARD)
+    if((nrt_mode == NRT_QUEUE_STANDARD) | (nrt_mode == NRT_QUEUE_RECENT))
     {
         *num_obs_queue = *n_clr - prev_i_break;
         if (*num_obs_queue > MAX_OBS_QUEUE){
@@ -2582,10 +2585,14 @@ int sccd_standard
 
 
     /* step 3: processing the n_clr of time series */
-    if (bl_train == 1)
-        *nrt_mode = NRT_MONITOR_STANDARD;
-    else
-        *nrt_mode = NRT_QUEUE_STANDARD;
+    if ((*num_fc > num_fc_record)&(*nrt_mode != NRT_VOID)){
+        *nrt_mode = NRT_QUEUE_RECENT;
+    }else{
+        if (bl_train == 1)
+            *nrt_mode = NRT_MONITOR_STANDARD;
+        else
+            *nrt_mode = NRT_QUEUE_STANDARD;
+    }
 
 
     status = step3_processing_end(instance, cov_p, fit_cft, clrx, clry, i, &n_clr, *nrt_mode,
