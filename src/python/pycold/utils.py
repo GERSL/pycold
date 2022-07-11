@@ -9,7 +9,7 @@ from collections import namedtuple
 from pycold.app import defaults
 import gdal
 
-SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
+SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue nrt_coefs_tmp")
 
 sccd_dt = np.dtype([('t_start', np.int32), ('t_break', np.int32), ('num_obs', np.int32),
                         ('coefs', np.float32, (6, 6)), ('rmse', np.float32, 6), ('magnitude', np.float32, 6)], align=True)

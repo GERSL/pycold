@@ -2073,13 +2073,13 @@ int step3_processing_end
         RETURN_ERROR("ERROR allocating bl_ids memory", FUNC_NAME, FAILURE);
     }
 
-    v_dif = (float **) allocate_2d_array (NUM_LASSO_BANDS, conse - 1, sizeof (float));
+    v_dif = (float **) allocate_2d_array (NUM_LASSO_BANDS, conse, sizeof (float));
     if (v_dif == NULL)
     {
         RETURN_ERROR ("Allocating v_dif memory",
                       FUNC_NAME, FAILURE);
     }
-    v_dif_mag_norm = (float *)malloc((conse - 1) * sizeof(float));
+    v_dif_mag_norm = (float *)malloc(conse * sizeof(float));
     if (v_dif_mag_norm == NULL)
     {
         RETURN_ERROR ("Allocating v_dif_mag_norm memory", FUNC_NAME, FAILURE);
@@ -2158,7 +2158,7 @@ int step3_processing_end
 
 
         if (nrt_mode == NRT_MONITOR_STANDARD){
-            for(i_conse = conse - 1 - 1; i_conse >= 0 ; i_conse--)
+            for(i_conse = 0; i_conse < conse; i_conse++)
             {
                 v_dif_mag_norm[i_conse] = 0;
                 for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
@@ -2179,13 +2179,13 @@ int step3_processing_end
                 }
             }
 
-            id_last = conse - 1;
-            for (i_conse = 1; i_conse <= conse - 1; i_conse++)
+            id_last = conse;
+            for (i_conse = 1; i_conse <= conse; i_conse++)
             {
                 v_diff_tmp =(float **) allocate_2d_array(NUM_LASSO_BANDS, i_conse, sizeof (float));
                 for (b = 0; b < NUM_LASSO_BANDS; b++)
                     for(j = 0; j < i_conse; j++)
-                      v_diff_tmp[b][j] = v_dif[b][conse - 1 - i_conse];
+                      v_diff_tmp[b][j] = v_dif[b][j];
 
                 for (b = 0; b < NUM_LASSO_BANDS; b++)
                 {
@@ -2197,7 +2197,7 @@ int step3_processing_end
                 mean_angle_2 = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, i_conse);
 
                 // NOTE THAT USE THE DEFAULT CHANGE THRESHOLD (0.99) TO CALCULATE PROBABILITY
-                if ((v_dif_mag_norm[conse - 1 - i_conse] <= DEFAULT_COLD_TCG)||(mean_angle_2 >= NSIGN_sccd))
+                if ((v_dif_mag_norm[i_conse - 1] <= DEFAULT_COLD_TCG)||(mean_angle_2 >= NSIGN_sccd))
                 {
                     /**************************************************/
                     /*                                                */
