@@ -21,8 +21,8 @@ OBCOLD:
   C5_sizeslope: 0.05
   C6_threshold: 11.07
   C6_sizeslope: 0.1
-  C7_threshold: 11.07
-  C7_sizeslope: 0.1
+  C7_threshold: 15.086
+  C7_sizeslope: 0.05
   C8_threshold: 15.086
   C8_sizeslope: 0.05
   default_sizeslope: 0
@@ -36,7 +36,7 @@ CLASSIFIER:
   N_FEATURES: 3
 
 SCCD:
-  PACK_ITEM: 7
+  PACK_ITEM: 6
   NRT_VOID: 0
   NRT_MONITOR_STANDARD: 1
   NRT_QUEUE_STANDARD: 2

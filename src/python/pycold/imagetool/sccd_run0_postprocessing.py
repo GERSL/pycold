@@ -10,6 +10,7 @@ from pycold.utils import assemble_array
 from pycold.pyclassifier import PyClassifierHPC
 from pycold.app import defaults
 from os.path import join
+from pycold.imagetool.TileProcessing import phen_anchor_days
 
 training_year = 2019
 
@@ -44,7 +45,11 @@ def main(rank, n_cores, sccdpack_path, yaml_path, seedmap_path):
 
     if not pyclassifier.is_finished_step4_assemble():
         if rank == 1:
+            # 1) output rf.model
             pyclassifier.step2_train_rf(ref_year=training_year)
+            for day in phen_anchor_days:
+                pyclassifier.step2_train_rf(ref_year=day)
+
             print("Training rf ends: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
         for i in range(nblock_eachcore):
@@ -52,8 +57,8 @@ def main(rank, n_cores, sccdpack_path, yaml_path, seedmap_path):
                 break
             pyclassifier.step3_classification_sccd(block_id=n_cores * i + rank)
 
-        # 1) output cover type map
         if rank == 1:  # serial mode for assemble
+            # 2) output yearly classification map
             pyclassifier.step4_assemble_sccd(clean=False)
 
     while not pyclassifier.is_finished_step4_assemble():
@@ -61,24 +66,6 @@ def main(rank, n_cores, sccdpack_path, yaml_path, seedmap_path):
 
     if rank == 1:
         print("Assemble classification map ends: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
-        # assemble status map
-        try:
-            tmp_map_blocks = [np.load(os.path.join(sccdpack_path, 'tmp_status_block{}.npy'.format(x + 1)))
-                              for x in range(config['n_blocks'])]
-        except Exception as e:
-            print("Status blocks are incomplete: {} ({})".format(e, datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
-
-        results = assemble_array(tmp_map_blocks, config['n_block_x'])
-        # 2) output status map
-        np.save(os.path.join(sccdpack_path, 'status_now.npy'), results)
-
-        # assemble last change data map
-        try:
-            tmp_map_blocks = [np.load(os.path.join(sccdpack_path, 'tmp_lastchangedate_block{}.npy'.format(x + 1)))
-                              for x in range(config['n_blocks'])]
-        except Exception as e:
-            print("Lastchangedate blocks are incomplete: {} ({})".format(e,
-                                                                         datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
         # 3) output last change date map
         # lastchangedate_assemble = assemble_array(tmp_map_blocks, config['n_block_x'])
         lastchangedate_tile = np.full((config['n_rows'], config['n_cols']), 0)

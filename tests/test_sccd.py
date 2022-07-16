@@ -3,7 +3,7 @@ from pycold import sccd_detect, sccd_update
 from pycold.utils import read_data
 import pickle
 from collections import namedtuple
-SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue nrt_coefs_tmp")
+SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
 
 
 def test_sccd_detect():

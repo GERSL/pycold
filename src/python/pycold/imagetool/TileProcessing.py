@@ -17,14 +17,18 @@ import click
 import time
 from pycold import cold_detect, sccd_detect
 from scipy.stats import chi2
-from pycold.utils import assemble_cmmaps, get_rowcol_intile, get_time_now, get_doy, unindex_sccdpack
+from pycold.utils import assemble_cmmaps, get_rowcol_intile, get_time_now, get_doy, unindex_sccdpack, predict_ref
 from pycold.ob_analyst import ObjectAnalystHPC
-from pycold.pyclassifier import PyClassifierHPC, extract_features_sccd
+from pycold.pyclassifier import PyClassifierHPC, extract_features_sccd, extract_features_sccd_now
 from pycold.app import defaults
 import pickle
 from dateutil.parser import parse
 
+# now_year = datetime.date.today().year
+now_year = 2021
 training_year = 2019
+phen_anchor_days = ['{}-1-15'.format(training_year), '{}-4-15'.format(training_year),
+                    '{}-7-15'.format(training_year), '{}-10-15'.format(training_year)]
 
 
 def tileprocessing_report(result_log_path, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
@@ -294,9 +298,13 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         else:
             # for sccd, as the output is heterogeneous, we continuously save the sccd pack for each pixel
             if method == "SCCDOFFLINE":
-                ordinal_day_list = [pd.Timestamp.toordinal(dt.date(year, 7, 1)) for year
+                training_day_list = [pd.Timestamp.toordinal(dt.date(year, 7, 1)) for year
                                     in [training_year]]
+                phen_anchor_days_ordinal = [pd.Timestamp.toordinal(parse(x)) for x in phen_anchor_days]
                 block_features = np.full((1, block_width * block_height,
+                                          defaults['SCCD']['NRT_BAND'] * defaults['SCCD']['N_FEATURES']),
+                                          defaults['COMMON']['NAN_VAL'], dtype=np.float32)
+                block_features_pheno = np.full((len(phen_anchor_days_ordinal), block_width * block_height,
                                           defaults['SCCD']['NRT_BAND'] * defaults['SCCD']['N_FEATURES']),
                                           defaults['COMMON']['NAN_VAL'], dtype=np.float32)
                 block_features_now = np.full((1, block_width * block_height,
@@ -331,20 +339,32 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
 
                     # save features for cover type training and prediction
                     for band in range(defaults['SCCD']['NRT_BAND']):
-                        feature_row, feature_row_now = extract_features_sccd(sccd_result, band, defaults['COMMON']['NAN_VAL'],
+                        feature_row = extract_features_sccd_now(sccd_result, band, defaults['COMMON']['NAN_VAL'],
                                                                              defaults['SCCD']['N_FEATURES'],
-                                                                             2021, ordinal_day_list=ordinal_day_list)
+                                                                now_year)
+
+                        feature_row_now = extract_features_sccd(sccd_result, band, defaults['COMMON']['NAN_VAL'],
+                                                                             defaults['SCCD']['N_FEATURES'],
+                                                                ordinal_day_list=training_day_list)
+                        feature_row_phen = extract_features_sccd(sccd_result, band, defaults['COMMON']['NAN_VAL'],
+                                                                             defaults['SCCD']['N_FEATURES'],
+                                                                             ordinal_day_list= phen_anchor_days_ordinal)
                         for index in range(defaults['SCCD']['N_FEATURES']):
                             block_features[:, i_row * block_width + i_col, band * defaults['SCCD']['N_FEATURES'] +
                                                                            index] \
                                 = feature_row[index]
-                            block_features_now[:, i_row * block_width + i_col, band * defaults['SCCD']['N_FEATURES'] + index] \
-                                = feature_row_now[index]
+                            block_features_now[:, i_row * block_width + i_col, band * defaults['SCCD']['N_FEATURES']
+                                               + index] = feature_row_now[index]
+                            block_features_pheno[:, i_row * block_width + i_col, band * defaults['SCCD']['N_FEATURES']
+                                                 + index] = feature_row_phen[index]
                     # replace structural array to list for saving storage space
                     pickle.dump(unindex_sccdpack(sccd_result), f)
                 f.close()
                 np.save(os.path.join(result_path, 'tmp_feature_year{}_block{}.npy').format(training_year, block_id),
                         block_features[0, :, :])
+                for index, date in enumerate(phen_anchor_days_ordinal):
+                    np.save(os.path.join(result_path, 'tmp_feature_year{}_block{}.npy').format(date, block_id),
+                            block_features[index, :, :])
                 np.save(os.path.join(result_path, 'tmp_feature_now_block{}.npy').format(block_id),
                         block_features_now[0, :, :])
                 # np.save(os.path.join(result_path, 'tmp_status_block{}.npy').format(block_id),

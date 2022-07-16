@@ -83,7 +83,7 @@ def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keywor
     # barren: 8
 
     log10_size = np.log10(int(stats_lut_row['npixels']))
-    intercept = 1
+    intercept = 0.95
     if classification_map is None:
         if log10_size * defaults['OBCOLD']['default_sizeslope'] + intercept < 2:
             scale = log10_size * defaults['OBCOLD']['default_sizeslope'] + intercept
@@ -376,6 +376,15 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None,
     object_map_s2 = object_map_s1.copy()
     object_map_s2[object_map_s2 > 0] = 1
     object_map_s2 = sklabel(object_map_s2, connectivity=2, background=0)
+    # object_map_s2 = object_map_s1   # only superpixel
+    # for only patch level 
+    # unq_s1, ids_s1, count_s1 = np.unique(object_map_s2, return_inverse=True, return_counts=True)
+    # mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
+    # mean_list = np.sqrt(np.bincount(ids_s1.astype(int),
+    # weights=np.square(cm_array_gaussian_s1.astype(np.int64)).reshape(ids_s1.shape)) / count_s1)
+    # mean_list[unq_s1 == 0] = defaults['COMMON']['NAN_VAL']  # force mean of unchanged objects to be -9999
+    # s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
+    # object_map_s1 = object_map_s2.copy()
     return object_map_s1, cm_date_array, object_map_s2, s1_info
 
 

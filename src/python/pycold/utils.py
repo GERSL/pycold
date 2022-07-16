@@ -9,7 +9,7 @@ from collections import namedtuple
 from pycold.app import defaults
 import gdal
 
-SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue nrt_coefs_tmp")
+SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
 
 sccd_dt = np.dtype([('t_start', np.int32), ('t_break', np.int32), ('num_obs', np.int32),
                         ('coefs', np.float32, (6, 6)), ('rmse', np.float32, 6), ('magnitude', np.float32, 6)], align=True)
@@ -424,6 +424,51 @@ def save_1band_fromrefimage(array, out_path, ref_image_path=None, gtype=gdal.GDT
         outdata.SetProjection(proj)
         outdata.FlushCache()
         del ref_image
+
+
+def coefficient_matrix(dates, num_coefficients):
+    """
+    Fourier transform function to be used for the matrix of inputs for
+    model fitting
+    Args:
+        dates: list of ordinal dates
+        num_coefficients: how many coefficients to use to build the matrix
+    Returns:
+        Populated numpy array with coefficient values
+    """
+    slope_scale = 10000
+    w = 0.0172  # 2 * np.pi / 365.25
+    matrix = np.zeros(shape=(num_coefficients), order='F')
+
+    # lookup optimizations
+    # Before optimization - 12.53% of total runtime
+    # After optimization  - 10.57% of total runtime
+    cos = np.cos
+    sin = np.sin
+
+    w23 = w * dates
+    matrix[0] = 1
+    matrix[1] = dates / slope_scale
+    matrix[2] = cos(w23 * dates)
+    matrix[3] = sin(w23 * dates)
+
+    if num_coefficients >= 6:
+        w45 = 2 * w23
+        matrix[4] = cos(w45 * dates)
+        matrix[5] = sin(w45 * dates)
+
+    if num_coefficients >= 8:
+        w67 = 3 * w23
+        matrix[6] = cos(w67 * dates)
+        matrix[7] = sin(w67 * dates)
+
+    return matrix
+
+
+def predict_ref(model, dates, num_coefficients=6):
+    coef_matrix = coefficient_matrix(dates, num_coefficients)
+    return np.dot(coef_matrix, model.T)
+
 
 
 def generate_rowcolimage(ref_image_path, out_path):
