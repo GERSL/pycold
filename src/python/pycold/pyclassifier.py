@@ -95,171 +95,6 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, n_features_perb
     return features
 
 
-def extract_features_sccd_now(sccd_plot, band, nan_val, n_features_perband, now_year, phenology=False):
-    """
-    generate current features from sccd pack structure for classification based on a plot-based rec_cg
-    and a list of days to be predicted
-    Parameters
-    ----------
-    sccd_plot: nested array
-        plot-based rec_cg
-    band: integer
-        the predicted band number range from 0 to 6
-    nan_val: integer
-        NA value assigned to the output
-    n_features_perband: integer
-        the number of features per band, 1, 3, 5, 7, 8.
-    ordinal_day_list: list
-        a list of days that this function will predict every days as a list as output. If none, only for sccd_update
-    phenology: bool
-        True - predicting overall values using the full harmonic coefficients
-    Returns
-    -------
-        feature: a list (length = n_feature) of 1-array [len(ordinal_day_list)]
-    """
-    features_now = [np.full(1, nan_val, dtype=np.double) for x in range(n_features_perband)]
-    # for features of current years, only monitor mode has cover type information
-    if sccd_plot.nrt_mode == defaults['SCCD']['NRT_MONITOR_STANDARD'] or sccd_plot.nrt_mode == defaults['SCCD'][
-        'NRT_MONITOR_SNOW']:
-        index = 0
-        ordinal_day_now = pd.Timestamp.toordinal(dt.date(now_year, 7, 1))
-        if n_features_perband == 6:
-            for n in range(n_features_perband):
-                if n == 0:
-                    if phenology:
-                        features_now[n][index] = predict_ref(cold_curve['nrt_coefs'][band], ordinal_day)
-                    else:
-                        features_now[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + \
-                                                 sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
-                                                 ordinal_day_now / defaults['COMMON']['SLOPE_SCALE']
-                    if np.isnan(features[n][index]):
-                        features_now[n][index] = 0
-                else:
-                    features_now[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n]
-                    if np.isnan(features[n][index]):
-                        features_now[n][index] = 0
-        else:
-            for n in range(n_features_perband):
-                if n == 0:
-                    if phenology:
-                        features_now[n][index] = predict_ref(cold_curve['nrt_coefs'][band], ordinal_day)
-                    else:
-                        features_now[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + \
-                                                 sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
-                                                 ordinal_day_now / defaults['COMMON']['SLOPE_SCALE']
-                    if np.isnan(features_now[n][index]):
-                        features_now[n][index] = 0
-                else:
-                    features_now[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][
-                        n + 1]  # n + 1 is because won't need slope as output
-                    if np.isnan(features_now[n][index]):
-                        features_now[n][index] = 0
-    return features_now
-
-
-def extract_features_sccd(sccd_plot, band, nan_val, n_features_perband, ordinal_day_list, phenology=False):
-    """
-    generate features from sccd pack structure for classification based on a plot-based rec_cg
-    and a list of days to be predicted
-    Parameters
-    ----------
-    sccd_plot: nested array
-        plot-based rec_cg
-    band: integer
-        the predicted band number range from 0 to 6
-    nan_val: integer
-        NA value assigned to the output
-    n_features_perband: integer
-        the number of features per band, 1, 3, 5, 7, 8.
-    ordinal_day_list: list
-        a list of days that this function will predict every days as a list as output. If none, only for sccd_update
-    phenology: bool
-        True - predicting overall values using the full harmonic coefficients
-    Returns
-    -------
-        feature: a list (length = n_feature) of 1-array [len(ordinal_day_list)]
-    """
-    features = [np.full(len(ordinal_day_list), nan_val, dtype=np.double) for x in range(n_features_perband)]
-    for index, ordinal_day in enumerate(ordinal_day_list):
-        # print(index)
-        for idx, cold_curve in enumerate(sccd_plot.rec_cg):
-            if idx == len(sccd_plot.rec_cg) - 1:
-                max_days = sccd_plot.rec_cg[idx]['t_break']
-            else:
-                max_days = sccd_plot.rec_cg[idx + 1]['t_start']
-            if n_features_perband == 6:
-                if cold_curve['t_start'] <= ordinal_day < max_days:
-                    for n in range(n_features_perband):
-                        if n == 0:
-                            if phenology:
-                                features[n][index] = predict_ref(cold_curve['coefs'][band], ordinal_day)
-                            else:
-                                features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
-                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                        else:
-                            features[n][index] = cold_curve['coefs'][band][n]
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                    break
-
-            else:
-                if cold_curve['t_start'] <= ordinal_day < max_days:
-                    for n in range(n_features_perband):
-                        if n == 0:
-                            if phenology:
-                                features[n][index] = predict_ref(cold_curve['coefs'][band], ordinal_day)
-                            else:
-                                # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
-                                features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
-                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                        else:
-                            features[n][index] = cold_curve['coefs'][band][n+1]  # n + 1 is because won't need slope as output
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                    break
-
-        if sccd_plot.nrt_mode == defaults['SCCD']['NRT_MONITOR_STANDARD'] or sccd_plot.nrt_mode == defaults['SCCD']['NRT_MONITOR_SNOW']:
-            if (sccd_plot.nrt_model['t_start_since1982'][0]+defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH']) <= \
-                    ordinal_day < (sccd_plot.nrt_model['obs_date_since1982'][0][0]+defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH']):
-                if n_features_perband == 6:
-                    for n in range(n_features_perband):
-                        if n == 0:
-                            if phenology:
-                                features[n][index] = predict_ref(cold_curve['coefs'][band], ordinal_day)
-                            else:
-                                features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
-                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                        else:
-                            features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n]
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                    break
-                else:
-                    for n in range(n_features_perband):
-                        if n == 0:
-                            if phenology:
-                                features[n][index] = predict_ref(cold_curve['coefs'][band], ordinal_day)
-                            else:
-                                # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
-                                features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][0] + sccd_plot.nrt_model['nrt_coefs'][0][band][1] * \
-                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                        else:
-                            features[n][index] = sccd_plot.nrt_model['nrt_coefs'][0][band][n+1]  # n + 1 is because won't need slope as output
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
-                    break
-
-    return features
-
-
 def generate_sample_num(label, sample_parameters):
     """
     generate sample number for each land cover category using the method from 'Optimizing selection of training and
@@ -542,7 +377,7 @@ class PyClassifierHPC(PyClassifier):
 
     @staticmethod
     def _save_rf_model(rf_model, rf_path):
-        joblib.dump(rf_model, rf_path, compress=3)
+        joblib.dump(rf_model, rf_path)
 
     def _is_finished_step2_train_rfmodel(self):
         return exists(self.rf_path)
@@ -623,22 +458,25 @@ class PyClassifierHPC(PyClassifier):
         with open(join(self.tmp_path, 'tmp_step1_predict_{}_finished.txt'.format(block_id)), 'w') as fp:
             pass
 
-    def step2_train_rf(self, ref_year=None):
+    def step2_train_rf(self, ref_year=None, rf_path=None):
         while not self._is_finished_step1_predict_features():
             time.sleep(5)
 
         if ref_year is None:
             ref_year = defaults['CLASSIFIER']['training_year']
 
-        if ref_year not in self.year_list_to_predict:
-            raise Exception("Ref_year {} is not in year_list_to_predict {}. "
-                            "PLease included it and re-run step1_feature_generation".format(ref_year,
-                                                                                            self.year_list_to_predict))
+        # if ref_year not in self.year_list_to_predict:
+        #     raise Exception("Ref_year {} is not in year_list_to_predict {}. "
+        #                     "PLease included it and re-run step1_feature_generation".format(ref_year,
+        #                                                                                     self.year_list_to_predict))
 
         full_feature_array = assemble_array(self.get_fullfeature_forcertainyear(ref_year),
                                             self.config['n_block_x'])
         rf_model = self.train_rfmodel(full_feature_array, gdal_array.LoadFile(self.seedmap_path))
-        self._save_rf_model(rf_model, self.rf_path)
+        if rf_path is None:
+            self._save_rf_model(rf_model, self.rf_path)
+        else:
+            self._save_rf_model(rf_model, rf_path)
 
     def step3_classification(self, block_id):
         while not self._is_finished_step2_train_rfmodel():
@@ -666,11 +504,11 @@ class PyClassifierHPC(PyClassifier):
             raise ("Please double check your rf model file directory or generate random forest model first:"
                    " {}".format(e))
 
-        for year in self.year_list_to_predict:
-            tmp_feature_block = get_features(join(self.tmp_path, 'tmp_feature_year{}_block{}.npy'.format(year,
-                                                                                                        block_id)))
-            cmap = self.classification_block(rf_model, tmp_feature_block)
-            self._save_yearlyclassification_maps(block_id, year, cmap)
+        # for year in self.year_list_to_predict:
+        #     tmp_feature_block = get_features(join(self.tmp_path, 'tmp_feature_year{}_block{}.npy'.format(year,
+        #                                                                                                 block_id)))
+        #     cmap = self.classification_block(rf_model, tmp_feature_block)
+        #     self._save_yearlyclassification_maps(block_id, year, cmap)
 
         tmp_feature_block = get_features(join(self.tmp_path, 'tmp_feature_now_block{}.npy'.format(block_id)))
         cmap = self.classification_block(rf_model, tmp_feature_block)
@@ -696,10 +534,10 @@ class PyClassifierHPC(PyClassifier):
                                                 self.config['n_block_x'])[:, :, 0]
         self._save_covermaps(full_yearlyclass_array, 'now')
 
-        for year in self.year_list_to_predict:
-            full_yearlyclass_array = assemble_array(self._get_fullclassification_forcertainyear(year),
-                                                    self.config['n_block_x'])[:, :, 0]
-            self._save_covermaps(full_yearlyclass_array, year)
+        # for year in self.year_list_to_predict:
+        #     full_yearlyclass_array = assemble_array(self._get_fullclassification_forcertainyear(year),
+        #                                             self.config['n_block_x'])[:, :, 0]
+        #     self._save_covermaps(full_yearlyclass_array, year)
         if clean:
             self._clean()  # _clean all temp files
 
