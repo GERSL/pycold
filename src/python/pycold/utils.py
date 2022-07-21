@@ -437,7 +437,7 @@ def coefficient_matrix(dates, num_coefficients):
         Populated numpy array with coefficient values
     """
     slope_scale = 10000
-    w = 0.0172  # 2 * np.pi / 365.25
+    w23 = 2 * np.pi / 365.25
     matrix = np.zeros(shape=(num_coefficients), order='F')
 
     # lookup optimizations
@@ -446,7 +446,6 @@ def coefficient_matrix(dates, num_coefficients):
     cos = np.cos
     sin = np.sin
 
-    w23 = w * dates
     matrix[0] = 1
     matrix[1] = dates / slope_scale
     matrix[2] = cos(w23 * dates)

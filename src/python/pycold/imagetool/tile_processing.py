@@ -310,7 +310,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                                               t_cg=threshold,
                                               conse=config['conse'],
                                               pos=config['n_cols'] * (original_row - 1) + original_col)
-
+                    
                     # replace structural array to list for saving storage space
                     pickle.dump(unindex_sccdpack(sccd_result), f)
                 f.close()

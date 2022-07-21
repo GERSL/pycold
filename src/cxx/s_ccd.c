@@ -223,6 +223,16 @@ int sccd
                                    num_obs_queue, obs_queue, min_rmse, cm_output_interval,
                                    starting_date, conse, cm_outputs, cm_outputs_date, b_pinpoint);
 
+         }else{
+             if(*nrt_mode == NRT_MONITOR_STANDARD){
+                 nrt_model->cm_outputs = NA_VALUE;
+                 nrt_model->cm_outputs_date = NA_VALUE;
+             }else if(*nrt_mode == NRT_QUEUE_RECENT){
+                 nrt_model->cm_outputs = NA_VALUE;
+                 nrt_model->cm_outputs_date = NA_VALUE;
+                 *nrt_mode = NRT_QUEUE_STANDARD;
+             }
+
          }
     }
     else
@@ -1800,6 +1810,14 @@ int step2_KF_ChangeDetection
                  break;
             }
         }
+//        else{
+//            if(v_dif_mag_norm[i_conse] < T_MIN_CG_SCCD)   // smaller than minimum threshold, it is impossible to be
+//            {
+//                change_flag = FALSE;
+//                 break;
+//            }
+
+//        }
 
         if(v_dif_mag_norm[i_conse] < break_mag)
         {
@@ -2357,7 +2375,6 @@ int sccd_standard
     int i_dense = 0;
     int t_start;
     int num_fc_record = *num_fc;
-    int tt;
     bool record_pinpoint_initial = FALSE;   // indicate that if pinpoint segment has been initialized
     bool record_change_detected = FALSE;
 

@@ -377,7 +377,7 @@ class PyClassifierHPC(PyClassifier):
 
     @staticmethod
     def _save_rf_model(rf_model, rf_path):
-        joblib.dump(rf_model, rf_path)
+        joblib.dump(rf_model, rf_path, compress=3)
 
     def _is_finished_step2_train_rfmodel(self):
         return exists(self.rf_path)
