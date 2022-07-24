@@ -2779,7 +2779,7 @@ int sccd_snow
         {
            obs_queue[k].clrx_since1982= clrx[k] - JULIAN_LANDSAT4_LAUNCH;
            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-               obs_queue[k].clry[i_b] = clry[k][i_b];
+               obs_queue[k].clry[i_b] = clry[i_b][k];
         }
         
         status = free_2d_array ((void **) temp_v_dif);

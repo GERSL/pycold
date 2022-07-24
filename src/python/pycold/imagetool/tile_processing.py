@@ -212,6 +212,7 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
 @click.option('--upper_datebound', type=str, default=None, help='upper date bound of image selection for processing.'
                                                                 'Example - 2021-12-31')
 def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path, low_datebound, upper_datebound):
+
     tz = timezone('US/Eastern')
     start_time = datetime.now(tz)
 
@@ -298,22 +299,33 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 # start looping every pixel in the block
                 for pos in range(block_width * block_height):
                     original_row, original_col = get_rowcol_intile(pos, block_width, block_height, block_x, block_y)
-                    sccd_result = sccd_detect(img_dates_sorted,
-                                              img_tstack[pos, 0, :].astype(np.int64),
-                                              img_tstack[pos, 1, :].astype(np.int64),
-                                              img_tstack[pos, 2, :].astype(np.int64),
-                                              img_tstack[pos, 3, :].astype(np.int64),
-                                              img_tstack[pos, 4, :].astype(np.int64),
-                                              img_tstack[pos, 5, :].astype(np.int64),
-                                              img_tstack[pos, 6, :].astype(np.int64),
-                                              img_tstack[pos, 7, :].astype(np.int64),
-                                              t_cg=threshold,
-                                              conse=config['conse'],
-                                              pos=config['n_cols'] * (original_row - 1) + original_col)
-                    
-                    # replace structural array to list for saving storage space
-                    pickle.dump(unindex_sccdpack(sccd_result), f)
+                    try:
+                        sccd_result = sccd_detect(img_dates_sorted,
+                                                  img_tstack[pos, 0, :].astype(np.int64),
+                                                  img_tstack[pos, 1, :].astype(np.int64),
+                                                  img_tstack[pos, 2, :].astype(np.int64),
+                                                  img_tstack[pos, 3, :].astype(np.int64),
+                                                  img_tstack[pos, 4, :].astype(np.int64),
+                                                  img_tstack[pos, 5, :].astype(np.int64),
+                                                  img_tstack[pos, 6, :].astype(np.int64),
+                                                  img_tstack[pos, 7, :].astype(np.int64),
+                                                  t_cg=threshold,
+                                                  conse=config['conse'],
+                                                  pos=config['n_cols'] * (original_row - 1) + original_col)
+                    except RuntimeError:
+                        print("S-CCD fails at original_row {}, original_col {} ({})".format(original_row, original_col,
+                                                                                           datetime.now(tz)
+                                                                                           .strftime(
+                                                                                               '%Y-%m-%d %H:%M:%S')))
+                    else:
+                        # replace structural array to list for saving storage space
+                        pickle.dump(unindex_sccdpack(sccd_result), f)
                 f.close()
+
+                # pos = 221
+                # from pycold.utils import save_obs2csv
+                # save_obs2csv('/home/coloury/Dropbox/UCONN/NRT/test_src/sccd_packid{}.csv'.format(pos),
+                #              pd.DataFrame(np.vstack((img_dates_sorted, img_tstack[pos, :, :])).T))
 
                 # free memory
                 del img_tstack
