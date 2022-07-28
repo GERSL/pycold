@@ -373,6 +373,9 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
         ts_t = np.ascontiguousarray(ts_t)
     if qas.flags['C_CONTIGUOUS'] == False:
         qas = np.ascontiguousarray(qas)
+        
+    if conse > DEFAULT_CONSE:
+        raise RuntimeError("The inputted conse is longer than the maximum conse for S-CCD: {}".format(DEFAULT_CONSE))
 
     cdef int valid_num_scenes = qas.shape[0]
     # allocate memory for rec_cg

@@ -356,7 +356,7 @@ int main(int argc, char *argv[])
     }
     else if (argv[1][0] == 't'){
         method = SCCDONLINE;
-        cm_output_interval = 99999;  // assigned an extreme to the interval as only one cm is saved
+        cm_output_interval = 999999;  // assigned an extreme to the interval as only one cm is saved
     }
     else
         RETURN_ERROR("The second input parameter has to be r, s, o or c", FUNC_NAME, FAILURE);
@@ -480,7 +480,10 @@ int main(int argc, char *argv[])
     fclose(sampleFile);
 
     n_cm_maps = (sdate[valid_scene_count - 1] - sdate[0]) / cm_output_interval + 1;
-    starting_date = sdate[0];
+    if(method == SCCDONLINE)
+        starting_date = 0;
+    else
+        starting_date = sdate[0];
 
 
 //    sensor_buf = (short int *) malloc(num_scenes * sizeof(short int));

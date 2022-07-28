@@ -94,7 +94,8 @@ int step2_KF_ChangeDetection
     int t_start,
     bool b_outputcm,
     bool b_pinpoint,
-     bool *b_pinpoint_initial
+    bool *b_pinpoint_initial,
+    int* id_last
 );
 
 
@@ -169,7 +170,8 @@ int step3_processing_end
     short int *min_rmse,
     double tcg,                /* I: the change threshold  */
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    int id_last
 );
 
 

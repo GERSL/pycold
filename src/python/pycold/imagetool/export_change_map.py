@@ -183,7 +183,7 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
     ranks_percore = int(np.ceil(config['n_blocks'] / n_process))
     for i in range(ranks_percore):
         iblock = n_process * i + rank
-        if iblock > config['n_blocks']:
+        if iblock >= config['n_blocks']:
             break
         current_block_y = int(np.floor(iblock / config['n_block_x'])) + 1
         current_block_x = iblock % config['n_block_x'] + 1
