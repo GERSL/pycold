@@ -23,9 +23,46 @@ from pycold.pyclassifier import PyClassifierHPC
 from pycold.app import defaults
 import pickle
 from dateutil.parser import parse
+import sys
+import traceback
+from multiprocessing.pool import Pool
+from functools import partial
+import gc
 
+def perform_sccd(pos, block_width , block_height,block_x, block_y,img_tstack,img_dates_sorted,threshold,config,f):
 
-def tileprocessing_report(result_log_path, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
+    original_row, original_col = get_rowcol_intile(pos, block_width, block_height, block_x, block_y)
+    try:
+        sccd_result = sccd_detect(img_dates_sorted,
+                                  img_tstack[pos, 0, :].astype(np.int64),
+                                  img_tstack[pos, 1, :].astype(np.int64),
+                                  img_tstack[pos, 2, :].astype(np.int64),
+                                  img_tstack[pos, 3, :].astype(np.int64),
+                                  img_tstack[pos, 4, :].astype(np.int64),
+                                  img_tstack[pos, 5, :].astype(np.int64),
+                                  img_tstack[pos, 6, :].astype(np.int64),
+                                  img_tstack[pos, 7, :].astype(np.int64),
+                                  t_cg=threshold,
+                                  conse=config['conse'],
+                                  pos=config['n_cols'] * (original_row - 1) + original_col)
+    except RuntimeError as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        traceback.print_tb(e.__traceback__, limit=100, file=sys.stdout)
+        traceback.print_exception(exc_type, exc_value, exc_traceback, limit=200, file=sys.stdout)
+
+        print("S-CCD fails at original_row {}, original_col {} ({})".format(original_row, original_col,
+                                                                            datetime.now(timezone('US/Eastern'))
+                                                                            .strftime(
+                                                                                '%Y-%m-%d %H:%M:%S')))
+    else:
+        # replace structural array to list for saving storage space
+        pickle.dump(unindex_sccdpack(sccd_result), f)
+
+        del original_row
+        del original_col
+        gc.collect()
+
+def tileprocessing_report(result_log_path, single_block, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
                           n_cores, starting_date=0, n_cm_maps=0, year_lowbound=0, year_uppbound=0):
     """
     output tile-based processing report
@@ -59,6 +96,7 @@ def tileprocessing_report(result_log_path, stack_path, version, algorithm, confi
     file.write("Conse: {}\n".format(config['conse']))
     file.write("stack_path: {}\n".format(stack_path))
     file.write("The number of requested cores: {}\n".format(n_cores))
+    file.write("Single block processing: {}\n".format(single_block))
     file.write("The program starts at {}\n".format(startpoint.strftime('%Y-%m-%d %H:%M:%S')))
     file.write("The COLD ends at {}\n".format(cold_timepoint.strftime('%Y-%m-%d %H:%M:%S')))
     file.write("The program ends at {}\n".format(endpoint.strftime('%Y-%m-%d %H:%M:%S')))
@@ -201,6 +239,7 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
 @click.command()
 @click.option('--rank', type=int, default=0, help='the rank id')
 @click.option('--n_cores', type=int, default=0, help='the total cores assigned')
+@click.option('--single-block', type=bool, default=False, help='Process single blocks in available threads')
 @click.option('--stack_path', type=str, default=None, help='the path for stack data')
 @click.option('--result_path', type=str, default=None, help='the path for storing results')
 @click.option('--yaml_path', type=str, default=None, help='YAML path')
@@ -211,7 +250,7 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
                                                               'Example - 2015-01-01')
 @click.option('--upper_datebound', type=str, default=None, help='upper date bound of image selection for processing.'
                                                                 'Example - 2021-12-31')
-def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path, low_datebound, upper_datebound):
+def main(rank, n_cores, single_block, stack_path, result_path, yaml_path, method, seedmap_path, low_datebound, upper_datebound):
 
     tz = timezone('US/Eastern')
     start_time = datetime.now(tz)
@@ -265,18 +304,26 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
     #########################################################################
     #                        per-pixel COLD procedure                       #
     #########################################################################
+    cores_divider = n_cores
+
+    if single_block:
+        cores_divider = 1
+
     threshold = chi2.ppf(config['probability_threshold'], 5)
-    nblock_eachcore = int(np.ceil(config['n_block_x'] * config['n_block_y'] * 1.0 / n_cores))
+    nblock_eachcore = int(np.ceil(config['n_block_x'] * config['n_block_y'] * 1.0 / cores_divider))
+
     for i in range(nblock_eachcore):
-        block_id = n_cores * i + rank  # started from 1, i.e., rank, rank + n_cores, rank + 2 * n_cores
+        block_id = cores_divider * i + rank  # started from 1, i.e., rank, rank + n_cores, rank + 2 * n_cores
         if block_id > config['n_block_x'] * config['n_block_y']:
             break
         block_y = int((block_id - 1) / config['n_block_x']) + 1  # note that block_x and block_y start from 1
         block_x = int((block_id - 1) % config['n_block_x']) + 1
         if os.path.exists(join(result_path, 'COLD_block{}_finished.txt'.format(block_id))):
-            print("Per-pixel COLD processing is finished for block_x{}_y{} ({})".format(block_x, block_y, 
+            print("Per-pixel COLD processing is finished for block_x{}_y{} ({})".format(block_x, block_y,
                                                                                         datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
             continue
+
+
         img_tstack, img_dates_sorted = get_stack_date(config, block_x, block_y, stack_path, low_datebound,
                                                       upper_datebound)
 
@@ -297,29 +344,16 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 # block_last_change_date = np.full((block_width, block_height), 0, dtype=np.int32)
                 f = open(join(result_path, 'record_change_x{}_y{}_sccd.npy'.format(block_x, block_y)), "wb+")
                 # start looping every pixel in the block
-                for pos in range(block_width * block_height):
-                    original_row, original_col = get_rowcol_intile(pos, block_width, block_height, block_x, block_y)
-                    try:
-                        sccd_result = sccd_detect(img_dates_sorted,
-                                                  img_tstack[pos, 0, :].astype(np.int64),
-                                                  img_tstack[pos, 1, :].astype(np.int64),
-                                                  img_tstack[pos, 2, :].astype(np.int64),
-                                                  img_tstack[pos, 3, :].astype(np.int64),
-                                                  img_tstack[pos, 4, :].astype(np.int64),
-                                                  img_tstack[pos, 5, :].astype(np.int64),
-                                                  img_tstack[pos, 6, :].astype(np.int64),
-                                                  img_tstack[pos, 7, :].astype(np.int64),
-                                                  t_cg=threshold,
-                                                  conse=config['conse'],
-                                                  pos=config['n_cols'] * (original_row - 1) + original_col)
-                    except RuntimeError:
-                        print("S-CCD fails at original_row {}, original_col {} ({})".format(original_row, original_col,
-                                                                                           datetime.now(tz)
-                                                                                           .strftime(
-                                                                                               '%Y-%m-%d %H:%M:%S')))
-                    else:
-                        # replace structural array to list for saving storage space
-                        pickle.dump(unindex_sccdpack(sccd_result), f)
+
+                if single_block:
+                    with Pool(n_cores) as p:
+                        p.map_async(partial(perform_sccd, block_width , block_height,block_x, block_y,img_tstack,img_dates_sorted,threshold,config, f), range(block_width * block_height))
+                        p.close()
+                        p.join()
+                else:
+                    for pos in range(block_width * block_height):
+                        perform_sccd(pos,block_width , block_height, block_x, block_y, img_tstack, img_dates_sorted, threshold, config, f)
+
                 f.close()
 
                 # pos = 221
@@ -330,6 +364,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 # free memory
                 del img_tstack
                 del img_dates_sorted
+                gc.collect()
                 # del block_status
                 # del block_last_change_date
             else:
@@ -423,7 +458,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
             if seedmap_path is not None:
                 pyclassifier.hpc_preparation()
             ob_analyst.hpc_preparation()
-        
+
         #########################################################################
         #                        reorganize cm snapshots                        #
         #########################################################################
@@ -448,18 +483,18 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 if rank == 1:
                     print("Starts predicting features: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
                 for i in range(nblock_eachcore):
-                    if n_cores * i + rank > config['n_block_x'] * config['n_block_y']:
+                    if cores_divider * i + rank > config['n_block_x'] * config['n_block_y']:
                         break
-                    pyclassifier.step1_feature_generation(block_id=n_cores * i + rank)
+                    pyclassifier.step1_feature_generation(block_id=cores_divider * i + rank)
 
                 if rank == 1:  # serial mode for producing rf
                     pyclassifier.step2_train_rf()
                     print("Training rf ends: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
                 for i in range(nblock_eachcore):
-                    if n_cores * i + rank > config['n_block_x'] * config['n_block_y']:
+                    if cores_divider * i + rank > config['n_block_x'] * config['n_block_y']:
                         break
-                    pyclassifier.step3_classification(block_id=n_cores * i + rank)
+                    pyclassifier.step3_classification(block_id=cores_divider * i + rank)
 
                 if rank == 1:  # serial mode for assemble
                     pyclassifier.step4_assemble()
@@ -473,12 +508,12 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         if not ob_analyst.is_finished_object_analysis(np.arange(starting_date,
                                                                 starting_date+config['CM_OUTPUT_INTERVAL']*n_cm_maps,
                                                       config['CM_OUTPUT_INTERVAL'])):
-            n_map_percore = int(np.ceil(n_cm_maps / n_cores))
+            n_map_percore = int(np.ceil(n_cm_maps / cores_divider))
             max_date = starting_date + (n_cm_maps - 1) * config['CM_OUTPUT_INTERVAL']
             for i in range(n_map_percore):
-                if starting_date + (rank - 1 + i * n_cores) * config['CM_OUTPUT_INTERVAL'] > max_date:
+                if starting_date + (rank - 1 + i * cores_divider) * config['CM_OUTPUT_INTERVAL'] > max_date:
                     break
-                date = starting_date + (rank - 1 + i * n_cores) * config['CM_OUTPUT_INTERVAL']
+                date = starting_date + (rank - 1 + i * cores_divider) * config['CM_OUTPUT_INTERVAL']
                 ob_analyst.obia_execute(date)
 
             while not ob_analyst.is_finished_object_analysis(np.arange(starting_date,
@@ -492,7 +527,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         #                        reconstruct change records                     #
         #########################################################################
         for i in range(nblock_eachcore):
-            block_id = n_cores * i + rank  # started from 1, i.e., rank, rank + n_cores, rank + 2 * n_cores
+            block_id = cores_divider * i + rank  # started from 1, i.e., rank, rank + n_cores, rank + 2 * n_cores
             if block_id > config['n_block_x'] * config['n_block_y']:
                 break
             block_y = int((block_id - 1) / config['n_block_x']) + 1  # note that block_x and block_y start from 1
@@ -506,11 +541,11 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
     if rank == 1:
         # tile_based report
         if method == 'OBCOLD':
-            tileprocessing_report(join(result_path, 'tile_processing_report.log'),
+            tileprocessing_report(join(result_path, 'tile_processing_report.log'), single_block,
                                   stack_path, pycold.__version__, method, config, start_time, cold_timepoint, tz,
                                   n_cores, starting_date, n_cm_maps, year_lowbound, year_uppbound)
         else:
-            tileprocessing_report(join(result_path, 'tile_processing_report.log'), stack_path, pycold.__version__,
+            tileprocessing_report(join(result_path, 'tile_processing_report.log'), stack_path, single_block, pycold.__version__,
                                   method, config, start_time, cold_timepoint, tz, n_cores)
         print("The whole procedure finished: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
