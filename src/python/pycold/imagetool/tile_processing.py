@@ -25,6 +25,44 @@ import pickle
 from dateutil.parser import parse
 import sys
 import traceback
+from multiprocessing.pool import Pool
+from functools import partial
+import gc
+
+
+def perform_sccd(pos, block_width , block_height,block_x, block_y,img_tstack,img_dates_sorted,threshold,config,f):
+
+    original_row, original_col = get_rowcol_intile(pos, block_width, block_height, block_x, block_y, img_tstack,
+                                                   img_dates_sorted, threshold, config)
+    try:
+        sccd_result = sccd_detect(img_dates_sorted,
+                                  img_tstack[pos, 0, :].astype(np.int64),
+                                  img_tstack[pos, 1, :].astype(np.int64),
+                                  img_tstack[pos, 2, :].astype(np.int64),
+                                  img_tstack[pos, 3, :].astype(np.int64),
+                                  img_tstack[pos, 4, :].astype(np.int64),
+                                  img_tstack[pos, 5, :].astype(np.int64),
+                                  img_tstack[pos, 6, :].astype(np.int64),
+                                  img_tstack[pos, 7, :].astype(np.int64),
+                                  t_cg=threshold,
+                                  conse=config['conse'],
+                                  pos=config['n_cols'] * (original_row - 1) + original_col)
+    except RuntimeError as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        traceback.print_tb(e.__traceback__, limit=100, file=sys.stdout)
+        traceback.print_exception(exc_type, exc_value, exc_traceback, limit=200, file=sys.stdout)
+
+        print("S-CCD fails at original_row {}, original_col {} ({})".format(original_row, original_col,
+                                                                            datetime.now(timezone('US/Eastern'))
+                                                                            .strftime(
+                                                                                '%Y-%m-%d %H:%M:%S')))
+    else:
+        # replace structural array to list for saving storage space
+        pickle.dump(unindex_sccdpack(sccd_result), f)
+
+        del original_row
+        del original_col
+        gc.collect()
 
 def tileprocessing_report(result_log_path, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
                           n_cores, starting_date=0, n_cm_maps=0, year_lowbound=0, year_uppbound=0):
@@ -268,6 +306,9 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
     #########################################################################
     threshold = chi2.ppf(config['probability_threshold'], 5)
     nblock_eachcore = int(np.ceil(config['n_block_x'] * config['n_block_y'] * 1.0 / n_cores))
+
+
+
     for i in range(nblock_eachcore):
         block_id = n_cores * i + rank  # started from 1, i.e., rank, rank + n_cores, rank + 2 * n_cores
         if block_id > config['n_block_x'] * config['n_block_y']:
@@ -275,9 +316,11 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         block_y = int((block_id - 1) / config['n_block_x']) + 1  # note that block_x and block_y start from 1
         block_x = int((block_id - 1) % config['n_block_x']) + 1
         if os.path.exists(join(result_path, 'COLD_block{}_finished.txt'.format(block_id))):
-            print("Per-pixel COLD processing is finished for block_x{}_y{} ({})".format(block_x, block_y, 
+            print("Per-pixel COLD processing is finished for block_x{}_y{} ({})".format(block_x, block_y,
                                                                                         datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
             continue
+
+
         img_tstack, img_dates_sorted = get_stack_date(config, block_x, block_y, stack_path, low_datebound,
                                                       upper_datebound)
 
@@ -298,33 +341,13 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 # block_last_change_date = np.full((block_width, block_height), 0, dtype=np.int32)
                 f = open(join(result_path, 'record_change_x{}_y{}_sccd.npy'.format(block_x, block_y)), "wb+")
                 # start looping every pixel in the block
-                for pos in range(block_width * block_height):
-                    original_row, original_col = get_rowcol_intile(pos, block_width, block_height, block_x, block_y)
-                    try:
-                        sccd_result = sccd_detect(img_dates_sorted,
-                                                  img_tstack[pos, 0, :].astype(np.int64),
-                                                  img_tstack[pos, 1, :].astype(np.int64),
-                                                  img_tstack[pos, 2, :].astype(np.int64),
-                                                  img_tstack[pos, 3, :].astype(np.int64),
-                                                  img_tstack[pos, 4, :].astype(np.int64),
-                                                  img_tstack[pos, 5, :].astype(np.int64),
-                                                  img_tstack[pos, 6, :].astype(np.int64),
-                                                  img_tstack[pos, 7, :].astype(np.int64),
-                                                  t_cg=threshold,
-                                                  conse=config['conse'],
-                                                  pos=config['n_cols'] * (original_row - 1) + original_col)
-                    except RuntimeError:
-                        exc_type, exc_value, exc_traceback = sys.exc_info()
-                        traceback.print_tb(e.__traceback__, limit=100, file=sys.stdout)
-                        traceback.print_exception(exc_type, exc_value, exc_traceback, limit=200, file=sys.stdout)
 
-                        print("S-CCD fails at original_row {}, original_col {} ({})".format(original_row, original_col,
-                                                                                           datetime.now(tz)
-                                                                                           .strftime(
-                                                                                               '%Y-%m-%d %H:%M:%S')))
-                    else:
-                        # replace structural array to list for saving storage space
-                        pickle.dump(unindex_sccdpack(sccd_result), f)
+
+                with Pool(int(os.environ.get("CPU_CORES"))) as p:
+                    p.map_async(partial(perform_sccd, block_width , block_height,block_x, block_y,img_tstack,img_dates_sorted,threshold,config, f), range(block_width * block_height))
+                    p.close()
+                    p.join()
+
                 f.close()
 
                 # pos = 221
@@ -335,6 +358,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 # free memory
                 del img_tstack
                 del img_dates_sorted
+                gc.collect()
                 # del block_status
                 # del block_last_change_date
             else:
@@ -428,7 +452,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
             if seedmap_path is not None:
                 pyclassifier.hpc_preparation()
             ob_analyst.hpc_preparation()
-        
+
         #########################################################################
         #                        reorganize cm snapshots                        #
         #########################################################################
