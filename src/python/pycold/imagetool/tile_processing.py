@@ -29,11 +29,9 @@ from multiprocessing.pool import Pool
 from functools import partial
 import gc
 
-
 def perform_sccd(pos, block_width , block_height,block_x, block_y,img_tstack,img_dates_sorted,threshold,config,f):
 
-    original_row, original_col = get_rowcol_intile(pos, block_width, block_height, block_x, block_y, img_tstack,
-                                                   img_dates_sorted, threshold, config)
+    original_row, original_col = get_rowcol_intile(pos, block_width, block_height, block_x, block_y)
     try:
         sccd_result = sccd_detect(img_dates_sorted,
                                   img_tstack[pos, 0, :].astype(np.int64),
@@ -64,7 +62,7 @@ def perform_sccd(pos, block_width , block_height,block_x, block_y,img_tstack,img
         del original_col
         gc.collect()
 
-def tileprocessing_report(result_log_path, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
+def tileprocessing_report(result_log_path, single_block, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
                           n_cores, starting_date=0, n_cm_maps=0, year_lowbound=0, year_uppbound=0):
     """
     output tile-based processing report
@@ -98,6 +96,7 @@ def tileprocessing_report(result_log_path, stack_path, version, algorithm, confi
     file.write("Conse: {}\n".format(config['conse']))
     file.write("stack_path: {}\n".format(stack_path))
     file.write("The number of requested cores: {}\n".format(n_cores))
+    file.write("Single block processing: {}\n".format(single_block))
     file.write("The program starts at {}\n".format(startpoint.strftime('%Y-%m-%d %H:%M:%S')))
     file.write("The COLD ends at {}\n".format(cold_timepoint.strftime('%Y-%m-%d %H:%M:%S')))
     file.write("The program ends at {}\n".format(endpoint.strftime('%Y-%m-%d %H:%M:%S')))
@@ -240,6 +239,7 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
 @click.command()
 @click.option('--rank', type=int, default=0, help='the rank id')
 @click.option('--n_cores', type=int, default=0, help='the total cores assigned')
+@click.option('--single-block', type=bool, default=False, help='Process single blocks in available threads')
 @click.option('--stack_path', type=str, default=None, help='the path for stack data')
 @click.option('--result_path', type=str, default=None, help='the path for storing results')
 @click.option('--yaml_path', type=str, default=None, help='YAML path')
@@ -250,7 +250,7 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
                                                               'Example - 2015-01-01')
 @click.option('--upper_datebound', type=str, default=None, help='upper date bound of image selection for processing.'
                                                                 'Example - 2021-12-31')
-def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path, low_datebound, upper_datebound):
+def main(rank, n_cores, single_block, stack_path, result_path, yaml_path, method, seedmap_path, low_datebound, upper_datebound):
 
     tz = timezone('US/Eastern')
     start_time = datetime.now(tz)
@@ -304,13 +304,16 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
     #########################################################################
     #                        per-pixel COLD procedure                       #
     #########################################################################
+    cores_divider = n_cores
+
+    if single_block:
+        cores_divider = 1
+
     threshold = chi2.ppf(config['probability_threshold'], 5)
-    nblock_eachcore = int(np.ceil(config['n_block_x'] * config['n_block_y'] * 1.0 / n_cores))
-
-
+    nblock_eachcore = int(np.ceil(config['n_block_x'] * config['n_block_y'] * 1.0 / cores_divider))
 
     for i in range(nblock_eachcore):
-        block_id = n_cores * i + rank  # started from 1, i.e., rank, rank + n_cores, rank + 2 * n_cores
+        block_id = cores_divider * i + rank  # started from 1, i.e., rank, rank + n_cores, rank + 2 * n_cores
         if block_id > config['n_block_x'] * config['n_block_y']:
             break
         block_y = int((block_id - 1) / config['n_block_x']) + 1  # note that block_x and block_y start from 1
@@ -342,11 +345,14 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 f = open(join(result_path, 'record_change_x{}_y{}_sccd.npy'.format(block_x, block_y)), "wb+")
                 # start looping every pixel in the block
 
-
-                with Pool(int(os.environ.get("CPU_CORES"))) as p:
-                    p.map_async(partial(perform_sccd, block_width , block_height,block_x, block_y,img_tstack,img_dates_sorted,threshold,config, f), range(block_width * block_height))
-                    p.close()
-                    p.join()
+                if single_block:
+                    with Pool(n_cores) as p:
+                        p.map_async(partial(perform_sccd, block_width , block_height,block_x, block_y,img_tstack,img_dates_sorted,threshold,config, f), range(block_width * block_height))
+                        p.close()
+                        p.join()
+                else:
+                    for pos in range(block_width * block_height):
+                        perform_sccd(pos,block_width , block_height, block_x, block_y, img_tstack, img_dates_sorted, threshold, config, f)
 
                 f.close()
 
@@ -477,18 +483,18 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 if rank == 1:
                     print("Starts predicting features: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
                 for i in range(nblock_eachcore):
-                    if n_cores * i + rank > config['n_block_x'] * config['n_block_y']:
+                    if cores_divider * i + rank > config['n_block_x'] * config['n_block_y']:
                         break
-                    pyclassifier.step1_feature_generation(block_id=n_cores * i + rank)
+                    pyclassifier.step1_feature_generation(block_id=cores_divider * i + rank)
 
                 if rank == 1:  # serial mode for producing rf
                     pyclassifier.step2_train_rf()
                     print("Training rf ends: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
                 for i in range(nblock_eachcore):
-                    if n_cores * i + rank > config['n_block_x'] * config['n_block_y']:
+                    if cores_divider * i + rank > config['n_block_x'] * config['n_block_y']:
                         break
-                    pyclassifier.step3_classification(block_id=n_cores * i + rank)
+                    pyclassifier.step3_classification(block_id=cores_divider * i + rank)
 
                 if rank == 1:  # serial mode for assemble
                     pyclassifier.step4_assemble()
@@ -502,12 +508,12 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         if not ob_analyst.is_finished_object_analysis(np.arange(starting_date,
                                                                 starting_date+config['CM_OUTPUT_INTERVAL']*n_cm_maps,
                                                       config['CM_OUTPUT_INTERVAL'])):
-            n_map_percore = int(np.ceil(n_cm_maps / n_cores))
+            n_map_percore = int(np.ceil(n_cm_maps / cores_divider))
             max_date = starting_date + (n_cm_maps - 1) * config['CM_OUTPUT_INTERVAL']
             for i in range(n_map_percore):
-                if starting_date + (rank - 1 + i * n_cores) * config['CM_OUTPUT_INTERVAL'] > max_date:
+                if starting_date + (rank - 1 + i * cores_divider) * config['CM_OUTPUT_INTERVAL'] > max_date:
                     break
-                date = starting_date + (rank - 1 + i * n_cores) * config['CM_OUTPUT_INTERVAL']
+                date = starting_date + (rank - 1 + i * cores_divider) * config['CM_OUTPUT_INTERVAL']
                 ob_analyst.obia_execute(date)
 
             while not ob_analyst.is_finished_object_analysis(np.arange(starting_date,
@@ -521,7 +527,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         #                        reconstruct change records                     #
         #########################################################################
         for i in range(nblock_eachcore):
-            block_id = n_cores * i + rank  # started from 1, i.e., rank, rank + n_cores, rank + 2 * n_cores
+            block_id = cores_divider * i + rank  # started from 1, i.e., rank, rank + n_cores, rank + 2 * n_cores
             if block_id > config['n_block_x'] * config['n_block_y']:
                 break
             block_y = int((block_id - 1) / config['n_block_x']) + 1  # note that block_x and block_y start from 1
@@ -535,11 +541,11 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
     if rank == 1:
         # tile_based report
         if method == 'OBCOLD':
-            tileprocessing_report(join(result_path, 'tile_processing_report.log'),
+            tileprocessing_report(join(result_path, 'tile_processing_report.log'), single_block,
                                   stack_path, pycold.__version__, method, config, start_time, cold_timepoint, tz,
                                   n_cores, starting_date, n_cm_maps, year_lowbound, year_uppbound)
         else:
-            tileprocessing_report(join(result_path, 'tile_processing_report.log'), stack_path, pycold.__version__,
+            tileprocessing_report(join(result_path, 'tile_processing_report.log'), stack_path, single_block, pycold.__version__,
                                   method, config, start_time, cold_timepoint, tz, n_cores)
         print("The whole procedure finished: {}".format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
