@@ -29,9 +29,9 @@ from multiprocessing.pool import Pool
 from functools import partial
 import gc
 
-def perform_sccd(pos, block_width , block_height,block_x, block_y,img_tstack,img_dates_sorted,threshold,config,f):
-
+def perform_sccd(pos, block_width , block_height,block_x, block_y,img_tstack,img_dates_sorted,threshold,config,result_path):
     original_row, original_col = get_rowcol_intile(pos, block_width, block_height, block_x, block_y)
+    f = open(join(result_path, 'record_change_x{}_y{}_sccd.npy'.format(block_x, block_y)), "ab+")
     try:
         sccd_result = sccd_detect(img_dates_sorted,
                                   img_tstack[pos, 0, :].astype(np.int64),
@@ -57,10 +57,8 @@ def perform_sccd(pos, block_width , block_height,block_x, block_y,img_tstack,img
     else:
         # replace structural array to list for saving storage space
         pickle.dump(unindex_sccdpack(sccd_result), f)
+        f.close()
 
-        del original_row
-        del original_col
-        gc.collect()
 
 def tileprocessing_report(result_log_path, single_block, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
                           n_cores, starting_date=0, n_cm_maps=0, year_lowbound=0, year_uppbound=0):
@@ -239,7 +237,7 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
 @click.command()
 @click.option('--rank', type=int, default=0, help='the rank id')
 @click.option('--n_cores', type=int, default=0, help='the total cores assigned')
-@click.option('--single-block', type=bool, default=False, help='Process single blocks in available threads')
+@click.option('--single_block', type=bool, default=False, help='Process single blocks in available threads')
 @click.option('--stack_path', type=str, default=None, help='the path for stack data')
 @click.option('--result_path', type=str, default=None, help='the path for storing results')
 @click.option('--yaml_path', type=str, default=None, help='YAML path')
@@ -342,19 +340,17 @@ def main(rank, n_cores, single_block, stack_path, result_path, yaml_path, method
             if method == "SCCDOFFLINE":
                 # block_status = np.full((block_width, block_height), 0, dtype=np.int8)
                 # block_last_change_date = np.full((block_width, block_height), 0, dtype=np.int32)
-                f = open(join(result_path, 'record_change_x{}_y{}_sccd.npy'.format(block_x, block_y)), "wb+")
+
                 # start looping every pixel in the block
 
                 if single_block:
                     with Pool(n_cores) as p:
-                        p.map_async(partial(perform_sccd, block_width , block_height,block_x, block_y,img_tstack,img_dates_sorted,threshold,config, f), range(block_width * block_height))
+                        p.map(partial(perform_sccd, block_width=block_width , block_height=block_height,block_x=block_x, block_y=block_y,img_tstack=img_tstack,img_dates_sorted=img_dates_sorted,threshold=threshold,config=config,result_path=result_path), range(block_width * block_height))
                         p.close()
                         p.join()
                 else:
                     for pos in range(block_width * block_height):
                         perform_sccd(pos,block_width , block_height, block_x, block_y, img_tstack, img_dates_sorted, threshold, config, f)
-
-                f.close()
 
                 # pos = 221
                 # from pycold.utils import save_obs2csv
