@@ -349,8 +349,12 @@ def main(rank, n_cores, single_block, stack_path, result_path, yaml_path, method
                         p.close()
                         p.join()
                 else:
+                    f = open(join(result_path, 'record_change_x{}_y{}_sccd.npy'.format(block_x, block_y)), "ab+")
+
                     for pos in range(block_width * block_height):
                         perform_sccd(pos,block_width , block_height, block_x, block_y, img_tstack, img_dates_sorted, threshold, config, f)
+
+                    f.close()
 
                 # pos = 221
                 # from pycold.utils import save_obs2csv
