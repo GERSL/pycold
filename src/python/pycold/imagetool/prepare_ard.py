@@ -204,7 +204,7 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
     except ValueError as e:
         # logger.error('Cannot open QA band for {}: {}'.format(folder, e))
         logger.error('Cannot open QA band for {}: {}'.format(folder, e))
-        return
+        return False
 
     # convertQA = np.vectorize(qabitval)
     QA_band_unpacked = qabitval_array_HLS(QA_band).astype(np.short)
@@ -222,10 +222,10 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
         file_name = sensor + tile_id + year + doy + collection + version1
         if low_year_bound != 0:
             if int(year) < low_year_bound:
-                return
+                return False
         if upp_year_bound != 9999:
             if int(year) > upp_year_bound:
-                return
+                return False
 
         if sensor == 'L30':
             try:
@@ -243,10 +243,10 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
                                          "{}.B07.tif".format(folder)))
                 B7 = np.full(B6.shape, 0)  # assign zero
 
-            except ValueError as e:
+            except Exception as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
                 logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
-                return
+                return False
         elif sensor == 'S30':
             try:
                 B1 = gdal_array.LoadFile(join(join(source_dir, folder),
@@ -263,14 +263,14 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
                                               "{}.B12.tif".format(folder)))
                 B7 = np.full(B6.shape, 0)
 
-            except ValueError as e:
+            except Exception as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
                 logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
-                return
+                return False
 
         if (B1 is None) or (B2 is None) or (B3 is None) or (B4 is None) or (B5 is None) or (B6 is None):
             logger.error('Reading Landsat band fails for {}'.format(folder))
-            return
+            return False
 
         if is_partition is True:
             b_width = int(config['n_cols'] / config['n_block_x'])  # width of a block
@@ -336,14 +336,18 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
                     block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
                     np.save(join(join(out_dir, block_folder), file_name),
                             np.dstack([B1_blocks[i][j], B2_blocks[i][j], B3_blocks[i][j], B4_blocks[i][j],
-                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j], QA_blocks[i][j]]))
+                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j],
+                                       QA_blocks[i][j]]).astype(np.int16))
 
         else:
-            np.save(join(out_dir, file_name), np.dstack([B1, B2, B3, B4, B5, B6, B7, QA_band_unpacked]))
+            np.save(join(out_dir, file_name),
+                    np.dstack([B1, B2, B3, B4, B5, B6, B7, QA_band_unpacked]).astype(np.int16))
         # scene_list.append(folder_name)
     else:
         # logger.info('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
         logger.warn('Not enough clear observations for {}'.format(folder))
+
+    return True
 
 
 def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger, config,
@@ -577,10 +581,11 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                     block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
                     np.save(join(join(out_dir, block_folder), file_name),
                             np.dstack([B1_blocks[i][j], B2_blocks[i][j], B3_blocks[i][j], B4_blocks[i][j],
-                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j], QA_blocks[i][j]]))
+                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j],
+                                       QA_blocks[i][j]]).astype(np.int16))
 
         else:
-            np.save(join(out_dir, file_name), np.dstack([B1, B2, B3, B4, B5,B6, B7, QA_band_unpacked]))
+            np.save(join(out_dir, file_name), np.dstack([B1, B2, B3, B4, B5,B6, B7, QA_band_unpacked]).astype(np.int16))
         # scene_list.append(folder_name)
     else:
         # logger.info('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
@@ -827,10 +832,10 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
                     block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
                     np.save(join(join(out_dir, block_folder), file_name),
                             np.dstack([B1_blocks[i][j], B2_blocks[i][j], B3_blocks[i][j], B4_blocks[i][j],
-                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j], QA_blocks[i][j]]))
+                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j], QA_blocks[i][j]]).astype(np.int16))
 
         else:
-            np.save(join(out_dir, file_name), np.dstack([B1, B2, B3, B4, B5, B6, B7, QA_band_unpacked]))
+            np.save(join(out_dir, file_name), np.dstack([B1, B2, B3, B4, B5, B6, B7, QA_band_unpacked]).astype(np.int16))
         # scene_list.append(folder_name)
     else:
         # logger.info('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
@@ -1101,7 +1106,7 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             if new_rank > (len(folder_list) - 1):  # means that all folder has been processed
                 break
             folder = folder_list[new_rank]
-            single_image_stacking_hls(source_dir, out_dir, folder, logger, config,
+            single_image_stacking_hls(source_dir, out_dir, logger, config, folder,
                                       is_partition=is_partition, low_year_bound=low_year_bound,
                                       upp_year_bound=upp_year_bound)
     # create an empty file for signaling the core that has been finished

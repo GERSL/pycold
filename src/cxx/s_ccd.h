@@ -94,8 +94,7 @@ int step2_KF_ChangeDetection
     int t_start,
     bool b_outputcm,
     bool b_pinpoint,
-    bool *b_pinpoint_initial,
-    int* id_last
+    bool *b_pinpoint_initial
 );
 
 

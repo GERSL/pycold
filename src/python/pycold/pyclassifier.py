@@ -232,7 +232,7 @@ class PyClassifier:
         index_list = np.vstack(index_list)
         label_list = np.hstack(label_list)
         feature_extraction = np.array([full_feature_array[tuple(x)] for x in index_list]).astype(np.float32)
-        rf_model = RandomForestClassifier(random_state=42, max_depth=8)
+        rf_model = RandomForestClassifier(random_state=42)
         rf_model.fit(feature_extraction, label_list)
         return rf_model
 
