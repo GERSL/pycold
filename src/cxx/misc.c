@@ -3103,7 +3103,8 @@ float angl_scatter_measure
       float *med_diff,
       float **v_diff, // input: a two-dimensional vector of different (i_count * lasso_num)
       int lasso_num,   // input: the number of lasso band
-      int i_count      // input: the number of consecutive observations
+      int i_count,      // input: the number of consecutive observations
+      int *lasso_bands
 )
 {
     float y;
@@ -3114,7 +3115,7 @@ float angl_scatter_measure
     float* angle;
     float angle_sum = 0;
     float interm;
-    if (i_count > 3)
+    if (i_count > 2)
     {
         angle = (float *)malloc((i_count) * sizeof(float));
 
@@ -3125,12 +3126,12 @@ float angl_scatter_measure
             norm2 = 0;
             for(j = 0; j < lasso_num; j++)
             {
-                product+= v_diff[j][i] * med_diff[j];
-                norm1 += v_diff[j][i] * v_diff[j][i];
-                norm2 += med_diff[j] * med_diff[j];
+                product+= v_diff[lasso_bands[j]][i] * med_diff[lasso_bands[j]];
+                norm1 += v_diff[lasso_bands[j]][i] * v_diff[lasso_bands[j]][i];
+                norm2 += med_diff[lasso_bands[j]] * med_diff[lasso_bands[j]];
                 //printf("%f\n", med_diff[j]);
             }
-            interm = (float)(product / (sqrt(norm1) * sqrt(norm2)));
+            interm = (float)(product / (sqrtf(norm1) * sqrtf(norm2)));
             if(interm > 1)
                 interm = 1;
             angle[i] = (acos(interm)  * 180.0) / PI;

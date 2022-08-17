@@ -26,7 +26,7 @@
                           /* last step noise removal                    */
                           /*  SY 11/19/2018: change from 35.8882 to 30.8562)                  */
 #define T_MAX_CG_SCCD 25.7448
-#define T_MIN_CG_SCCD 5.5418141398686735
+#define T_MIN_CG_SCCD 9.236
 // #define T_MAX_CG_SCCD 30.8562
 // #define T_MAX_CG_SCCD 20.515
 
@@ -128,7 +128,7 @@
 
 #define N_FEATURE 7
 #define DEFAULT_PROBABILITY 0.99
-#define DEFAULT_CONSE 5
+#define DEFAULT_CONSE 6
 
 #define JULY1ST_DOY 183
 #define SLOPE_SCALE 10000 // the parameter to guarantee the precision for converting scale double slope to float slope
@@ -141,7 +141,7 @@
 #define NRT_MONITOR_SNOW 3
 #define NRT_QUEUE_SNOW 4
 #define NRT_QUEUE_RECENT 5
-#define MAX_OBS_QUEUE 300 /* the maximum number of observations in queue (for NRT) */
+#define MAX_OBS_QUEUE 240 /* the maximum number of observations in queue (for NRT) */
 
 #define LANDSAT45_TM 4
 #define LANDSAT7_ETM 5

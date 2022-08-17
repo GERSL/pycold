@@ -28,11 +28,11 @@ int sccd
     output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
     short int *min_rmse,         /* O: adjusted rmse for the pixel    */
     int cm_output_interval,
-    int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
+    int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date */
     int conse,                  /* I: consecutive observation number for change detection   */
     bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel testdue to the current low quality  */
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
+    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
     bool b_pinpoint
 );
 
@@ -89,10 +89,9 @@ int step2_KF_ChangeDetection
     int *count_cur_obs,             /* I/O:  the number of current non-noise observations being processed */
     int starting_date,
     int cm_output_interval,
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
+    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
     int t_start,
-    bool b_outputcm,
     bool b_pinpoint,
     bool *b_pinpoint_initial
 );
@@ -168,9 +167,11 @@ int step3_processing_end
     int conse,
     short int *min_rmse,
     double tcg,                /* I: the change threshold  */
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    int id_last
+    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
+    short int* cm_outputs_date,      // I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
+    int id_last,
+    Output_sccd* rec_cg,
+    int num_fc
 );
 
 
@@ -201,10 +202,10 @@ int sccd_standard
     output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
     short int *min_rmse,       /* O: adjusted rmse for the pixel    */
     int cm_output_interval,
-    int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date, only for b_outputCM is True */
+    int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date*/
     int conse,
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
+    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
     bool b_pinpoint
 );
 

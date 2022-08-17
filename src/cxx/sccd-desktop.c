@@ -331,7 +331,7 @@ int main(int argc, char *argv[])
     int headline = -1;
     if (b_header_csv == TRUE)
         headline = 0;   // skip the head line of csv
-    bool b_pinpoint = TRUE;
+    bool b_pinpoint = FALSE;
 
     /**************************************************************/
     /*                                                            */

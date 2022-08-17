@@ -19,8 +19,8 @@ except ImportError:
     pass  # The modules don't actually have to exists for Cython to use them as annotations
 
 cdef int NUM_FC = 40  # define the maximum number of outputted curves
-cdef int NUM_NRT_QUEUE = 300
-DEF DEFAULT_CONSE = 5
+cdef int NUM_NRT_QUEUE = 240
+DEF DEFAULT_CONSE = 6
 DEF NRT_BAND = 6
 
 reccg_dt = np.dtype([('t_start', np.int32),  # time when series model gets started
@@ -39,15 +39,15 @@ sccd_dt = np.dtype([('t_start', np.int32),
                         ('t_break', np.int32),
                         ('num_obs', np.int32),
                         ('coefs', np.float32, (6, 6)),
-                        ('rmse', np.float32, 6),
-                        ('magnitude', np.float32, 6)],
+                        ('rmse', np.float32, NRT_BAND),
+                        ('magnitude', np.float32, NRT_BAND)],
                         align=True)
 
-nrtqueue_dt = np.dtype([('clry', np.short, 6), ('clrx_since1982', np.short)], align=True)
-nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (6, 5)),
-                         ('obs_date_since1982', np.short, 5), ('covariance', np.float32, (6, 36)),
-                         ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
-                         ('cm_outputs', np.short), ('cm_outputs_date', np.short), ('change_prob', np.ubyte)], align=True)
+nrtqueue_dt = np.dtype([('clry', np.short, NRT_BAND), ('clrx_since1982', np.short)], align=True)
+nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (NRT_BAND, DEFAULT_CONSE-1)),
+                         ('obs_date_since1982', np.short, DEFAULT_CONSE-1), ('covariance', np.float32, (NRT_BAND, 36)),
+                         ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, NRT_BAND), ('rmse_sum', np.uint32, 6), ('cm_bands', np.short, NRT_BAND),
+                         ('cm_outputs', np.short), ('cm_outputs_date', np.short), ('conse_last', np.ubyte)], align=True)
 
 
 cdef extern from "../../cxx/output.h":
@@ -81,15 +81,16 @@ cdef extern from "../../cxx/output.h":
     ctypedef struct output_nrtmodel:
         short int t_start_since1982
         short int num_obs
-        short int obs[NRT_BAND][DEFAULT_CONSE]
-        short int obs_date_since1982[DEFAULT_CONSE]
+        short int obs[NRT_BAND][DEFAULT_CONSE-1]
+        short int obs_date_since1982[DEFAULT_CONSE-1]
         float covariance[NRT_BAND][36]
         float nrt_coefs[NRT_BAND][6]
         float H[NRT_BAND]
         unsigned int rmse_sum[NRT_BAND]
+        short cm_bands[NRT_BAND]
         short int cm_outputs;
         short int cm_outputs_date;
-        unsigned char change_prob;
+        unsigned char conse_last;
  
 cdef Output_sccd t
 cdef output_nrtqueue t2
@@ -322,7 +323,7 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
                 np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
                 bint b_output_cm=False, int starting_date=0, int n_cm=0, int cm_output_interval=60, double t_cg = 15.0863, int pos=1,
-                int conse=5, bint b_c2=False):
+                int conse=6, bint b_c2=False):
     """
     S-CCD processing. It is required to be done before near real time monitoring
 
@@ -461,7 +462,7 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
                 np.ndarray[np.int64_t, ndim=1] ts_g, np.ndarray[np.int64_t, ndim=1] ts_r,
                 np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t,
-                np.ndarray[np.int64_t, ndim=1] qas, double t_cg = 15.0863, int pos=1, int conse=5, bint b_c2=False,
+                np.ndarray[np.int64_t, ndim=1] qas, double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False,
                 bint b_pinpoint=False):
     """
     SCCD online update for new observations

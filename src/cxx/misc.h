@@ -456,7 +456,8 @@ float angl_scatter_measure
       float *med_diff,
       float **v_diff, // input: a two-dimensional vector of different (i_count * lasso_num)
       int lasso_num,   // input: the number of lasso band
-      int i_count      // input: the number of consecutive observations
+      int i_count,      // input: the number of consecutive observations
+      int *lasso_bands
 );
 
 int singleband_variogram
