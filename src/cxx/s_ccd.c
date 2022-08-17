@@ -57,8 +57,7 @@ int sccd
     int conse,                  /* I: consecutive observation number for change detection   */
     bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band due to the current low quality  */
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    bool b_pinpoint
+    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
 )
 {
     int clear_sum = 0;      /* Total number of clear cfmask pixels          */
@@ -222,7 +221,7 @@ int sccd
 
             result = sccd_standard(clrx, clry, n_clr, tcg, rec_cg, num_fc, nrt_mode, nrt_model,
                                    num_obs_queue, obs_queue, min_rmse, cm_output_interval,
-                                   starting_date, conse, cm_outputs, cm_outputs_date, b_pinpoint);
+                                   starting_date, conse, cm_outputs, cm_outputs_date);
 
          }else{
              // no new observation, output NONE for ending parameters
@@ -1708,9 +1707,7 @@ int step2_KF_ChangeDetection
     int cm_output_interval,
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
     short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    int t_start,
-    bool b_pinpoint,
-    bool *record_pinpoint_initial
+    int t_start
 )
 {
     int i_b, b, m, k;
@@ -1738,6 +1735,7 @@ int step2_KF_ChangeDetection
     float prob_angle;
     int current_CM_n;
     short int tmp_CM = -9999;
+    
 
     current_CM_n = (clrx[cur_i] - starting_date) / cm_output_interval;
 
@@ -1873,47 +1871,6 @@ int step2_KF_ChangeDetection
     {
         cm_outputs[current_CM_n] = tmp_CM;
         cm_outputs_date[current_CM_n] = (short int)(clrx[cur_i] - JULIAN_LANDSAT4_LAUNCH);
-
-        /************************************************************/
-        /*  we pinpoint the status for change magnitude is maximum  */
-        /************************************************************/
-        if (b_pinpoint == TRUE){
-            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-            {
-                quick_sort_float(v_dif_mag[i_b], 0, conse-1);
-                matlab_2d_float_median(v_dif_mag, i_b, conse,
-                                       &tmp);
-                rec_cg[*num_curve].magnitude[i_b] = (float)tmp;
-                for (k = 0; k < SCCD_NUM_C; k++)
-                {
-                    /**********************************/
-                    /*                                */
-                    /* Record fitted coefficients.    */
-                    /*                                */
-                    /**********************************/
-                    rec_cg[*num_curve].coefs[i_b][k] = fit_cft[i_b][k];
-                }
-    //            for (k = 0; k < cur_i - i_start; k++) /* slope is the second element of coefs, so start from 1*/
-    //            {
-    //                printf("%f\n", rec_v_dif_copy[i_b][k]);
-    //            }
-                // printf("auto_ts_fit_sccd2 finished \n", i);
-
-                /* kt = pt*zt */
-                rec_cg[*num_curve].rmse[i_b] = 0;   // the RMSE of pinpoint is 0
-
-            } //for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-
-            /* record break  */
-            rec_cg[*num_curve].t_break = clrx[cur_i];
-            rec_cg[*num_curve].t_start = clrx[cur_i];  // the t_start of pinpoint segment is equal to t_break
-            rec_cg[*num_curve].num_obs = 1;   // the number obs of pinpoint segment is 1
-            if(*record_pinpoint_initial == FALSE){
-                *record_pinpoint_initial = TRUE;   // meaning that has been initialized
-                *num_curve = *num_curve + 1;
-            }
-        }
-
     }
 
     if ((change_flag == TRUE) && (break_mag > tcg) && (mean_angle_2 < NSIGN_sccd))
@@ -1925,29 +1882,28 @@ int step2_KF_ChangeDetection
 
         rec_cg[*num_curve].num_obs = *num_obs_processed;
         rec_cg[*num_curve].t_start = t_start;
-        if (b_pinpoint == FALSE)
-        {
-            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-            {
-                quick_sort_float(v_dif_mag[i_b], 0, conse-1);
-                matlab_2d_float_median(v_dif_mag, i_b, conse,
-                                       &tmp);
-                rec_cg[*num_curve].magnitude[i_b] = (float)tmp;
-                for (k = 0; k < SCCD_NUM_C; k++)
-                {
-                    /**********************************/
-                    /*                                */
-                    /* Record fitted coefficients.    */
-                    /*                                */
-                    /**********************************/
-                    rec_cg[*num_curve].coefs[i_b][k] = fit_cft[i_b][k];
-                }
-            } //for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
 
-            /* record break  */
-            rec_cg[*num_curve].t_break = clrx[cur_i];
-            *num_curve = *num_curve + 1;
-        }
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+        {
+            quick_sort_float(v_dif_mag[i_b], 0, conse-1);
+            matlab_2d_float_median(v_dif_mag, i_b, conse,
+                                   &tmp);
+            rec_cg[*num_curve].magnitude[i_b] = (float)tmp;
+            for (k = 0; k < SCCD_NUM_C; k++)
+            {
+                /**********************************/
+                /*                                */
+                /* Record fitted coefficients.    */
+                /*                                */
+                /**********************************/
+                rec_cg[*num_curve].coefs[i_b][k] = fit_cft[i_b][k];
+            }
+        } //for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+
+        /* record break  */
+        rec_cg[*num_curve].t_break = clrx[cur_i];
+        *num_curve = *num_curve + 1;
+
 
         /**********************************************/
         /*                                            */
@@ -2406,8 +2362,7 @@ int sccd_standard
     int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date */
     int conse,
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    bool b_pinpoint
+    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
 )
 {
     int i_b;
@@ -2435,7 +2390,6 @@ int sccd_standard
     int i_start = 0;
     int i_dense = 0;
     int t_start;
-    bool record_pinpoint_initial = FALSE;   // indicate that if pinpoint segment has been initialized
     bool change_detected = FALSE;
     int id_last;
     clock_t t_time = clock();
@@ -2660,15 +2614,13 @@ int sccd_standard
             {
                 status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
                                                   cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed, starting_date,
-                                                  cm_output_interval, cm_outputs, cm_outputs_date, t_start, FALSE,
-                                                  &record_pinpoint_initial);
+                                                  cm_output_interval, cm_outputs, cm_outputs_date, t_start);
             }
             else
             {
                 status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
                                                   cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed, starting_date,
-                                                  cm_output_interval, cm_outputs, cm_outputs_date, t_start, b_pinpoint,
-                                                  &record_pinpoint_initial);
+                                                  cm_output_interval, cm_outputs, cm_outputs_date, t_start);
             }
             if(status == CHANGEDETECTED)
             {
@@ -2686,7 +2638,6 @@ int sccd_standard
                 /*                                            */
                 /**********************************************/
                 bl_train = 0;
-                record_pinpoint_initial = FALSE;
                 change_detected = TRUE;
 
             }
