@@ -69,6 +69,15 @@ typedef struct
 
 typedef struct
 {
+    int t_break;           /* time when the first break (change) is observed */
+    short int cm_bands[DEFAULT_CONSE][TOTAL_IMAGE_BANDS_SCCD];
+    short int cm_outputs[DEFAULT_CONSE];
+    unsigned char cm_angle[DEFAULT_CONSE];
+} Output_sccd_pinpoint;
+
+
+typedef struct
+{
     short int t_start_since1982;           /* dates (Julian dates - JULIAN_DATE_LAST_DAY_1972) when series model gets started */
     short int num_obs;
     short int obs[TOTAL_IMAGE_BANDS_SCCD][DEFAULT_CONSE-1];   /* the last observations, d=(TOTAL_IMAGE_BANDS, conse - 1) */
@@ -80,6 +89,7 @@ typedef struct
     short int cm_bands[TOTAL_IMAGE_BANDS_SCCD];
     short int cm_outputs;
     short int cm_outputs_date;
+    unsigned char cm_angle;
     unsigned char conse_last;
 } output_nrtmodel;
 

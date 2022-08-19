@@ -8,8 +8,7 @@
 
 int sccd
 (
-    long *buf_b,
-        /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
+    long *buf_b,            /* I:  Landsat blue spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     long *buf_g,            /* I:  Landsat green spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     long *buf_r,            /* I:  Landsat red spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
     long *buf_n,            /* I:  Landsat NIR spectral time series.The dimension is (n_obs, 7). Invalid (qa is filled value (255)) must be removed */
@@ -21,20 +20,19 @@ int sccd
     int valid_num_scenes,       /* I: number of valid scenes under cfmask fill counts  */
     double tcg,                /* I: the change threshold  */
     int *num_fc,                /* O: number of fitting curves                       */
-    int *nrt_mode,           /* O: 0 - void; 1 - monitor mode for standard; 2 - queue mode for standard; 3 - monitor mode for snow; 4 - queue mode for snow */
-    Output_sccd *rec_cg,           /* O: outputted structure for CCDC results    */
-    output_nrtmodel *rec_nrt,
+    int *nrt_mode,              /* O: 0 - void; 1 - monitor mode for standard; 2 - queue mode for standard;
+        3 - unconfirmed queue; 4 - monitor mode for snow; 5 - queue mode for snow */
+    Output_sccd *rec_cg,           /* O: historical change records for SCCD results    */
+    output_nrtmodel *nrt_model,      /* O: nrt model structure for SCCD results    */
     int *num_obs_queue,             /* O: the number of multispectral observations    */
     output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
-    short int *min_rmse,         /* O: adjusted rmse for the pixel    */
-    int cm_output_interval,
-    int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date */
+    short int *min_rmse,       /* O: adjusted rmse for the pixel    */
     int conse,                  /* I: consecutive observation number for change detection   */
-    bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel testdue to the current low quality  */
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
+    bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band due to the current low quality  */
+    bool b_pinpoint,
+    Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
+    int *num_fc_b_pinpoint
 );
-
 
 int step1_cold_initialize
 (
@@ -85,14 +83,15 @@ int step2_KF_ChangeDetection
     float** fit_cft,       /* I/O: state variables  */
     Output_sccd* rec_cg,           /* I/O: the outputted S-CCD result structure   */
     unsigned int *sum_square_vt,              /* I/O:  the sum of predicted square of residuals  */
-    int *count_cur_obs,             /* I/O:  the number of current non-noise observations being processed */
-    int starting_date,
-    int cm_output_interval,
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
-    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
-    int t_start
+    int *num_obs_processed,             /* I/O:  the number of current non-noise observations being processed */
+    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
+    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
+    float* cm_angle,
+    int t_start,
+    bool b_pinpoint,
+    Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
+    int *num_fc_b_pinpoint
 );
-
 
 int KF_ts_predict_conse
 (
@@ -159,14 +158,12 @@ int step3_processing_end
     unsigned *sum_square_vt,              /* I/O:  the sum of predicted square of residuals  */
     int num_obs_processed,
     int t_start,
-    int cm_output_interval,
-    int starting_date,
     int conse,
     short int *min_rmse,
     double tcg,                /* I: the change threshold  */
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    short int* cm_outputs_date,      // I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    int id_last,
+    short int cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
+    short int cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
+    float cm_angle,
     Output_sccd* rec_cg,
     int num_fc
 );
@@ -198,11 +195,10 @@ int sccd_standard
     int *num_obs_queue,             /* O: the number of multispectral observations    */
     output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
     short int *min_rmse,       /* O: adjusted rmse for the pixel    */
-    int cm_output_interval,
-    int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date*/
     int conse,
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
-    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
+    bool b_pinpoint,
+    Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
+    int *num_fc_b_pinpoint
 );
 
 

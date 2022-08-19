@@ -497,6 +497,14 @@ float MeanAngl_float
       int i_count      // input: the number of consecutive observations
 );
 
+float MeanAngl_float_selective
+(
+      float ** v_diff, // input: a two-dimensional vector of different (i_count * lasso_num)
+      int lasso_num,   // input: the number of lasso band
+      int i_count,      // input: the number of consecutive observations
+      int *lasso_bands
+);
+
 int auto_ts_fit_float
 (
     int *clrx,

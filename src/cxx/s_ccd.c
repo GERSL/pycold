@@ -52,12 +52,11 @@ int sccd
     int *num_obs_queue,             /* O: the number of multispectral observations    */
     output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
     short int *min_rmse,       /* O: adjusted rmse for the pixel    */
-    int cm_output_interval,
-    int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date */
     int conse,                  /* I: consecutive observation number for change detection   */
     bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band due to the current low quality  */
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
+    bool b_pinpoint,
+    Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
+    int *num_fc_pinpoint
 )
 {
     int clear_sum = 0;      /* Total number of clear cfmask pixels          */
@@ -204,9 +203,6 @@ int sccd
 
          if (n_clr > n_clr_record)
          {
-             // set the default starting_date is the first observation of the unprocessed array
-             if (starting_date == 0)
-                 starting_date = clrx[0];
 
              /* need to calculate min_rmse at the beginning of the monitoring */
              if (*num_fc == 0){
@@ -219,9 +215,8 @@ int sccd
                  }
              }
 
-            result = sccd_standard(clrx, clry, n_clr, tcg, rec_cg, num_fc, nrt_mode, nrt_model,
-                                   num_obs_queue, obs_queue, min_rmse, cm_output_interval,
-                                   starting_date, conse, cm_outputs, cm_outputs_date);
+            result = sccd_standard(clrx, clry, n_clr, tcg, rec_cg, num_fc, nrt_mode, nrt_model, num_obs_queue,
+                                   obs_queue, min_rmse, conse, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint);
 
          }else{
              // no new observation, output NONE for ending parameters
@@ -233,6 +228,7 @@ int sccd
                  {
                      nrt_model->cm_bands[i_b] = NA_VALUE;
                  }
+                 nrt_model->cm_angle = 255;
                  if(*nrt_mode == NRT_QUEUE_RECENT){
                      *nrt_mode = NRT_QUEUE_STANDARD;
                  }
@@ -1703,14 +1699,16 @@ int step2_KF_ChangeDetection
     Output_sccd* rec_cg,           /* I/O: the outputted S-CCD result structure   */
     unsigned int *sum_square_vt,              /* I/O:  the sum of predicted square of residuals  */
     int *num_obs_processed,             /* I/O:  the number of current non-noise observations being processed */
-    int starting_date,
-    int cm_output_interval,
     short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
     short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    int t_start
+    float* cm_angle,
+    int t_start,
+    bool b_pinpoint,
+    Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
+    int *num_fc_pinpoint
 )
 {
-    int i_b, b, m, k;
+    int i_b, b, m, k, j;
     int status;
     int i_conse;
     // int j_conse;
@@ -1726,21 +1724,19 @@ int step2_KF_ChangeDetection
     float *medium_v_dif;
     float max_rmse[TOTAL_IMAGE_BANDS_SCCD];
     bool change_flag = TRUE;
-    float mean_angle_2 = 9999.0;
+    float mean_angle = 9999.0;
     float tmp;
     double vt;
     float rmse_band[TOTAL_IMAGE_BANDS_SCCD];
     bool steady = FALSE;
     float break_mag = 9999.0;
-    float prob_angle;
-    int current_CM_n;
     short int tmp_CM = -9999;
-    
+    int conse_last;
+    float **v_diff_tmp;
+    float **v_dif_mag_tmp;
 
-    current_CM_n = (clrx[cur_i] - starting_date) / cm_output_interval;
 
-
-    v_dif = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_SCCD, conse, sizeof (float));
+    v_dif = (float **) allocate_2d_array (NUM_LASSO_BANDS, conse, sizeof (float));
     if (v_dif == NULL)
     {
         RETURN_ERROR ("Allocating v_dif memory",
@@ -1796,21 +1792,29 @@ int step2_KF_ChangeDetection
 //                printf("############################be careful! \n");
 //            }
             v_dif_mag[i_b][i_conse] =  clry[i_b][cur_i + i_conse] - pred_y;
-            v_dif[i_b][i_conse] =  v_dif_mag[i_b][i_conse] / max_rmse[i_b];
             for (b = 0; b < NUM_LASSO_BANDS; b++)
             {
                 if (i_b == lasso_blist_sccd[b])
                 {
-                    v_dif_mag_norm[i_conse] = v_dif_mag_norm[i_conse] + v_dif[i_b][i_conse] * v_dif[i_b][i_conse];
+                    v_dif[b][i_conse] =  v_dif_mag[i_b][i_conse] / max_rmse[i_b];
+                    v_dif_mag_norm[i_conse] = v_dif_mag_norm[i_conse] + v_dif[b][i_conse] * v_dif[b][i_conse];
                     break;
                 }
             }
         }
 
-        if(v_dif_mag_norm[i_conse] < tcg){
-            change_flag = FALSE;
-            break;
+        if (b_pinpoint == TRUE){
+            if((v_dif_mag_norm[i_conse] < tcg) & (i_conse < PINPOINT_CONSE)){
+                change_flag = FALSE;
+                break;
+            }
+        }else{
+            if(v_dif_mag_norm[i_conse] < tcg){
+                change_flag = FALSE;
+                break;
+            }
         }
+
 
         /* for fast computing*/
 //        if(b_outputcm == FALSE)
@@ -1836,30 +1840,94 @@ int step2_KF_ChangeDetection
         }
     }
 
+    if (b_pinpoint == TRUE){
+        if (i_conse >= PINPOINT_CONSE){
+            if ((*num_fc_pinpoint == 0) | (clrx[cur_i] - rec_cg_pinpoint[*num_fc_pinpoint - 1].t_break > AVE_DAYS_IN_A_YEAR))// must has a gap of 1 year with the last pinpoint break
+            {
+                for (conse_last = 1; conse_last <= conse; conse_last++)
+                {
+                    v_diff_tmp = (float **) allocate_2d_array(NUM_LASSO_BANDS, conse_last, sizeof (float)); // used to calculate angle
+                    v_dif_mag_tmp = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, conse_last,
+                                sizeof (float));
+                    for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++){
+                        for (b = 0; b < NUM_LASSO_BANDS; b++)
+                        {
+                            if (i_b == lasso_blist_sccd[b])
+                            {
+                                for(j = 0; j < conse_last; j++)
+                                    v_diff_tmp[b][j] = v_dif[b][j];
+                            }
+                        }
+                        for(j = 0; j < conse_last; j++)
+                            v_dif_mag_tmp[i_b][j] = v_dif_mag[i_b][j];
+                    }
+
+
+                    // mean_angle = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, conse_last, lasso_blist_sccd);
+                    mean_angle = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last);
+
+                    float min_cm = 999999;
+                    for(j = 0; j < conse_last; j++)
+                        if(v_dif_mag_norm[j] * 100 < min_cm)
+                            min_cm = v_dif_mag_norm[j] * 100;
+
+                    if (min_cm > 32767)
+                        min_cm = 32767;
+                    if (mean_angle > 255)
+                        mean_angle = 255;
+                    rec_cg_pinpoint[*num_fc_pinpoint].cm_angle[conse_last-1] = (unsigned char)mean_angle;
+                    rec_cg_pinpoint[*num_fc_pinpoint].cm_outputs[conse_last-1] = (short int)min_cm;
+
+                    for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++){
+                        for (b = 0; b < NUM_LASSO_BANDS; b++)
+                        {
+                            if (i_b == lasso_blist_sccd[b])
+                            {
+                                for(j = 0; j < conse_last; j++)
+                                    v_diff_tmp[b][j] = v_dif[b][j];
+                            }
+                        }
+                        quick_sort_float(v_dif_mag_tmp[i_b], 0, conse_last - 1);
+                        matlab_2d_float_median(v_dif_mag_tmp, i_b, conse_last,
+                                               &tmp);
+                        rec_cg_pinpoint[*num_fc_pinpoint].cm_bands[conse_last-1][i_b] = tmp;
+
+                    }
+                    rec_cg_pinpoint[*num_fc_pinpoint].t_break = clrx[cur_i];
+
+                    status = free_2d_array ((void **) v_diff_tmp);
+                    if (status != SUCCESS)
+                    {
+                        RETURN_ERROR ("Freeing memory: v_diff_tmp\n",
+                                      FUNC_NAME, FAILURE);
+                    }
+                    status = free_2d_array ((void **) v_dif_mag_tmp);
+                    if (status != SUCCESS)
+                    {
+                        RETURN_ERROR ("Freeing memory: v_dif_mag_tmp\n",
+                                      FUNC_NAME, FAILURE);
+                    }
+                } // for (conse_last = 1; conse_last <= conse; conse_last++)
+                *num_fc_pinpoint = *num_fc_pinpoint + 1;
+            }
+        }
+    }
+
+
 
     if(change_flag == TRUE)
     {
-        for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-        {
-    //            for(k = 0; k < conse; k++)
-    //                printf("%d = %f \n", k, v_dif[b][k]);
 
-            quick_sort_float(v_dif[i_b], 0, conse-1);
-            matlab_2d_float_median(v_dif, i_b, conse, &tmp);
-            medium_v_dif[i_b] = tmp;
-        }
+        // mean_angle = angl_scatter_measure(medium_v_dif, v_dif, NUM_LASSO_BANDS, conse, lasso_blist_sccd);
+        mean_angle  = MeanAngl_float(v_dif, NUM_LASSO_BANDS, conse);
 
-        mean_angle_2 = angl_scatter_measure(medium_v_dif, v_dif, NUM_LASSO_BANDS, conse, lasso_blist_sccd);
-        // mean_angle  = MeanAngl(v_dif, NUM_LASSO_BANDS, conse);
-
-
-        prob_angle = (float)angle_decaying(mean_angle_2, (double)NSIGN_sccd, NSIGN_sccd*2);
         // prob_MCM = Chi_Square_Distribution(break_mag, NUM_LASSO_BANDS);
-        tmp = round(prob_angle * break_mag * 100);
+        tmp = round(break_mag * 100);
         if (tmp > 32767) // 32767 is upper limit of short 16
             tmp = 32767;
         tmp_CM = (short int) (tmp);
-        if (mean_angle_2 > NSIGN_sccd)
+
+        if (mean_angle > NSIGN)
         //if (mean_angle > NSIGN)
         {
             change_flag = FALSE;
@@ -1867,14 +1935,15 @@ int step2_KF_ChangeDetection
     }
 
 
-    if(tmp_CM > cm_outputs[current_CM_n])
+    if(tmp_CM > *cm_outputs)
     {
-        cm_outputs[current_CM_n] = tmp_CM;
-        cm_outputs_date[current_CM_n] = (short int)(clrx[cur_i] - JULIAN_LANDSAT4_LAUNCH);
+        *cm_outputs = tmp_CM;
+        *cm_outputs_date = (short int)(clrx[cur_i] - JULIAN_LANDSAT4_LAUNCH);
     }
 
-    if ((change_flag == TRUE) && (break_mag > tcg) && (mean_angle_2 < NSIGN_sccd))
+    if ((change_flag == TRUE) && (break_mag > tcg) && (mean_angle <= NSIGN))
     {
+        *cm_angle = mean_angle;
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             rec_cg[*num_curve].rmse[i_b] = sqrtf((float)rmse_band[i_b]);
@@ -2021,20 +2090,18 @@ int step3_processing_end
     unsigned *sum_square_vt,              /* I/O:  the sum of predicted square of residuals  */
     int num_obs_processed,
     int t_start,
-    int cm_output_interval,
-    int starting_date,
     int conse,
     short int *min_rmse,
     double tcg,                /* I: the change threshold  */
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
-    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
-    int id_last,
+    short int cm_outputs,      /* I: change magnitudes if new break detected*/
+    short int cm_outputs_date,      /* I: dates for maximum change magnitudes if new break detected*/
+    float cm_angle,   /* I: change angle for maximum change magnitudes if new break detected*/
     Output_sccd* rec_cg,
     int num_fc
 )
 {
     int k, k1, k2;
-    int i_b;
+    int i_b, b;
     int  status;
     char FUNC_NAME[] = "step3_processingn_end";
     int *bl_ids, *ids;
@@ -2045,28 +2112,24 @@ int step3_processing_end
     // double tmp_q;
     float** temp_v_dif;
     int istart_queue;
-    int current_CM_n;
     int i_conse, j;
     float** v_diff_tmp;
+    float** v_dif_mag_tmp;
     float pred_y;
     float pred_y_f;
     float rmse_band[TOTAL_IMAGE_BANDS_SCCD];
     float max_rmse;
     float *v_dif_mag_norm;
     float** v_dif;
-    float mean_angle_2 = 9999.0;
+    float mean_angle = 9999.0;
     float tmp;
     float *medium_v_dif;
     clock_t t_time = clock();
+    float **v_dif_mag;
+
     // double time_taken;
     t_time = clock();
-
-    if (cur_i == 0){
-        current_CM_n = 0;
-    }else{
-         current_CM_n = (clrx[cur_i - 1] - starting_date) / cm_output_interval;
-    }
-
+    int conse_last;
 
 
     w = TWO_PI / AVE_DAYS_IN_A_YEAR;
@@ -2103,17 +2166,27 @@ int step3_processing_end
         RETURN_ERROR("ERROR allocating bl_ids memory", FUNC_NAME, FAILURE);
     }
 
-    v_dif = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_SCCD, conse, sizeof (float));
+    v_dif = (float **) allocate_2d_array (NUM_LASSO_BANDS, conse, sizeof (float));
     if (v_dif == NULL)
     {
         RETURN_ERROR ("Allocating v_dif memory",
                       FUNC_NAME, FAILURE);
     }
+
     v_dif_mag_norm = (float *)malloc(conse * sizeof(float));
     if (v_dif_mag_norm == NULL)
     {
         RETURN_ERROR ("Allocating v_dif_mag_norm memory", FUNC_NAME, FAILURE);
     }
+
+    v_dif_mag = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, conse,
+                sizeof (float));
+    if (v_dif_mag == NULL)
+    {
+        RETURN_ERROR ("Allocating v_dif_mag memory",
+                                 FUNC_NAME, FAILURE);
+    }
+
     medium_v_dif = (float *)malloc(TOTAL_IMAGE_BANDS_SCCD * sizeof(float));
     if (medium_v_dif == NULL)
     {
@@ -2198,7 +2271,6 @@ int step3_processing_end
 
         if (nrt_mode == NRT_MONITOR_STANDARD)
         {
-            id_last = conse;
             for(i_conse = 0; i_conse < conse; i_conse++)
             {
                 v_dif_mag_norm[i_conse] = 0;
@@ -2208,8 +2280,16 @@ int step3_processing_end
                                         i_b, cur_i, &pred_y, &pred_y_f, FALSE);
                     // max_rmse[i_b] = max(min_rmse[i_b], sqrtf(pred_y_f));
                     max_rmse = max(min_rmse[i_b], sqrtf(rmse_band[i_b]));
-                    v_dif[i_b][i_conse] =  (clry[i_b][*n_clr - 1 - i_conse] - pred_y) / max_rmse;
-                    v_dif_mag_norm[i_conse] = v_dif_mag_norm[i_conse] + v_dif[i_b][i_conse] * v_dif[i_b][i_conse];
+                    v_dif_mag[i_b][i_conse] = clry[i_b][*n_clr - 1 - i_conse] - pred_y;
+                    for (b = 0; b < NUM_LASSO_BANDS; b++)
+                    {
+                        if (i_b == lasso_blist_sccd[b])
+                        {
+                            v_dif[b][i_conse] =  v_dif_mag[i_b][i_conse] / max_rmse;
+                            v_dif_mag_norm[i_conse] = v_dif_mag_norm[i_conse] + v_dif[b][i_conse] * v_dif[b][i_conse];
+                            break;
+                        }
+                    }
 
                 }
 //                if (v_dif_mag_norm[i_conse] <= DEFAULT_COLD_TCG)
@@ -2219,24 +2299,32 @@ int step3_processing_end
 //            time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
 //            printf("step3 timepoint 3 took %f seconds to execute\n", time_taken);
 //            t_time = clock();
-
-            for (i_conse = 1; i_conse <= conse; i_conse++)  // equal to *n_clr - 1 to *n_clr - 1 - conse + 1
+            // note v_dif and v_dif_mag are all reversed order by date
+            for (conse_last = 1; conse_last <= conse; conse_last++)  // equal to *n_clr - 1 to *n_clr - 1 - conse + 1
             {
-                v_diff_tmp =(float **) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, i_conse, sizeof (float));
+                v_diff_tmp =(float **) allocate_2d_array(NUM_LASSO_BANDS, conse_last, sizeof (float));
+                v_dif_mag_tmp = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, conse_last,
+                            sizeof (float));
                 for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++){
-                    for(j = 0; j < i_conse; j++)
-                      v_diff_tmp[i_b][j] = v_dif[i_b][j];
-                    quick_sort_float(v_diff_tmp[i_b], 0, i_conse-1);
-                    matlab_2d_float_median(v_diff_tmp, i_b, i_conse, &tmp);
-                    medium_v_dif[i_b] = tmp;
+                    for (b = 0; b < NUM_LASSO_BANDS; b++)
+                    {
+                        if (i_b == lasso_blist_sccd[b])
+                        {
+                            for(j = 0; j < conse_last; j++)
+                                v_diff_tmp[b][j] = v_dif[b][j];
+                        }
+                    }
+                    for(j = 0; j < conse_last; j++)
+                        v_dif_mag_tmp[i_b][j] = v_dif_mag[i_b][j];
                 }
 
 
-                mean_angle_2 = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, i_conse, lasso_blist_sccd);
+                // mean_angle = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, conse_last, lasso_blist_sccd);
+                mean_angle = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last);
 
                 // NOTE THAT USE THE DEFAULT CHANGE THRESHOLD (0.99) TO CALCULATE PROBABILITY
-                if ((v_dif_mag_norm[i_conse - 1] <= T_MIN_CG_SCCD)||(mean_angle_2 >= NSIGN_sccd))
-                //if (v_dif_mag_norm[i_conse - 1] <= DEFAULT_COLD_TCG)
+                if (v_dif_mag_norm[conse_last - 1] <= T_MIN_CG_SCCD)
+                //if (v_dif_mag_norm[conse_last - 1] <= DEFAULT_COLD_TCG)
                 {
                     /**************************************************/
                     /*                                                */
@@ -2244,59 +2332,106 @@ int step3_processing_end
                     /*                                                */
                     /**************************************************/
 
-                    id_last = i_conse - 1;
+                    if (conse_last > 1)
+                    {
+                        float min_cm = 999999;
+                        for(j = 0; j < conse_last - 1; j++)
+                            if(v_dif_mag_norm[j] * 100 < min_cm)
+                                min_cm = v_dif_mag_norm[j] * 100;
+
+                        if (min_cm > 32767)
+                            min_cm = 32767;
+                        if (mean_angle > 255)
+                            mean_angle = 255;
+
+
+                        nrt_model->cm_outputs = (short int) (min_cm);
+                        nrt_model->cm_outputs_date = (short int) (clrx[*n_clr - conse_last + 1] - JULIAN_LANDSAT4_LAUNCH);
+                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                        {
+                            quick_sort_float(v_dif_mag_tmp[i_b], 0, conse_last - 1);
+                            matlab_2d_float_median(v_dif_mag_tmp, i_b, conse_last,
+                                                   &tmp);
+                            nrt_model->cm_bands[i_b] = (short int) (tmp);
+                        }
+                        nrt_model->conse_last = conse_last - 1;   // for new change, at last conse
+                        nrt_model->cm_angle = (unsigned char)mean_angle;
+
+                    }
+                    else{
+                        nrt_model->cm_outputs = NA_VALUE;
+                        nrt_model->cm_outputs_date = NA_VALUE;
+                        nrt_model->cm_angle = 255;
+                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                        {
+                            nrt_model->cm_bands[i_b] = NA_VALUE;
+                        }
+                        nrt_model->conse_last = 0;   // for new change, at last conse
+                    }
+
+
                     status = free_2d_array ((void **) v_diff_tmp);
                     if (status != SUCCESS)
                     {
                         RETURN_ERROR ("Freeing memory: v_diff_tmp\n",
                                       FUNC_NAME, FAILURE);
                     }
+                    status = free_2d_array ((void **) v_dif_mag_tmp);
+                    if (status != SUCCESS)
+                    {
+                        RETURN_ERROR ("Freeing memory: v_dif_mag_tmp\n",
+                                      FUNC_NAME, FAILURE);
+                    }
                     break;
+                }else{
+                    if(conse_last == conse){ // all observation in the last conse passed T_MIN_CG_SCCD
+                        float min_cm = 999999;
+                        for(j = 0; j < conse_last - 1; j++)
+                            if(v_dif_mag_norm[j] * 100 < min_cm)
+                                min_cm =  v_dif_mag_norm[j] * 100;
+                        if (min_cm > 32767)
+                            min_cm = 32767;
+                        if (mean_angle > 255)
+                            mean_angle = 255;
+
+                        nrt_model->cm_outputs = (short int)min_cm;
+                        nrt_model->cm_outputs_date = (short int) (clrx[*n_clr - 1 - conse_last + 1] - JULIAN_LANDSAT4_LAUNCH);
+                        nrt_model->cm_angle = (unsigned char)mean_angle;
+                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                        {
+                            quick_sort_float(v_dif_mag_tmp[i_b], 0, conse_last - 1);
+                            matlab_2d_float_median(v_dif_mag_tmp, i_b, conse_last,
+                                                   &tmp);
+                            nrt_model->cm_bands[i_b] = (short int) (tmp);
+                        }
+                        nrt_model->conse_last = conse_last;   // for new change, at last conse
+                    }
                 }
+
                 status = free_2d_array ((void **) v_diff_tmp);
                 if (status != SUCCESS)
                 {
                     RETURN_ERROR ("Freeing memory: v_diff_tmp\n",
                                   FUNC_NAME, FAILURE);
                 }
-            }
-
-
-
-            if (id_last > 0)
-            {
-                float min_cm = 999999;
-                for(j = 0; j < id_last; j++)
-                    if(v_dif_mag_norm[j] < min_cm)
-                        min_cm = v_dif_mag_norm[j];
-
-                nrt_model->cm_outputs = (short int) (min_cm * 100);
-                nrt_model->cm_outputs_date = (short int) (clrx[*n_clr - id_last] - JULIAN_LANDSAT4_LAUNCH);
-                for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                status = free_2d_array ((void **) v_dif_mag_tmp);
+                if (status != SUCCESS)
                 {
-
-                    max_rmse = max(min_rmse[i_b], sqrtf(rmse_band[i_b]));
-                    nrt_model->cm_bands[i_b] = (short int) (medium_v_dif[i_b] * max_rmse);
+                    RETURN_ERROR ("Freeing memory: v_dif_mag_tmp\n",
+                                  FUNC_NAME, FAILURE);
                 }
             }
-            else{
-                nrt_model->cm_outputs = NA_VALUE;
-                nrt_model->cm_outputs_date = NA_VALUE;
-                for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-                {
-                    nrt_model->cm_bands[i_b] = NA_VALUE;
-                }
-            }
-
-            nrt_model->conse_last = (unsigned char)id_last;
         }else if (nrt_mode == NRT_QUEUE_RECENT){
-            nrt_model->cm_outputs = cm_outputs[current_CM_n];
-            nrt_model->cm_outputs_date = cm_outputs_date[current_CM_n];
+            nrt_model->cm_outputs = cm_outputs;
+            nrt_model->cm_outputs_date = cm_outputs_date;
             for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
             {
                 nrt_model->cm_bands[i_b] = (short int)(rec_cg[num_fc-1].magnitude[i_b]);
             }
             nrt_model->conse_last = (unsigned char)conse;   // for new change, at last conse
+            if (cm_angle > 255)
+                cm_angle = 255;
+            nrt_model->cm_angle = (unsigned char)cm_angle;
         }
 //        time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
 //        printf("step3 timepoint 4 took %f seconds to execute\n", time_taken);
@@ -2341,6 +2476,13 @@ int step3_processing_end
     free(v_dif_mag_norm);
     v_dif_mag_norm = NULL;
     free(medium_v_dif);
+    status = free_2d_array ((void **) v_dif_mag);
+    if (status != SUCCESS)
+    {
+        RETURN_ERROR ("Freeing memory: v_dif_mag\n", FUNC_NAME,
+                      FAILURE);
+    }
+
     return SUCCESS;
 
 }
@@ -2358,11 +2500,10 @@ int sccd_standard
     int *num_obs_queue,             /* O: the number of multispectral observations    */
     output_nrtqueue *obs_queue,       /* O: multispectral observations in queue    */
     short int *min_rmse,       /* O: adjusted rmse for the pixel    */
-    int cm_output_interval,
-    int starting_date,           /* I: the starting date of the whole dataset to enable reconstruct CM_date, all pixels for a tile should have the same date */
     int conse,
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    short int* cm_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
+    bool b_pinpoint,
+    Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
+    int *num_fc_pinpoint
 )
 {
     int i_b;
@@ -2391,9 +2532,9 @@ int sccd_standard
     int i_dense = 0;
     int t_start;
     bool change_detected = FALSE;
-    int id_last;
-    clock_t t_time = clock();
-    double time_taken;
+    float cm_angle = 0;
+    short int cm_outputs = NA_VALUE;      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
+    short int cm_outputs_date = NA_VALUE;      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
 
     cov_p = (gsl_matrix **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, 1, sizeof(gsl_matrix));
     if (cov_p == NULL)
@@ -2490,8 +2631,6 @@ int sccd_standard
     else
     {
         bl_train = 0;
-        /* if queue and void mode, there would be no difference with offline processing */
-        starting_date = clrx[0];
 
         /* Start with mininum requirement of clear obs.               */
         i = N_TIMES * MID_NUM_C  - 1;
@@ -2608,19 +2747,18 @@ int sccd_standard
         /**************************************************************/
         else
         {
-            id_last = conse;
 
             if(*nrt_mode == NRT_VOID)
             {
                 status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
-                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed, starting_date,
-                                                  cm_output_interval, cm_outputs, cm_outputs_date, t_start);
+                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed, &cm_outputs, &cm_outputs_date, &cm_angle,
+                                                  t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint);
             }
             else
             {
                 status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
-                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed, starting_date,
-                                                  cm_output_interval, cm_outputs, cm_outputs_date, t_start);
+                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed, &cm_outputs, &cm_outputs_date, &cm_angle,
+                                                  t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint);
             }
             if(status == CHANGEDETECTED)
             {
@@ -2681,8 +2819,8 @@ int sccd_standard
     status = step3_processing_end(instance, cov_p, fit_cft, clrx, clry, i, &n_clr, *nrt_mode,
                                   i_start, prev_i_break, nrt_model, num_obs_queue,
                                   obs_queue, sum_square_vt, num_obs_processed, t_start,
-                                  cm_output_interval, starting_date, conse, min_rmse,tcg,
-                                  cm_outputs, cm_outputs_date, id_last, rec_cg, *num_fc);
+                                  conse, min_rmse,tcg,
+                                  cm_outputs, cm_outputs_date, cm_angle, rec_cg, *num_fc);
 
 //    time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
 //    printf("processing_end took %f seconds to execute \n", time_taken);

@@ -150,4 +150,5 @@
 #define KFAS_TOL 1E-14
 #define KFAS_LIK_C 0.5 * log(8.0 * atan(1.0))
 #define SLOPE_SS_SCALE 1000000
+#define PINPOINT_CONSE 3
 

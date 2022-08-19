@@ -329,6 +329,9 @@ int main(int argc, char *argv[])
     bool b_c2 = FALSE;
     bool b_header_csv = FALSE;
     int headline = -1;
+    bool b_pinpoint = TRUE;
+    Output_sccd_pinpoint *rec_cg_pinpoint;
+    int num_fc_pinpoint = 0;
     if (b_header_csv == TRUE)
         headline = 0;   // skip the head line of csv
 
@@ -520,6 +523,14 @@ int main(int argc, char *argv[])
         RETURN_ERROR ("ERROR allocating s_rec_cg",
                       FUNC_NAME, FAILURE);
     }
+
+    rec_cg_pinpoint = malloc(NUM_FC * sizeof(Output_sccd_pinpoint));
+    if (rec_cg_pinpoint == NULL)
+    {
+        RETURN_ERROR ("ERROR allocating rec_cg_pinpoint",
+                      FUNC_NAME, FAILURE);
+    }
+
     nrt_model = malloc(sizeof(output_nrtmodel));
     if (nrt_model == NULL)
     {
@@ -718,8 +729,8 @@ int main(int argc, char *argv[])
                         CM_outputs_date[i] = NA_VALUE;
                     }
                     result = sccd(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, sdate, valid_scene_count,
-                                  tcg, &num_fc, &nrt_mode, s_rec_cg, nrt_model, &num_obs_queue, obs_queue, min_rmse, cm_output_interval,
-                                  starting_date, conse, b_c2, CM_outputs, CM_outputs_date);
+                                  tcg, &num_fc, &nrt_mode, s_rec_cg, nrt_model, &num_obs_queue, obs_queue, min_rmse, conse,
+                                  b_c2, b_pinpoint, rec_cg_pinpoint, &num_fc_pinpoint);
 
                     //printf("free stage 9 \n");
                     for(i = 0; i < num_fc; i++)
@@ -790,6 +801,7 @@ int main(int argc, char *argv[])
     }
 
     free(s_rec_cg);
+    free(rec_cg_pinpoint);
     free(obs_queue);
     free(nrt_model);
     // free(fh);

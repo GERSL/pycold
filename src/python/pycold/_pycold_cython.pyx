@@ -19,6 +19,7 @@ except ImportError:
     pass  # The modules don't actually have to exists for Cython to use them as annotations
 
 cdef int NUM_FC = 40  # define the maximum number of outputted curves
+cdef int NUM_FC_SCCD = 20
 cdef int NUM_NRT_QUEUE = 240
 DEF DEFAULT_CONSE = 6
 DEF NRT_BAND = 6
@@ -47,7 +48,7 @@ nrtqueue_dt = np.dtype([('clry', np.short, NRT_BAND), ('clrx_since1982', np.shor
 nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (NRT_BAND, DEFAULT_CONSE-1)),
                          ('obs_date_since1982', np.short, DEFAULT_CONSE-1), ('covariance', np.float32, (NRT_BAND, 36)),
                          ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, NRT_BAND), ('rmse_sum', np.uint32, 6), ('cm_bands', np.short, NRT_BAND),
-                         ('cm_outputs', np.short), ('cm_outputs_date', np.short), ('conse_last', np.ubyte)], align=True)
+                         ('cm_outputs', np.short), ('cm_outputs_date', np.short), ('cm_angle', np.ubyte), ('conse_last', np.ubyte)], align=True)
 
 
 cdef extern from "../../cxx/output.h":
@@ -90,11 +91,20 @@ cdef extern from "../../cxx/output.h":
         short cm_bands[NRT_BAND]
         short int cm_outputs;
         short int cm_outputs_date;
+        unsigned char cm_angle;
         unsigned char conse_last;
+
+cdef extern from "../../cxx/output.h":
+    ctypedef struct Output_sccd_pinpoint:
+        int t_break
+        short int cm_bands[DEFAULT_CONSE][NRT_BAND]
+        short int cm_outputs[DEFAULT_CONSE]
+        unsigned char cm_angle[DEFAULT_CONSE]
  
 cdef Output_sccd t
 cdef output_nrtqueue t2
 cdef output_nrtmodel t3
+cdef Output_sccd_pinpoint t4
 
 
 cdef extern from "../../cxx/cold.h":
@@ -116,8 +126,8 @@ cdef extern from "../../cxx/s_ccd.h":
     cdef int sccd(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2, long *buf_t,
                   long *fmask_buf, long *valid_date_array, int valid_num_scenes, double tcg, int *num_fc, int *nrt_mode,
                   Output_sccd *rec_cg, output_nrtmodel *nrt_model, int *num_nrt_queue, output_nrtqueue *nrt_queue,
-                  short int *min_rmse, int cm_output_interval, int starting_date, int conse, bool b_c2,
-                  short int* cm_outputs, short int* cm_outputs_date, bool b_pinpoint)
+                  short int *min_rmse, int conse, bool b_c2, bool b_pinpoint, Output_sccd_pinpoint *rec_cg_pinpoint, 
+                  int *num_fc_pinpoint)
 
 
 
@@ -134,6 +144,7 @@ cdef extern from "../../cxx/s_ccd.h":
 #        self.nrt_model = nrt_model
 #        self.nrt_queue = nrt_queue
 SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
+SccdReccgPinpoint = namedtuple("SccdReccgPinpoint", "position rec_cg_pinpoint")
 
 def test_func():
     """
@@ -322,8 +333,7 @@ def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64
 def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
                 np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
-                bint b_output_cm=False, int starting_date=0, int n_cm=0, int cm_output_interval=60, double t_cg = 15.0863, int pos=1,
-                int conse=6, bint b_c2=False):
+                double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False, b_pinpoint=False):
     """
     S-CCD processing. It is required to be done before near real time monitoring
 
@@ -338,13 +348,11 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     	ts_s2: 1d array of shape(observation numbers), time series of swir2 band
     	ts_t: 1d array of shape(observation numbers), time series of thermal band
     	qas: 1d array, the QA cfmask bands. '0' - clear; '1' - water; '2' - shadow; '3' - snow; '4' - cloud
-    	starting_date: the global starting date of the dataset
-    	n_cm: the global number of change magnitude snapshots
-    	cm_output_interval: the interval of change magnitude output
     	t_cg: threshold of change magnitude, default is chi2.ppf(0.99,5)
         pos: position id of the pixel
     	conse: consecutive observation number
     	b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to its current low quality
+    	b_pinpoint: bool, output pinpoint break
     	Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
     	Returns
     	----------
@@ -382,7 +390,9 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     # allocate memory for rec_cg
     cdef int num_fc = 0
     cdef int num_nrt_queue = 0
-    cdef Output_sccd* rec_cg = <Output_sccd*> PyMem_Malloc(NUM_FC * sizeof(t))
+    cdef int num_fc_pinpoint = 0
+    cdef Output_sccd* rec_cg = <Output_sccd*> PyMem_Malloc(NUM_FC_SCCD * sizeof(t))
+    cdef Output_sccd_pinpoint* rec_cg_pinpoint = <Output_sccd_pinpoint*> PyMem_Malloc(NUM_FC_SCCD * sizeof(t4))
     cdef output_nrtqueue* nrt_queue = <output_nrtqueue*> PyMem_Malloc(NUM_NRT_QUEUE * sizeof(t2))
     cdef output_nrtmodel* nrt_model = <output_nrtmodel*> PyMem_Malloc(sizeof(t3))
     cdef int nrt_mode = 0
@@ -411,26 +421,10 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
-    if b_output_cm == True:
-        if starting_date == 0:
-           starting_date = dates[0]
-        if n_cm == 0:
-           n_cm = math.ceil((dates[valid_num_scenes-1] - starting_date + 1) / cm_output_interval)
-        cm_outputs = np.full(n_cm, -9999, dtype=np.short)
-        cm_outputs_date = np.full(n_cm, -9999, dtype=np.short)
-    # set the length to 1 to save memory, as they won't be assigned values
-    else:  
-        cm_outputs = np.full(1, -9999, dtype=np.short)
-        cm_outputs_date = np.full(1, -9999, dtype=np.short)
-        cm_output_interval = 999999   # give any extreme large value
-        
-    cdef short [:] cm_outputs_view = cm_outputs  # memory view
-    cdef short [:] cm_outputs_date_view = cm_outputs_date  # memory view
 
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, rec_cg,
-                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], cm_output_interval, starting_date, 
-                  conse, b_c2, &cm_outputs_view[0] , &cm_outputs_date_view[0], False)
+                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], conse, b_c2, b_pinpoint, rec_cg_pinpoint, &num_fc_pinpoint)
     if result != 0:
         raise RuntimeError("S-CCD function fails for pos = {} ".format(pos))
     else:
@@ -442,28 +436,49 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
             else:
                 output_rec_cg = np.array([])
                 
-
-            if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
-                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                  np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([]))
-            elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
-                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                  np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
-            elif nrt_mode == 5:  # queue recent
-                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                  np.asarray(<output_nrtmodel[:1]>nrt_model),
-                                  np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
-            elif nrt_mode == 0:  # void mode
-                return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
-                                  np.array([]))
+            if b_pinpoint == False:
+                if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
+                    return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                      np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([]))
+                elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
+                    return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                      np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
+                elif nrt_mode == 5:  # queue recent
+                    return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                      np.asarray(<output_nrtmodel[:1]>nrt_model),
+                                      np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
+                elif nrt_mode == 0:  # void mode
+                    return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
+                                      np.array([]))
+            else:
+                if num_fc_pinpoint > 0:
+                    output_rec_cg_pinpoint = np.asarray(<Output_sccd_pinpoint[:num_fc_pinpoint]>rec_cg_pinpoint)
+                else:
+                    output_rec_cg_pinpoint = np.array([])
+           
+                if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
+                    return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                      np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([])), 
+                                      SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+                elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
+                    return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                      np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)), 
+                                      SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+                elif nrt_mode == 5:  # queue recent
+                    return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                      np.asarray(<output_nrtmodel[:1]>nrt_model),
+                                      np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)), 
+                                      SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+                elif nrt_mode == 0:  # void mode
+                    return [SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
+                                      np.array([])), SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
 
 
 def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b,
                 np.ndarray[np.int64_t, ndim=1] ts_g, np.ndarray[np.int64_t, ndim=1] ts_r,
                 np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t,
-                np.ndarray[np.int64_t, ndim=1] qas, double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False,
-                bint b_pinpoint=False):
+                np.ndarray[np.int64_t, ndim=1] qas, double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False):
     """
     SCCD online update for new observations
        Parameters
@@ -482,7 +497,6 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
        pos: position id of the pixel
        conse: consecutive observation number
        b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to its current low quality
-       b_pinpoint: bool, pinpoint the most likely to be change in the epoch
        Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
        Returns
        ----------
@@ -522,14 +536,11 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     cdef int nrt_mode = sccd_pack.nrt_mode
     cdef int num_fc = len(sccd_pack.rec_cg)
     cdef int num_nrt_queue = len(sccd_pack.nrt_queue)
+    cdef int num_fc_pinpoint = 0
+    cdef Output_sccd_pinpoint* rec_cg_pinpoint = <Output_sccd_pinpoint*> PyMem_Malloc(sizeof(t4))
 
-    # use an extreme value to enable only one cm output
-    cdef int cm_output_interval = 999999
-    cdef int starting_date = 0
-    cdef int n_cm = 1
-    
     # grab inputs from the input
-    rec_cg_new = np.empty(NUM_FC, dtype=sccd_dt)
+    rec_cg_new = np.empty(NUM_FC_SCCD, dtype=sccd_dt)
     if num_fc > 0:
         rec_cg_new[0:num_fc] = sccd_pack.rec_cg[0:num_fc]
     # rec_cg = <Output_sccd*> PyMem_Malloc(NUM_FC * sizeof(t))
@@ -570,15 +581,11 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
-    cm_outputs = np.full(1, -9999, dtype=np.short)
-    cm_outputs_date = np.full(1, -9999, dtype=np.short)
-    cdef short [:] cm_outputs_view = cm_outputs  # memory view
-    cdef short [:] cm_outputs_date_view = cm_outputs_date  # memory view    
+
     
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, &rec_cg_view[0],
-                  &nrt_model_view[0], &num_nrt_queue, &nrt_queue_view[0], &min_rmse_view[0], cm_output_interval, starting_date,
-                  conse, b_c2, &cm_outputs_view[0], &cm_outputs_date_view[0], b_pinpoint)
+                  &nrt_model_view[0], &num_nrt_queue, &nrt_queue_view[0], &min_rmse_view[0], conse, b_c2, False, rec_cg_pinpoint, &num_fc_pinpoint)
     if result != 0:
         raise RuntimeError("sccd_update function fails for pos = {} ".format(pos))
     else:

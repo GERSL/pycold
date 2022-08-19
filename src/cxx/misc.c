@@ -3043,6 +3043,46 @@ float MeanAngl_float
 }
 
 
+float MeanAngl_float_selective
+(
+      float ** v_diff, // input: a two-dimensional vector of different (i_count * lasso_num)
+      int lasso_num,   // input: the number of lasso band
+      int i_count,      // input: the number of consecutive observations
+      int *lasso_bands
+)
+{
+    float y;
+    int i, j;
+    float product;
+    float norm1;
+    float norm2;
+    float angl_sum = 0;
+    float tmp;
+    if (i_count > 1)
+    {
+        for(i = 0; i < i_count - 1; i++)
+        {
+            product = 0;
+            norm1 = 0;
+            norm2 = 0;
+            for(j = 0; j < lasso_num; j++)
+            {
+                product+= v_diff[lasso_bands[j]][i] * v_diff[lasso_bands[j]][i+1];
+                norm1 += v_diff[lasso_bands[j]][i] * v_diff[lasso_bands[j]][i];
+                norm2 += v_diff[lasso_bands[j]][i+1] * v_diff[lasso_bands[j]][i+1];
+            }
+            tmp = acosf(product / (sqrtf(norm1) * sqrtf(norm2)));
+            angl_sum += (tmp * 180.0)/PI;
+        }
+        y = angl_sum/(i_count-1);
+    }
+    else
+    {
+        y = 0;
+    }
+    return y;
+}
+
 float MediumAngl(
       float ** v_diff, // input: a two-dimensional vector of different (i_count * lasso_num)
       int lasso_num,   // input: the number of lasso band
