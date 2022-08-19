@@ -211,10 +211,21 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
                                                               'Example - 2015-01-01')
 @click.option('--upper_datebound', type=str, default=None, help='upper date bound of image selection for processing.'
                                                                 'Example - 2021-12-31')
-def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path, low_datebound, upper_datebound):
-
-    tz = timezone('US/Eastern')
-    start_time = datetime.now(tz)
+@click.option('--b_c2', type=bool, default=False, help='indicate if it is c2 or hls')
+def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path, low_datebound, upper_datebound, b_c2):
+# def main():
+#     rank = 29
+#     n_cores = 200
+#     stack_path = '/gpfs/sharedfs1/zhulab/Jiwon/HLS/Stack/10SEG/10SEG_stack_0.2'
+#     result_path = '/scratch/suy20004/suy20004/test'
+#     yaml_path = '/home/suy20004/Document/pycold-uconnhpc/config_hls.yaml'
+#     method = 'COLD'
+#     seedmap_path = None
+#     low_datebound = None
+#     upper_datebound = None
+#     tz = timezone('US/Eastern')
+#     start_time = datetime.now(tz)
+#     b_c2 =True
 
     if low_datebound is None:
         low_datebound = 0
@@ -310,7 +321,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                                                   img_tstack[pos, 6, :].astype(np.int64),
                                                   img_tstack[pos, 7, :].astype(np.int64),
                                                   t_cg=threshold,
-                                                  conse=config['conse'],
+                                                  conse=config['conse'], b_c2=b_c2,
                                                   pos=config['n_cols'] * (original_row - 1) + original_col)
                     except RuntimeError:
                         print("S-CCD fails at original_row {}, original_col {} ({})".format(original_row, original_col,
@@ -335,6 +346,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
             else:
                 # start looping every pixel in the block
                 for pos in range(block_width * block_height):
+                # for pos in [17682]:
                     original_row, original_col = get_rowcol_intile(pos, block_width,
                                                                    block_height, block_x, block_y)
                     try:
@@ -366,7 +378,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                                                       img_tstack[pos, 6, :].astype(np.int64),
                                                       img_tstack[pos, 7, :].astype(np.int64),
                                                       t_cg=threshold,
-                                                      conse=config['conse'],
+                                                      conse=config['conse'], b_c2=b_c2,
                                                       pos=config['n_cols'] * (original_row - 1) + original_col)
                     except RuntimeError:
                         print("COLD fails at original_row {}, original_col {} ({})".format(original_row, original_col,

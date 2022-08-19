@@ -173,7 +173,7 @@ int cold
     // if ((clr_pct < T_CLR)||(clear_sum < N_TIMES * MAX_NUM_C)){
     if (clear_sum < N_TIMES * MAX_NUM_C){
         result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
-                                 fmask_buf, id_range,sn_pct,rec_cg, num_fc);
+                                 fmask_buf, id_range,sn_pct,rec_cg, num_fc, b_c2);
     }
     else{
 
@@ -1198,8 +1198,8 @@ int stand_procedure_fixeddays
                                 prob_angle = angle_decaying(mean_angle, (double)NSIGN, 135.0);
                                 current_CM_n = (clrx[i_ini+1] - starting_date) / CM_OUTPUT_INTERVAL;  // looking back, t_break = current_i + 1
                                 tmp = round(prob_angle * vec_magg_min * 100);
-                                if (tmp > 32767) // 32767 is upper limit of short 16
-                                    tmp = 32767;
+                                if (tmp > MAX_SHORT) // MAX_SHORT is upper limit of short 16
+                                    tmp = MAX_SHORT;
                                 tmp_CM = (short int) (tmp);
                                 if(tmp_CM > CM_outputs[current_CM_n])
                                 {
@@ -1980,8 +1980,8 @@ int stand_procedure_fixeddays
                     // prob_MCM = Chi_Square_Distribution(break_mag, NUM_LASSO_BANDS);
                     current_CM_n = (clrx[i] - starting_date) / CM_OUTPUT_INTERVAL;
                     tmp = round(prob_angle * break_mag * 100);
-                    if (tmp > 32767) // 32767 is upper limit of short 16
-                        tmp = 32767;
+                    if (tmp > MAX_SHORT) // MAX_SHORT is upper limit of short 16
+                        tmp = MAX_SHORT;
                     tmp_CM = (short int) (tmp);
 
                     /*********************************************/
@@ -3567,8 +3567,8 @@ int stand_procedure
                                 prob_angle = angle_decaying(mean_angle, (double)NSIGN, 90.0);
                                 current_CM_n = (clrx[i_ini+1] - starting_date) / CM_OUTPUT_INTERVAL;  // looking back, t_break = current_i + 1
                                 tmp = round(prob_angle * vec_magg_min * 100);
-                                if (tmp > 32767) // 32767 is upper limit of short 16
-                                    tmp = 32767;
+                                if (tmp > MAX_SHORT) // MAX_SHORT is upper limit of short 16
+                                    tmp = MAX_SHORT;
                                 tmp_CM = (short int) (tmp);
                                 if(tmp_CM > CM_outputs[current_CM_n])
                                 {
@@ -4274,8 +4274,8 @@ int stand_procedure
                     // prob_MCM = Chi_Square_Distribution(break_mag, NUM_LASSO_BANDS);
                     current_CM_n = (clrx[i] - starting_date) / CM_OUTPUT_INTERVAL;
                     tmp = round(prob_angle * break_mag * 100);
-                    if (tmp > 32767) // 32767 is upper limit of short 16
-                        tmp = 32767;
+                    if (tmp > MAX_SHORT) // MAX_SHORT is upper limit of short 16
+                        tmp = MAX_SHORT;
                     tmp_CM = (short int) (tmp);
 
                     /*********************************************/
@@ -4856,7 +4856,8 @@ int inefficientobs_procedure
     int *id_range,
     float sn_pct,
     Output_t *rec_cg,
-    int *num_fc
+    int *num_fc,
+    bool b_c2
 )
 {
     int n_sn;
@@ -4936,8 +4937,14 @@ int inefficientobs_procedure
                         clry[k][n_sn] = (float)buf_s1[i];
                     else if(k == 5)
                         clry[k][n_sn] = (float)buf_s2[i];
-                    else if(k == 6)
-                        clry[k][n_sn] = (float)(buf_t[i] * 10 - 27320);
+                    else if(k == 6){
+                        if (b_c2 == TRUE){
+                            clry[k][n_sn] = 0;
+                        }
+                        else{
+                            clry[k][n_sn] = (float)(buf_t[i] * 10 - 27320);
+                        }
+                   }
                 }
                 n_sn++;
             }
@@ -5174,8 +5181,14 @@ int inefficientobs_procedure
                         clry[k][n_clr] = (float)buf_s1[i];
                     else if(k == 5)
                         clry[k][n_clr] = (float)buf_s2[i];
-                    else if(k == 6)
-                        clry[k][n_clr] = (float)(buf_t[i] * 10 - 27320);
+                    else if(k == 6){
+                        if (b_c2 == TRUE){
+                            clry[k][n_sn] = 0;
+                        }
+                        else{
+                            clry[k][n_sn] = (float)(buf_t[i] * 10 - 27320);
+                        }
+                   }
                 }
                 n_clr++;
             }
@@ -5549,7 +5562,7 @@ int obcold_reconstruction_procedure
 
     if (clear_sum < N_TIMES * MAX_NUM_C){
         result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
-                                 fmask_buf, id_range,sn_pct,rec_cg, num_fc);
+                                 fmask_buf, id_range,sn_pct,rec_cg, num_fc, b_c2);
     }else
     {
         /**************************************************************/
@@ -5857,7 +5870,7 @@ int obcold_reconstruction_procedure
 
         if(*num_fc == 0){ // apply inefficient procedure to force to have a model
             result = inefficientobs_procedure(valid_num_scenes,valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t,
-                                     fmask_buf, id_range,sn_pct,rec_cg, num_fc);
+                                     fmask_buf, id_range,sn_pct,rec_cg, num_fc, b_c2);
         }
     }
 

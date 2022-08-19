@@ -69,7 +69,8 @@ int inefficientobs_procedure
     int *id_range,
     float sn_pct,
     Output_t *rec_cg,
-    int *num_fc
+    int *num_fc,
+    bool b_c2
 );
 
 

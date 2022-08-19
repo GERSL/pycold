@@ -326,7 +326,7 @@ int main(int argc, char *argv[])
     int pos;
     short min_rmse[TOTAL_IMAGE_BANDS] = {0,0,0,0,0,0,0};
     int cm_output_interval;
-    bool b_c2 = FALSE;
+    bool b_c2 = TRUE;
     bool b_header_csv = FALSE;
     int headline = -1;
     bool b_pinpoint = TRUE;

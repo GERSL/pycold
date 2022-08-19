@@ -72,7 +72,7 @@ typedef struct
     int t_break;           /* time when the first break (change) is observed */
     short int cm_bands[DEFAULT_CONSE][TOTAL_IMAGE_BANDS_SCCD];
     short int cm_outputs[DEFAULT_CONSE];
-    unsigned char cm_angle[DEFAULT_CONSE];
+    short int cm_angle[DEFAULT_CONSE];
 } Output_sccd_pinpoint;
 
 
@@ -89,7 +89,7 @@ typedef struct
     short int cm_bands[TOTAL_IMAGE_BANDS_SCCD];
     short int cm_outputs;
     short int cm_outputs_date;
-    unsigned char cm_angle;
+    short int cm_angle;
     unsigned char conse_last;
 } output_nrtmodel;
 

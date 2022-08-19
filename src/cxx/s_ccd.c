@@ -228,7 +228,7 @@ int sccd
                  {
                      nrt_model->cm_bands[i_b] = NA_VALUE;
                  }
-                 nrt_model->cm_angle = 255;
+                 nrt_model->cm_angle = NA_VALUE;
                  if(*nrt_mode == NRT_QUEUE_RECENT){
                      *nrt_mode = NRT_QUEUE_STANDARD;
                  }
@@ -1724,7 +1724,8 @@ int step2_KF_ChangeDetection
     float *medium_v_dif;
     float max_rmse[TOTAL_IMAGE_BANDS_SCCD];
     bool change_flag = TRUE;
-    float mean_angle = 9999.0;
+    float mean_angle = 0;
+    float mean_angle_scale100 = 0;
     float tmp;
     double vt;
     float rmse_band[TOTAL_IMAGE_BANDS_SCCD];
@@ -1864,18 +1865,18 @@ int step2_KF_ChangeDetection
 
 
                     // mean_angle = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, conse_last, lasso_blist_sccd);
-                    mean_angle = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last);
+                    mean_angle_scale100 = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last) * 100;
 
                     float min_cm = 999999;
                     for(j = 0; j < conse_last; j++)
                         if(v_dif_mag_norm[j] * 100 < min_cm)
                             min_cm = v_dif_mag_norm[j] * 100;
 
-                    if (min_cm > 32767)
-                        min_cm = 32767;
-                    if (mean_angle > 255)
-                        mean_angle = 255;
-                    rec_cg_pinpoint[*num_fc_pinpoint].cm_angle[conse_last-1] = (unsigned char)mean_angle;
+                    if (min_cm > MAX_SHORT)
+                        min_cm = MAX_SHORT;
+                    if (mean_angle_scale100 > MAX_SHORT)
+                        mean_angle_scale100 = MAX_SHORT;
+                    rec_cg_pinpoint[*num_fc_pinpoint].cm_angle[conse_last-1] = (short int)mean_angle_scale100;
                     rec_cg_pinpoint[*num_fc_pinpoint].cm_outputs[conse_last-1] = (short int)min_cm;
 
                     for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++){
@@ -1923,8 +1924,8 @@ int step2_KF_ChangeDetection
 
         // prob_MCM = Chi_Square_Distribution(break_mag, NUM_LASSO_BANDS);
         tmp = round(break_mag * 100);
-        if (tmp > 32767) // 32767 is upper limit of short 16
-            tmp = 32767;
+        if (tmp > MAX_SHORT) // MAX_SHORT is upper limit of short 16
+            tmp = MAX_SHORT;
         tmp_CM = (short int) (tmp);
 
         if (mean_angle > NSIGN)
@@ -1943,7 +1944,10 @@ int step2_KF_ChangeDetection
 
     if ((change_flag == TRUE) && (break_mag > tcg) && (mean_angle <= NSIGN))
     {
-        *cm_angle = mean_angle;
+        mean_angle_scale100 = (mean_angle * 100);
+        if (mean_angle_scale100 > MAX_SHORT)
+            mean_angle_scale100 = MAX_SHORT;
+        *cm_angle = (short int) mean_angle_scale100;
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             rec_cg[*num_curve].rmse[i_b] = sqrtf((float)rmse_band[i_b]);
@@ -1972,6 +1976,7 @@ int step2_KF_ChangeDetection
         /* record break  */
         rec_cg[*num_curve].t_break = clrx[cur_i];
         *num_curve = *num_curve + 1;
+        *num_obs_processed = *num_obs_processed + 1;
 
 
         /**********************************************/
@@ -2121,7 +2126,7 @@ int step3_processing_end
     float max_rmse;
     float *v_dif_mag_norm;
     float** v_dif;
-    float mean_angle = 9999.0;
+    float mean_angle_scale100 = 0;
     float tmp;
     float *medium_v_dif;
     clock_t t_time = clock();
@@ -2320,7 +2325,7 @@ int step3_processing_end
 
 
                 // mean_angle = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, conse_last, lasso_blist_sccd);
-                mean_angle = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last);
+                mean_angle_scale100 = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last) * 100;
 
                 // NOTE THAT USE THE DEFAULT CHANGE THRESHOLD (0.99) TO CALCULATE PROBABILITY
                 if (v_dif_mag_norm[conse_last - 1] <= T_MIN_CG_SCCD)
@@ -2339,10 +2344,10 @@ int step3_processing_end
                             if(v_dif_mag_norm[j] * 100 < min_cm)
                                 min_cm = v_dif_mag_norm[j] * 100;
 
-                        if (min_cm > 32767)
-                            min_cm = 32767;
-                        if (mean_angle > 255)
-                            mean_angle = 255;
+                        if (min_cm > MAX_SHORT)
+                            min_cm = MAX_SHORT;
+                        if (mean_angle_scale100 > MAX_SHORT)
+                            mean_angle_scale100 = MAX_SHORT;
 
 
                         nrt_model->cm_outputs = (short int) (min_cm);
@@ -2355,13 +2360,13 @@ int step3_processing_end
                             nrt_model->cm_bands[i_b] = (short int) (tmp);
                         }
                         nrt_model->conse_last = conse_last - 1;   // for new change, at last conse
-                        nrt_model->cm_angle = (unsigned char)mean_angle;
+                        nrt_model->cm_angle = (short int)mean_angle_scale100;
 
                     }
                     else{
                         nrt_model->cm_outputs = NA_VALUE;
                         nrt_model->cm_outputs_date = NA_VALUE;
-                        nrt_model->cm_angle = 255;
+                        nrt_model->cm_angle = NA_VALUE;
                         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                         {
                             nrt_model->cm_bands[i_b] = NA_VALUE;
@@ -2389,14 +2394,14 @@ int step3_processing_end
                         for(j = 0; j < conse_last - 1; j++)
                             if(v_dif_mag_norm[j] * 100 < min_cm)
                                 min_cm =  v_dif_mag_norm[j] * 100;
-                        if (min_cm > 32767)
-                            min_cm = 32767;
-                        if (mean_angle > 255)
-                            mean_angle = 255;
+                        if (min_cm > MAX_SHORT)
+                            min_cm = MAX_SHORT;
+                        if (mean_angle_scale100 > MAX_SHORT)
+                            mean_angle_scale100 = MAX_SHORT;
 
                         nrt_model->cm_outputs = (short int)min_cm;
                         nrt_model->cm_outputs_date = (short int) (clrx[*n_clr - 1 - conse_last + 1] - JULIAN_LANDSAT4_LAUNCH);
-                        nrt_model->cm_angle = (unsigned char)mean_angle;
+                        nrt_model->cm_angle = (short int)mean_angle_scale100;
                         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                         {
                             quick_sort_float(v_dif_mag_tmp[i_b], 0, conse_last - 1);
@@ -2429,9 +2434,10 @@ int step3_processing_end
                 nrt_model->cm_bands[i_b] = (short int)(rec_cg[num_fc-1].magnitude[i_b]);
             }
             nrt_model->conse_last = (unsigned char)conse;   // for new change, at last conse
-            if (cm_angle > 255)
-                cm_angle = 255;
-            nrt_model->cm_angle = (unsigned char)cm_angle;
+            if (cm_angle > MAX_SHORT)
+                cm_angle = MAX_SHORT;
+            nrt_model->cm_angle = (short int)cm_angle;
+
         }
 //        time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
 //        printf("step3 timepoint 4 took %f seconds to execute\n", time_taken);

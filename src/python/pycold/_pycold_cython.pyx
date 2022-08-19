@@ -48,7 +48,7 @@ nrtqueue_dt = np.dtype([('clry', np.short, NRT_BAND), ('clrx_since1982', np.shor
 nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (NRT_BAND, DEFAULT_CONSE-1)),
                          ('obs_date_since1982', np.short, DEFAULT_CONSE-1), ('covariance', np.float32, (NRT_BAND, 36)),
                          ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, NRT_BAND), ('rmse_sum', np.uint32, 6), ('cm_bands', np.short, NRT_BAND),
-                         ('cm_outputs', np.short), ('cm_outputs_date', np.short), ('cm_angle', np.ubyte), ('conse_last', np.ubyte)], align=True)
+                         ('cm_outputs', np.short), ('cm_outputs_date', np.short), ('cm_angle', np.short), ('conse_last', np.ubyte)], align=True)
 
 
 cdef extern from "../../cxx/output.h":
@@ -91,7 +91,7 @@ cdef extern from "../../cxx/output.h":
         short cm_bands[NRT_BAND]
         short int cm_outputs;
         short int cm_outputs_date;
-        unsigned char cm_angle;
+        short int cm_angle;
         unsigned char conse_last;
 
 cdef extern from "../../cxx/output.h":
@@ -99,7 +99,7 @@ cdef extern from "../../cxx/output.h":
         int t_break
         short int cm_bands[DEFAULT_CONSE][NRT_BAND]
         short int cm_outputs[DEFAULT_CONSE]
-        unsigned char cm_angle[DEFAULT_CONSE]
+        short int cm_angle[DEFAULT_CONSE]
  
 cdef Output_sccd t
 cdef output_nrtqueue t2
