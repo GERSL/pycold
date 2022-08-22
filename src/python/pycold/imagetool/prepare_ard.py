@@ -34,6 +34,8 @@ warnings.filterwarnings("ignore")
 # import geopandas as gpd
 import fiona
 from pathlib import Path
+from glob import glob
+
 
 # define constant here
 QA_CLEAR = 0
@@ -91,6 +93,7 @@ def qabitval_array_HLS(packedint_array):
     unpacked[QA_SHADOW_unpacked > 0] = QA_SHADOW
     unpacked[QA_CLOUD_ADJ > 0] = QA_CLOUD
     unpacked[QA_CLOUD_unpacked > 0] = QA_CLOUD
+    unpacked[packedint_array == QA_FILL] = QA_FILL
 
     return unpacked
 
@@ -261,6 +264,162 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
                                               "{}.B11.tif".format(folder)))
                 B6 = gdal_array.LoadFile(join(join(source_dir, folder),
                                               "{}.B12.tif".format(folder)))
+                B7 = np.full(B6.shape, 0)
+
+            except Exception as e:
+                # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
+                logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                return False
+
+        if (B1 is None) or (B2 is None) or (B3 is None) or (B4 is None) or (B5 is None) or (B6 is None):
+            logger.error('Reading Landsat band fails for {}'.format(folder))
+            return False
+
+        if is_partition is True:
+            b_width = int(config['n_cols'] / config['n_block_x'])  # width of a block
+            b_height = int(config['n_rows'] / config['n_block_y'])
+            bytesize = 2  # short16 = 2 * byte
+            # source: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-in-python-using-numpy-d1bf0dd7b6f7
+            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(config['n_block_y'],
+                                                        config['n_block_x'], b_height, b_width),
+                                                        strides=(config['n_cols'] * b_height * bytesize,
+                                                                 b_width * bytesize,
+                                                                 config['n_cols'] * bytesize, bytesize))
+            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(config['n_block_y'],
+                                                        config['n_block_x'], b_height, b_width),
+                                                        strides=(config['n_cols'] * b_height * bytesize,
+                                                                 b_width * bytesize,
+                                                                 config['n_cols'] * bytesize, bytesize))
+            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(config['n_block_y'],
+                                                        config['n_block_x'], b_height, b_width),
+                                                        strides=(config['n_cols'] * b_height * bytesize,
+                                                                 b_width * bytesize,
+                                                                 config['n_cols'] * bytesize, bytesize))
+            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(config['n_block_y'],
+                                                        config['n_block_x'], b_height, b_width),
+                                                        strides=(config['n_cols'] * b_height * bytesize,
+                                                                 b_width * bytesize,
+                                                                 config['n_cols'] * bytesize, bytesize))
+            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(config['n_block_y'],
+                                                        config['n_block_x'], b_height, b_width),
+                                                        strides=(config['n_cols'] * b_height * bytesize,
+                                                                 b_width * bytesize,
+                                                                 config['n_cols'] * bytesize, bytesize))
+            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(config['n_block_y'],
+                                                        config['n_block_x'], b_height, b_width),
+                                                        strides=(config['n_cols'] * b_height * bytesize,
+                                                                 b_width * bytesize,
+                                                                 config['n_cols'] * bytesize, bytesize))
+            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(config['n_block_y'],
+                                                        config['n_block_x'], b_height, b_width),
+                                                        strides=(config['n_cols'] * b_height * bytesize,
+                                                                 b_width * bytesize,
+                                                                 config['n_cols'] * bytesize, bytesize))
+            QA_blocks = np.lib.stride_tricks.as_strided(QA_band_unpacked,
+                                                        shape=(config['n_block_y'],
+                                                               config['n_block_x'], b_height,
+                                                               b_width),
+                                                        strides=(config['n_cols']*b_height*bytesize,
+                                                                 b_width * bytesize,
+                                                                 config['n_cols']*bytesize,
+                                                                 bytesize))
+            for i in range(config['n_block_y']):
+                for j in range(config['n_block_x']):
+                    # check if no valid pixels in the chip, then eliminate
+                    qa_unique = np.unique(QA_blocks[i][j])
+
+                    # skip blocks are all cloud, shadow or filled values
+                    # in DHTC, we also don't need to save pixel that has qa value of 'QA_CLOUD',
+                    # 'QA_SHADOW', or FILLED value (255)
+                    if QA_CLEAR not in qa_unique and \
+                            QA_WATER not in qa_unique and \
+                            QA_SNOW not in qa_unique:
+                        continue
+
+                    block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
+                    np.save(join(join(out_dir, block_folder), file_name),
+                            np.dstack([B1_blocks[i][j], B2_blocks[i][j], B3_blocks[i][j], B4_blocks[i][j],
+                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j],
+                                       QA_blocks[i][j]]).astype(np.int16))
+
+        else:
+            np.save(join(out_dir, file_name),
+                    np.dstack([B1, B2, B3, B4, B5, B6, B7, QA_band_unpacked]).astype(np.int16))
+        # scene_list.append(folder_name)
+    else:
+        # logger.info('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
+        logger.warn('Not enough clear observations for {}'.format(folder))
+
+    return True
+
+
+def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=True, clear_threshold=0,
+                              low_year_bound=1, upp_year_bound=9999):
+    """
+    unzip single image, convert bit-pack qa to byte value, and save as numpy
+    :param source_dir: the parent folder to save image 'folder'
+    :param out_dir: the folder to save result
+    :param folder: the folder name of image
+    :param logger: the handler of logger file
+    :param config
+    :param is_partition: True, partition each image into blocks; False, save original size of image
+    :param clear_threshold: threshold of clear pixel percentage, if lower than threshold, won't be processed
+    :param low_year_bound: the lower bound of user interested year range
+    :param upp_year_bound: the upper bound of user interested year range
+    :return:
+    """
+    try:
+        hdf_ds = gdal.Open(folder, gdal.GA_ReadOnly).GetSubDatasets()
+        qa_ds = gdal.Open(hdf_ds[10][0])
+        QA_band = qa_ds.ReadAsArray()
+    except ValueError as e:
+        # logger.error('Cannot open QA band for {}: {}'.format(folder, e))
+        logger.error('Cannot open QA band for {}: {}'.format(folder, e))
+        return False
+
+    # convertQA = np.vectorize(qabitval)
+    QA_band_unpacked = qabitval_array_HLS(QA_band).astype(np.short)
+    if clear_threshold > 0:
+        clear_ratio = np.sum(np.logical_or(QA_band_unpacked == QA_CLEAR,
+                                           QA_band_unpacked == QA_WATER)) \
+                      / np.sum(QA_band_unpacked != QA_FILL)
+    else:
+        clear_ratio = 1
+
+    if clear_ratio > clear_threshold:
+        [collection, sensor, tile_id, imagetime, version1, version2, ext] = folder.split('/')[-1].rsplit('.')
+        year = imagetime[0:4]
+        doy = imagetime[4:7]
+        file_name = sensor + tile_id + year + doy + collection + version1
+        if low_year_bound != 0:
+            if int(year) < low_year_bound:
+                return False
+        if upp_year_bound != 9999:
+            if int(year) > upp_year_bound:
+                return False
+
+        if sensor == 'L30':
+            try:
+                B1 = gdal.Open(hdf_ds[1][0]).ReadAsArray()
+                B2 = gdal.Open(hdf_ds[2][0]).ReadAsArray()
+                B3 = gdal.Open(hdf_ds[3][0]).ReadAsArray()
+                B4 = gdal.Open(hdf_ds[4][0]).ReadAsArray()
+                B5 = gdal.Open(hdf_ds[5][0]).ReadAsArray()
+                B6 = gdal.Open(hdf_ds[6][0]).ReadAsArray()
+                B7 = np.full(B6.shape, 0)  # assign zero
+
+            except Exception as e:
+                # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
+                logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                return False
+        elif sensor == 'S30':
+            try:
+                B1 = gdal.Open(hdf_ds[1][0]).ReadAsArray()
+                B2 = gdal.Open(hdf_ds[2][0]).ReadAsArray()
+                B3 = gdal.Open(hdf_ds[3][0]).ReadAsArray()
+                B4 = gdal.Open(hdf_ds[8][0]).ReadAsArray()
+                B5 = gdal.Open(hdf_ds[11][0]).ReadAsArray()
+                B6 = gdal.Open(hdf_ds[12][0]).ReadAsArray()
                 B7 = np.full(B6.shape, 0)
 
             except Exception as e:
@@ -952,8 +1111,8 @@ def bbox(f):
 @click.option('--hpc/--dhtc', default=True, help='if it is set for HPC or DHTC environment')
 @click.option('--low_year_bound', type=int, default=1, help='the lower bound of the year range of user interest')
 @click.option('--upp_year_bound', type=int, default=9999, help='the upper bound of the year range of user interest')
-@click.option('--collection',  type=click.Choice(['ARD', 'C2', 'HLS']), default='ARD',
-              help='if it is landsat collection 2')
+@click.option('--collection',  type=click.Choice(['ARD', 'C2', 'HLS', 'HLS14']), default='ARD',
+              help='image source')
 @click.option('--shapefile_path', type=str, default=None)
 @click.option('--id', type=int, default=0)
 def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_partition, yaml_path, hpc, low_year_bound,
@@ -971,6 +1130,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                        (isfile(join(source_dir, f)) and f.endswith('.tar'))]
     elif collection == 'HLS':
         folder_list = [f for f in listdir(source_dir) if f.startswith('HLS')]
+    elif collection == 'HLS14':
+        folder_list = [y for x in os.walk(source_dir) for y in glob(os.path.join(x[0], '*.hdf'))]
 
     tmp_path = join(out_dir, 'tmp{}'.format(rank))
 
@@ -981,7 +1142,7 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
     logger = None
     # create needed folders
     if rank == 1:
-        logging.basicConfig(filename=join(os.getcwd(), 'AutoPrepareDataARD.log'),
+        logging.basicConfig(filename=join(os.getcwd(), 'prepare_ard.log'),
                             filemode='w', level=logging.INFO)  # mode = w enables the log file to be overwritten
         logger = logging.getLogger(__name__)
 
@@ -1037,6 +1198,9 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         elif collection == 'HLS':
             ordinal_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder[15:19]), 1, 1)) + int(folder[19:22]) - 1
                              for folder in folder_list]
+        elif collection == 'HLS14':
+            ordinal_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder.split('/')[-1][15:19]), 1, 1))
+                             + int(folder.split('/')[-1][19:22]) - 1 for folder in folder_list]
         ordinal_dates.sort()
         file = open(join(out_dir, "starting_last_dates.txt"), "w+")  # need to save out starting and
         # lasting date for this tile
@@ -1046,7 +1210,7 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                                                  pd.Timestamp.toordinal(dt.datetime(upp_year_bound, 12, 31))]))))
         file.close()
     else:
-        logging.basicConfig(filename=join(os.getcwd(), 'AutoPrepareDataARD.log'),
+        logging.basicConfig(filename=join(os.getcwd(), 'prepare_ard.log'),
                             filemode='a', level=logging.INFO)  # mode = w enables the log file to be overwritten
         logger = logging.getLogger(__name__)
 
@@ -1107,6 +1271,16 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                 break
             folder = folder_list[new_rank]
             single_image_stacking_hls(source_dir, out_dir, logger, config, folder,
+                                      is_partition=is_partition, low_year_bound=low_year_bound,
+                                      upp_year_bound=upp_year_bound)
+    elif collection == 'HLS14':
+        # assign files to each core
+        for i in range(int(np.ceil(len(folder_list) / n_cores))):
+            new_rank = rank - 1 + i * n_cores
+            if new_rank > (len(folder_list) - 1):  # means that all folder has been processed
+                break
+            folder = folder_list[new_rank]
+            single_image_stacking_hls14(out_dir, logger, config, folder,
                                       is_partition=is_partition, low_year_bound=low_year_bound,
                                       upp_year_bound=upp_year_bound)
     # create an empty file for signaling the core that has been finished
