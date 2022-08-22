@@ -51,7 +51,8 @@ int stand_procedure
     int *num_fc,                /* O: number of fitting curves                       */
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    short int* CM_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* CM_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    bool b_c2
 );
 
 int inefficientobs_procedure

@@ -211,7 +211,8 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
                                                               'Example - 2015-01-01')
 @click.option('--upper_datebound', type=str, default=None, help='upper date bound of image selection for processing.'
                                                                 'Example - 2021-12-31')
-@click.option('--b_c2', is_flag=True, show_default=True, default=False, help='indicate if it is c2 or hls; if so, thermal bands will not be considered for observation selection ')
+@click.option('--b_c2', is_flag=True, show_default=True, default=False, help='indicate if it is c2 or hls; if so, '
+                                                                             'thermal bands will not be considered for observation selection ')
 def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path, low_datebound, upper_datebound, b_c2):
 # def main():
 #     rank = 29

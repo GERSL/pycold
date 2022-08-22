@@ -469,7 +469,6 @@ def predict_ref(model, dates, num_coefficients=6):
     return np.dot(coef_matrix, model.T)
 
 
-
 def generate_rowcolimage(ref_image_path, out_path):
     """
     a function to convert source image to index image (starting from 1, e.g., the first pixel is 10001)

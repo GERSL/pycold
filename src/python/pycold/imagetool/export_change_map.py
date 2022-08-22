@@ -23,6 +23,80 @@ output_nrtmodel = np.dtype([('t_start_since1982', np.short), ('num_obs', np.shor
                             ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
                             ('cm_outputs', np.short), ('cm_outputs_date', np.short)], align=True)
 
+# copy from /pycold/src/python/pycold/pyclassifier.py because MPI has conflicts with the pycold package in UCONN HPC.
+# Dirty approach!
+def extract_features(cold_plot, band, ordinal_day_list, nan_val, feature_outputs=['a0', 'a1', 'b1']):
+    """
+    generate features for classification based on a plot-based rec_cg and a list of days to be predicted
+    Parameters
+    ----------
+    cold_plot: nested array
+        plot-based rec_cg
+    band: integer
+        the predicted band number range from 0 to 6
+    ordinal_day_list: list
+        a list of days that this function will predict every days as a list as output
+    nan_val: integer
+        NA value assigned to the output
+    feature_outputs: a list of outputted feature name
+        it must be within [a0, c1, a1, b1,a2, b2, a3, b3, rmse]
+    Returns
+    -------
+        feature: a list (length = n_feature) of 1-array [len(ordinal_day_list)]
+    """
+    features = [np.full(len(ordinal_day_list), nan_val, dtype=np.double) for x in range(len(feature_outputs))]
+    for index, ordinal_day in enumerate(ordinal_day_list):
+        # print(index)
+        for idx, cold_curve in enumerate(cold_plot):
+            if idx == len(cold_plot) - 1:
+                max_days = cold_plot[idx]['t_end']
+            else:
+                max_days = cold_plot[idx + 1]['t_start']
+
+            if cold_curve['t_start'] <= ordinal_day < max_days:
+                for n, feature in enumerate(feature_outputs):
+                    if feature == 'a0':
+                        features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
+                                             ordinal_day / 100
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'c1':
+                        features[n][index] = cold_curve['coefs'][band][1] / 100
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'a1':
+                        features[n][index] = cold_curve['coefs'][band][2]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'b1':
+                        features[n][index] = cold_curve['coefs'][band][3]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'a2':
+                        features[n][index] = cold_curve['coefs'][band][4]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'b2':
+                        features[n][index] = cold_curve['coefs'][band][5]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'a3':
+                        features[n][index] = cold_curve['coefs'][band][6]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'b3':
+                        features[n][index] = cold_curve['coefs'][band][7]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'rmse':
+                        features[n][index] = cold_curve['rmse'][band]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    else:
+                        raise Exception('the outputted feature must be in [a0, c1, a1, b1,a2, b2, a3, b3, rmse]')
+                break
+    return features
+
 
 def index_sccdpack(sccd_pack_single):
     """
@@ -109,7 +183,11 @@ def getcategory_sccd(cold_plot, i_curve):
 @click.option('--yaml_path', type=str, help='path for yaml file')
 @click.option('--year_lowbound', type=int, default=1982, help='the starting year for exporting')
 @click.option('--year_uppbound', type=int, default=2020, help='the ending year for exporting')
-def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbound, yaml_path):
+@click.option('--coefs', default=False, help='if output coefs layers')
+@click.option('--coefs_bands', default=[0, 1, 2, 3, 4, 5], help='indicate the bands for output coefs_bands,'
+                                                                ' only works when coefs is True; note that the band order is'
+                                                                'b,g,r,n, s1,s2, t')
+def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbound, yaml_path, coefs, coefs_bands):
     # reference_path = '/Users/coloury/Dropbox/UCONN/spatial/test_results/h016v010/recentdist_map_COLD.tif'
     # method = 'SCCDOFFLINE'
     # yaml_path = '/home/coloury/Dropbox/Documents/PyCharmProjects/HLS_NRT/config_hls.yaml'

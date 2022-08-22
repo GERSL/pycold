@@ -194,7 +194,7 @@ int cold
 //        printf("num_fc=%d\n", *num_fc);
          result = stand_procedure(valid_num_scenes, valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t, fmask_buf, id_range,
                                  tcg, conse, b_outputCM, starting_date, rec_cg, num_fc, CM_OUTPUT_INTERVAL, CM_outputs,
-                                 CM_outputs_date);
+                                 CM_outputs_date, b_c2);
 //        result = stand_procedure_fixeddays(valid_num_scenes, valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t, fmask_buf, id_range,
 //                                 tcg, conse, b_outputCM, starting_date, rec_cg, num_fc, CM_OUTPUT_INTERVAL, CM_outputs,
 //                                 CM_outputs_date, (conse - 1) * 16);
@@ -2629,7 +2629,8 @@ int stand_procedure
     int *num_fc,                /* O: number of fitting curves                       */
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    short int* CM_outputs_date      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* CM_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    bool b_c2
 )
 {
     int status;
@@ -2770,8 +2771,13 @@ int stand_procedure
                         clry[k][n_clr] = (float)buf_s1[i];
                     else if (k == 5)
                         clry[k][n_clr] = (float)buf_s2[i];
-                    else if (k == 6)
-                        clry[k][n_clr] = (float)(buf_t[i] * 10 - 27320);
+                    else if (k == 6){
+                        if (b_c2 == TRUE)
+                            clry[k][n_clr] = 0;
+                        else
+                            clry[k][n_clr] = (float)(buf_t[i] * 10 - 27320);
+                    }
+
                     //printf("%3.2f\n", clry[k][n_clr]);
                 }
                 n_clr++;

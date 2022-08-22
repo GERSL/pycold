@@ -16,7 +16,7 @@ import logging
 import sys
 
 
-def extract_features(cold_plot, band, ordinal_day_list, nan_val, n_features_perband, ismat=False):
+def extract_features(cold_plot, band, ordinal_day_list, nan_val, feature_outputs=['a0', 'a1', 'b1']):
     """
     generate features for classification based on a plot-based rec_cg and a list of days to be predicted
     Parameters
@@ -29,15 +29,13 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, n_features_perb
         a list of days that this function will predict every days as a list as output
     nan_val: integer
         NA value assigned to the output
-    n_features_perband: integer
-        the number of features per band, 1, 3, 5, 7, 8.
-    ismat: bool
-        True -> the input is MATLAB rec_cg
+    feature_outputs: a list of outputted feature name
+        it must be within [a0, c1, a1, b1,a2, b2, a3, b3, rmse]
     Returns
     -------
         feature: a list (length = n_feature) of 1-array [len(ordinal_day_list)]
     """
-    features = [np.full(len(ordinal_day_list), nan_val, dtype=np.double) for x in range(n_features_perband)]
+    features = [np.full(len(ordinal_day_list), nan_val, dtype=np.double) for x in range(len(feature_outputs))]
     for index, ordinal_day in enumerate(ordinal_day_list):
         # print(index)
         for idx, cold_curve in enumerate(cold_plot):
@@ -45,53 +43,49 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, n_features_perb
                 max_days = cold_plot[idx]['t_end']
             else:
                 max_days = cold_plot[idx + 1]['t_start']
-            if n_features_perband == 8:
-                if cold_curve['t_start'] <= ordinal_day < max_days:
-                    if ismat:
-                        for n in range(n_features_perband):
-                            if n == 0:
-                                features[n][index] = cold_curve['coefs'][0][band] + cold_curve['coefs'][1][band] * \
-                                                     ordinal_day
-                            else:
-                                features[n][index] = cold_curve['coefs'][n][band]
-                        break
-                    else:
-                        for n in range(n_features_perband):
-                            if n == 0:
-                                features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
-                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
-                                if np.isnan(features[n][index]):
-                                    features[n][index] = 0
-                            else:
-                                features[n][index] = cold_curve['coefs'][band][n]
-                                if np.isnan(features[n][index]):
-                                    features[n][index] = 0
-                        break
 
-            else:
-                if cold_curve['t_start'] <= ordinal_day < max_days:
-                    if ismat:
-                        for n in range(n_features_perband):
-                            if n == 0:
-                                # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
-                                features[n][index] = cold_curve['coefs'][0][band] + cold_curve['coefs'][1][band] * \
-                                                     ordinal_day
-                            else:
-                                features[n][index] = cold_curve['coefs'][n+1][band]
-                        break
+            if cold_curve['t_start'] <= ordinal_day < max_days:
+                for n, feature in enumerate(feature_outputs):
+                    if feature == 'a0':
+                        features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
+                                             ordinal_day / defaults['COMMON']['SLOPE_SCALE']
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'c1':
+                        features[n][index] = cold_curve['coefs'][band][1] / defaults['COMMON']['SLOPE_SCALE']
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'a1':
+                        features[n][index] = cold_curve['coefs'][band][2]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'b1':
+                        features[n][index] = cold_curve['coefs'][band][3]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'a2':
+                        features[n][index] = cold_curve['coefs'][band][4]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'b2':
+                        features[n][index] = cold_curve['coefs'][band][5]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'a3':
+                        features[n][index] = cold_curve['coefs'][band][6]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'b3':
+                        features[n][index] = cold_curve['coefs'][band][7]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
+                    elif feature == 'rmse':
+                        features[n][index] = cold_curve['rmse'][band]
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
                     else:
-                        for n in range(n_features_perband):
-                            if n == 0:
-                                # if cold_curve['t_start'] <= ordinal_day < cold_curve['t_end']:
-                                features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
-                                                     ordinal_day / defaults['COMMON']['SLOPE_SCALE']
-                                if np.isnan(features[n][index]):
-                                    features[n][index] = 0
-                            else:
-                                features[n][index] = cold_curve['coefs'][band][n+1]  # n + 1 is because won't need slope as output
-                                if np.isnan(features[n][index]):
-                                    features[n][index] = 0
-                        break
+                        raise Exception('the outputted feature must be in [a0, c1, a1, b1,a2, b2, a3, b3, rmse]')
+                break
     return features
 
 
@@ -133,21 +127,22 @@ def get_features(path):
 
 
 class PyClassifier:
-    def __init__(self, config, n_features_perband=None, logger=None, band_num=7):
+    def __init__(self, config, feature_outputs=['a0', 'a1', 'b1'], logger=None, band_num=7):
         """
         Parameters
         ----------
         config: from config.yaml
-        n_features: the total feature number for a single pixel, it may be overwritten when accessory bands are added
+        feature_outputs: a list of outputted feature name
+            it must be within [a0, c1, a1, b1,a2, b2, a3, b3, rmse]
         """
         self.config = config
         self.config['block_width'] = int(self.config['n_cols'] / self.config['n_block_x'])
         self.config['block_height'] = int(self.config['n_rows'] / self.config['n_block_y'])
         self.config['n_blocks'] = self.config['n_block_x'] * self.config['n_block_y']
-        if n_features is None:
-            self.n_features = band_num * defaults['CLASSIFIER']['N_FEATURES']
-        else:
-            self.n_features = band_num * n_features_perband
+        for feature in feature_outputs:
+            assert feature in ['a0', 'c1', 'a1', 'b1', 'a2', 'b2', 'a3', 'b3', 'rmse']
+        self.n_features = band_num * len(feature_outputs)
+        self.feature_outputs = feature_outputs
         if logger is None:
             logging.basicConfig(level=logging.DEBUG,
                                 format='%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s',
@@ -199,7 +194,7 @@ class PyClassifier:
 
             for band in range(self.band_num):
                 feature_row = extract_features(element, band, ordinal_day_list, defaults['COMMON']['NAN_VAL'],
-                                               int(self.n_features / self.band_num), ismat)
+                                               feature_outputs=self.feature_outputs)
                 for index in range(int(self.n_features / self.band_num)):
                     block_features[:, i_row * self.config['block_width'] + i_col, 
                                    int(band * self.n_features / self.band_num) + index] \
@@ -266,7 +261,7 @@ class PyClassifierHPC(PyClassifier):
     this class adds IO functions based on the HPC environment for the base class
     """
     def __init__(self, config, record_path, band_num=7, year_list_to_predict=list(range(1982, 2022)),
-                 tmp_path=None, output_path=None, n_features_perband=defaults['CLASSIFIER']['N_FEATURES'],
+                 tmp_path=None, output_path=None, feature_outputs=['a0', 'a1', 'b1'],
                  seedmap_path=None, rf_path=None, logger=None):
         """
         Parameters
@@ -280,10 +275,8 @@ class PyClassifierHPC(PyClassifier):
             the path to save temporal folder, if None, will set /record_path/feature_maps
         output_path: string, default is None
             the path to save classification map output, if None, will set /record_path/feature_maps
-        n_features: number of feature output per band, 1, 3, 5, 7, 8. If n_features = 1,3,5,7, we will output corresponding
-                intercept and harmonic coefficients. For example, 3 means that 1 - intercept, 2- cos(annual), 3- sin(annual);
-                if n_features = 8, we output all coefficients.
-                Note that intercept for each year is adjusted by slope, i.e., intercept + slope * date
+        feature_outputs: a list of outputted feature name
+            it must be within [a0, c1, a1, b1,a2, b2, a3, b3, rmse]
         seedmap_path: the path for the seed map to produce rf model
         rf_path: the path for existing random forest forest
         logger: the logger handler
@@ -293,13 +286,14 @@ class PyClassifierHPC(PyClassifier):
         except ValueError or FileExistsError as e:
             raise e
 
-        assert n_features_perband in [1, 3, 5, 7, 8]
-        
         self.config = config
         self.config['block_width'] = int(self.config['n_cols'] / self.config['n_block_x'])
         self.config['block_height'] = int(self.config['n_rows'] / self.config['n_block_y'])
         self.config['n_blocks'] = self.config['n_block_x'] * self.config['n_block_y']
         self.record_path = record_path
+        for feature in feature_outputs:
+            assert feature in ['a0', 'c1', 'a1', 'b1', 'a2', 'b2', 'a3', 'b3', 'rmse']
+        self.feature_outputs = feature_outputs
 
         if tmp_path is None:
             self.tmp_path = join(record_path, 'feature_maps')  # default path
@@ -311,7 +305,7 @@ class PyClassifierHPC(PyClassifier):
         else:
             self.output_path = tmp_path
 
-        self.n_features = band_num * n_features_perband
+        self.n_features = band_num * len(feature_outputs)
 
         self.year_list_to_predict = year_list_to_predict
         self.seedmap_path = seedmap_path
