@@ -209,6 +209,7 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
         logger.error('Cannot open QA band for {}: {}'.format(folder, e))
         return False
 
+
     # convertQA = np.vectorize(qabitval)
     QA_band_unpacked = qabitval_array_HLS(QA_band).astype(np.short)
     if clear_threshold > 0:
@@ -1270,7 +1271,7 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             if new_rank > (len(folder_list) - 1):  # means that all folder has been processed
                 break
             folder = folder_list[new_rank]
-            single_image_stacking_hls(source_dir, out_dir, logger, config, folder,
+            single_image_stacking_hls(source_dir, out_dir, logger, config, folder, clear_threshold=clear_threshold,
                                       is_partition=is_partition, low_year_bound=low_year_bound,
                                       upp_year_bound=upp_year_bound)
     elif collection == 'HLS14':
@@ -1280,7 +1281,7 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             if new_rank > (len(folder_list) - 1):  # means that all folder has been processed
                 break
             folder = folder_list[new_rank]
-            single_image_stacking_hls14(out_dir, logger, config, folder,
+            single_image_stacking_hls14(out_dir, logger, config, folder, clear_threshold=clear_threshold,
                                       is_partition=is_partition, low_year_bound=low_year_bound,
                                       upp_year_bound=upp_year_bound)
     # create an empty file for signaling the core that has been finished
