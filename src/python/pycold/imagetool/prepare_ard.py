@@ -53,6 +53,7 @@ QA_CLOUDADJACENT_HLS = 2
 QA_CLOUD_HLS = 1
 res = 30
 
+
 s2_stack_bands = ['B02', 'B03', 'B04', 'B8A', 'B11', 'B12', 'Fmask']
 l8_stack_bands = ['B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'Fmask']
 
@@ -371,7 +372,7 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
     """
     try:
         hdf_ds = gdal.Open(folder, gdal.GA_ReadOnly).GetSubDatasets()
-        qa_ds = gdal.Open(hdf_ds[10][0])
+        qa_ds = gdal.Open(hdf_ds[-1][0])
         QA_band = qa_ds.ReadAsArray()
     except ValueError as e:
         # logger.error('Cannot open QA band for {}: {}'.format(folder, e))
