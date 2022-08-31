@@ -56,7 +56,8 @@ int sccd
     bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band due to the current low quality  */
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
-    int *num_fc_pinpoint
+    int *num_fc_pinpoint,
+    double gate_tcg
 )
 {
     int clear_sum = 0;      /* Total number of clear cfmask pixels          */
@@ -83,7 +84,7 @@ int sccd
     if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD)|(*nrt_mode  == NRT_QUEUE_RECENT))
         len_clrx = valid_num_scenes + *num_obs_queue;
     else if ((*nrt_mode  == NRT_MONITOR_SNOW)|(*nrt_mode  == NRT_MONITOR_STANDARD))
-        len_clrx = valid_num_scenes + DEFAULT_CONSE - 1;
+        len_clrx = valid_num_scenes + DEFAULT_CONSE;
     else
        len_clrx = valid_num_scenes;
 
@@ -143,7 +144,7 @@ int sccd
     }else if ((*nrt_mode  == NRT_MONITOR_SNOW)|(*nrt_mode  == NRT_MONITOR_STANDARD))
     {
         //  if monitor mode, will append output_nrtmodel default conse-1 obs
-        for (k = 0; k < DEFAULT_CONSE - 1; k++){
+        for (k = 0; k < DEFAULT_CONSE; k++){
             for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
             {
                 clry[i_b][k] = nrt_model->obs[i_b][k];
@@ -216,22 +217,21 @@ int sccd
              }
 
             result = sccd_standard(clrx, clry, n_clr, tcg, rec_cg, num_fc, nrt_mode, nrt_model, num_obs_queue,
-                                   obs_queue, min_rmse, conse, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint);
+                                   obs_queue, min_rmse, conse, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg);
 
          }else{
-             // no new observation, output NONE for ending parameters
+             // no new observation, output NONE for ending parameters   // remove it! 08302022SY
              if((*nrt_mode == NRT_MONITOR_STANDARD) | (*nrt_mode == NRT_QUEUE_RECENT)){
-                 nrt_model->cm_outputs = NA_VALUE;
-                 nrt_model->cm_outputs_date = NA_VALUE;
-                 nrt_model->conse_last = 0;
-                 for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-                 {
-                     nrt_model->cm_bands[i_b] = NA_VALUE;
-                 }
-                 nrt_model->cm_angle = NA_VALUE;
-                 if(*nrt_mode == NRT_QUEUE_RECENT){
-                     *nrt_mode = NRT_QUEUE_STANDARD;
-                 }
+//                 nrt_model->norm_cm = NA_VALUE;
+//                 nrt_model->conse_last = 0;
+//                 for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+//                 {
+//                     nrt_model->cm_bands[i_b] = NA_VALUE;
+//                 }
+//                nrt_model->cm_angle = NA_VALUE;
+//                 if(*nrt_mode == NRT_QUEUE_RECENT){
+//                     *nrt_mode = NRT_QUEUE_STANDARD;
+//                 }
              }
          }
     }
@@ -1699,13 +1699,13 @@ int step2_KF_ChangeDetection
     Output_sccd* rec_cg,           /* I/O: the outputted S-CCD result structure   */
     unsigned int *sum_square_vt,              /* I/O:  the sum of predicted square of residuals  */
     int *num_obs_processed,             /* I/O:  the number of current non-noise observations being processed */
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    float* cm_angle,
     int t_start,
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
-    int *num_fc_pinpoint
+    int *num_fc_pinpoint,
+    double gate_tcg,
+    short int *norm_cm_scale100,
+    short int *mean_angle_scale100
 )
 {
     int i_b, b, m, k, j;
@@ -1725,7 +1725,6 @@ int step2_KF_ChangeDetection
     float max_rmse[TOTAL_IMAGE_BANDS_SCCD];
     bool change_flag = TRUE;
     float mean_angle = 0;
-    float mean_angle_scale100 = 0;
     float tmp;
     double vt;
     float rmse_band[TOTAL_IMAGE_BANDS_SCCD];
@@ -1805,7 +1804,7 @@ int step2_KF_ChangeDetection
         }
 
         if (b_pinpoint == TRUE){
-            if((v_dif_mag_norm[i_conse] < tcg) & (i_conse < PINPOINT_CONSE)){
+            if((v_dif_mag_norm[i_conse] < gate_tcg) & (i_conse < PINPOINT_CONSE)){
                 change_flag = FALSE;
                 break;
             }
@@ -1863,37 +1862,57 @@ int step2_KF_ChangeDetection
                             v_dif_mag_tmp[i_b][j] = v_dif_mag[i_b][j];
                     }
 
-
-                    // mean_angle = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, conse_last, lasso_blist_sccd);
-                    mean_angle_scale100 = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last) * 100;
-
                     float min_cm = 999999;
+                    float mean_angle_pinpoint;
+                    // mean_angle = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, conse_last, lasso_blist_sccd);
+                    mean_angle_pinpoint = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last) * 100;
+
                     for(j = 0; j < conse_last; j++)
                         if(v_dif_mag_norm[j] * 100 < min_cm)
                             min_cm = v_dif_mag_norm[j] * 100;
 
                     if (min_cm > MAX_SHORT)
                         min_cm = MAX_SHORT;
-                    if (mean_angle_scale100 > MAX_SHORT)
-                        mean_angle_scale100 = MAX_SHORT;
-                    rec_cg_pinpoint[*num_fc_pinpoint].cm_angle[conse_last-1] = (short int)mean_angle_scale100;
-                    rec_cg_pinpoint[*num_fc_pinpoint].cm_outputs[conse_last-1] = (short int)min_cm;
-
-                    for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++){
-                        for (b = 0; b < NUM_LASSO_BANDS; b++)
+                    if (mean_angle_pinpoint > MAX_SHORT)
+                        mean_angle_pinpoint = MAX_SHORT;
+                    rec_cg_pinpoint[*num_fc_pinpoint].cm_angle[conse_last-1] = (short int)mean_angle_pinpoint;
+                    rec_cg_pinpoint[*num_fc_pinpoint].norm_cm[conse_last-1] = (short int)min_cm;
+                    for(k = 0; k < DEFAULT_CONSE; k ++)
+                    {
+                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                         {
-                            if (i_b == lasso_blist_sccd[b])
-                            {
-                                for(j = 0; j < conse_last; j++)
-                                    v_diff_tmp[b][j] = v_dif[b][j];
-                            }
+                            rec_cg_pinpoint[*num_fc_pinpoint].obs[i_b][k] = (short int)clry[i_b][cur_i + k];
                         }
-                        quick_sort_float(v_dif_mag_tmp[i_b], 0, conse_last - 1);
-                        matlab_2d_float_median(v_dif_mag_tmp, i_b, conse_last,
-                                               &tmp);
-                        rec_cg_pinpoint[*num_fc_pinpoint].cm_bands[conse_last-1][i_b] = tmp;
-
+                        rec_cg_pinpoint[*num_fc_pinpoint].obs_date_since1982[k] = (short int)(clrx[cur_i + k] - JULIAN_LANDSAT4_LAUNCH);
                     }
+                    for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                    {
+                        for (k = 0; k < SCCD_NUM_C; k++)
+                        {
+                            /**********************************/
+                            /*                                */
+                            /* Record fitted coefficients.    */
+                            /*                                */
+                            /**********************************/
+                            rec_cg_pinpoint[*num_fc_pinpoint].coefs[i_b][k] = fit_cft[i_b][k];
+                        }
+                    } //for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+
+//                    for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++){
+//                        for (b = 0; b < NUM_LASSO_BANDS; b++)
+//                        {
+//                            if (i_b == lasso_blist_sccd[b])
+//                            {
+//                                for(j = 0; j < conse_last; j++)
+//                                    v_diff_tmp[b][j] = v_dif[b][j];
+//                            }
+//                        }
+//                        quick_sort_float(v_dif_mag_tmp[i_b], 0, conse_last - 1);
+//                        matlab_2d_float_median(v_dif_mag_tmp, i_b, conse_last,
+//                                               &tmp);
+//                        rec_cg_pinpoint[*num_fc_pinpoint].cm_bands[conse_last-1][i_b] = tmp;
+
+//                    }
                     rec_cg_pinpoint[*num_fc_pinpoint].t_break = clrx[cur_i];
 
                     status = free_2d_array ((void **) v_diff_tmp);
@@ -1915,39 +1934,40 @@ int step2_KF_ChangeDetection
     }
 
 
-
     if(change_flag == TRUE)
     {
+        if(break_mag < tcg){
+              change_flag = FALSE;
+        }
+        else{
+            // mean_angle = angl_scatter_measure(medium_v_dif, v_dif, NUM_LASSO_BANDS, conse, lasso_blist_sccd);
+            mean_angle  = MeanAngl_float(v_dif, NUM_LASSO_BANDS, conse);
 
-        // mean_angle = angl_scatter_measure(medium_v_dif, v_dif, NUM_LASSO_BANDS, conse, lasso_blist_sccd);
-        mean_angle  = MeanAngl_float(v_dif, NUM_LASSO_BANDS, conse);
+            // prob_MCM = Chi_Square_Distribution(break_mag, NUM_LASSO_BANDS);
+            tmp = round(break_mag * 100);
+            if (tmp > MAX_SHORT) // MAX_SHORT is upper limit of short 16
+                tmp = MAX_SHORT;
+            tmp_CM = (short int) (tmp);
 
-        // prob_MCM = Chi_Square_Distribution(break_mag, NUM_LASSO_BANDS);
-        tmp = round(break_mag * 100);
-        if (tmp > MAX_SHORT) // MAX_SHORT is upper limit of short 16
-            tmp = MAX_SHORT;
-        tmp_CM = (short int) (tmp);
+            if (mean_angle > NSIGN)
+            //if (mean_angle > NSIGN)
+            {
+                change_flag = FALSE;
+            }
 
-        if (mean_angle > NSIGN)
-        //if (mean_angle > NSIGN)
-        {
-            change_flag = FALSE;
         }
     }
 
 
-    if(tmp_CM > *cm_outputs)
+    if (change_flag == TRUE)
     {
-        *cm_outputs = tmp_CM;
-        *cm_outputs_date = (short int)(clrx[cur_i] - JULIAN_LANDSAT4_LAUNCH);
-    }
+        *mean_angle_scale100 = (mean_angle * 100);
+        if (*mean_angle_scale100 > MAX_SHORT)
+            *mean_angle_scale100 = MAX_SHORT;
+        *norm_cm_scale100 = break_mag * 100;
+        if (*norm_cm_scale100  > MAX_SHORT)
+            *norm_cm_scale100  = MAX_SHORT;
 
-    if ((change_flag == TRUE) && (break_mag > tcg) && (mean_angle <= NSIGN))
-    {
-        mean_angle_scale100 = (mean_angle * 100);
-        if (mean_angle_scale100 > MAX_SHORT)
-            mean_angle_scale100 = MAX_SHORT;
-        *cm_angle = (short int) mean_angle_scale100;
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             rec_cg[*num_curve].rmse[i_b] = sqrtf((float)rmse_band[i_b]);
@@ -1976,7 +1996,7 @@ int step2_KF_ChangeDetection
         /* record break  */
         rec_cg[*num_curve].t_break = clrx[cur_i];
         *num_curve = *num_curve + 1;
-        *num_obs_processed = *num_obs_processed + 1;
+        // *num_obs_processed = *num_obs_processed + 1;
 
 
         /**********************************************/
@@ -2097,12 +2117,7 @@ int step3_processing_end
     int t_start,
     int conse,
     short int *min_rmse,
-    double tcg,                /* I: the change threshold  */
-    short int cm_outputs,      /* I: change magnitudes if new break detected*/
-    short int cm_outputs_date,      /* I: dates for maximum change magnitudes if new break detected*/
-    float cm_angle,   /* I: change angle for maximum change magnitudes if new break detected*/
-    Output_sccd* rec_cg,
-    int num_fc
+    double gate_tcg
 )
 {
     int k, k1, k2;
@@ -2202,7 +2217,7 @@ int step3_processing_end
 //    printf("step3 timepoint 1 took %f seconds to execute\n", time_taken);
 //    t_time = clock();
 
-    if ((nrt_mode == NRT_MONITOR_STANDARD)| (nrt_mode == NRT_QUEUE_RECENT))
+    if (nrt_mode == NRT_MONITOR_STANDARD)
     {
         /****************************************************/
         /*   need to save nrt records for monitor mode      */
@@ -2229,9 +2244,9 @@ int step3_processing_end
         nrt_model->num_obs = (short int)(num_obs_processed);
 
         /*     5. observations in tail       */
-        for(k = 0; k < DEFAULT_CONSE - 1; k ++)
+        for(k = 0; k < DEFAULT_CONSE; k ++)
         {
-            if (k < conse - 1)
+            if (k < conse)
             {
                 for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                 {
@@ -2254,8 +2269,8 @@ int step3_processing_end
             nrt_model->H[i_b] = instance[i_b].H;
             nrt_model->rmse_sum[i_b] = sum_square_vt[i_b];
         }
-//        nrt_model->cm_outputs = cm_outputs[current_CM_n];
-//        nrt_model->cm_outputs_date = cm_outputs_date[current_CM_n];
+//        nrt_model->norm_cm = norm_cm[current_CM_n];
+//        nrt_model->norm_cm_date = norm_cm_date[current_CM_n];
 
 
         /**********************************************************/
@@ -2272,146 +2287,102 @@ int step3_processing_end
 //        printf("step3 timepoint 2 took %f seconds to execute\n", time_taken);
 //        t_time = clock();
 
-
-
-        if (nrt_mode == NRT_MONITOR_STANDARD)
+        for(i_conse = 0; i_conse < conse; i_conse++)
         {
-            for(i_conse = 0; i_conse < conse; i_conse++)
+            v_dif_mag_norm[i_conse] = 0;
+            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
             {
-                v_dif_mag_norm[i_conse] = 0;
-                for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                KF_ts_predict_conse(&instance[i_b], clrx, cov_p[i_b], fit_cft, *n_clr - 1 - i_conse, *n_clr - 1 - i_conse,
+                                    i_b, cur_i, &pred_y, &pred_y_f, FALSE);
+                // max_rmse[i_b] = max(min_rmse[i_b], sqrtf(pred_y_f));
+                max_rmse = max(min_rmse[i_b], sqrtf(rmse_band[i_b]));
+                v_dif_mag[i_b][i_conse] = clry[i_b][*n_clr - 1 - i_conse] - pred_y;
+                for (b = 0; b < NUM_LASSO_BANDS; b++)
                 {
-                    KF_ts_predict_conse(&instance[i_b], clrx, cov_p[i_b], fit_cft, *n_clr - 1 - i_conse, *n_clr - 1 - i_conse,
-                                        i_b, cur_i, &pred_y, &pred_y_f, FALSE);
-                    // max_rmse[i_b] = max(min_rmse[i_b], sqrtf(pred_y_f));
-                    max_rmse = max(min_rmse[i_b], sqrtf(rmse_band[i_b]));
-                    v_dif_mag[i_b][i_conse] = clry[i_b][*n_clr - 1 - i_conse] - pred_y;
-                    for (b = 0; b < NUM_LASSO_BANDS; b++)
+                    if (i_b == lasso_blist_sccd[b])
                     {
-                        if (i_b == lasso_blist_sccd[b])
-                        {
-                            v_dif[b][i_conse] =  v_dif_mag[i_b][i_conse] / max_rmse;
-                            v_dif_mag_norm[i_conse] = v_dif_mag_norm[i_conse] + v_dif[b][i_conse] * v_dif[b][i_conse];
-                            break;
-                        }
+                        v_dif[b][i_conse] =  v_dif_mag[i_b][i_conse] / max_rmse;
+                        v_dif_mag_norm[i_conse] = v_dif_mag_norm[i_conse] + v_dif[b][i_conse] * v_dif[b][i_conse];
+                        break;
                     }
-
                 }
+
+            }
 //                if (v_dif_mag_norm[i_conse] <= DEFAULT_COLD_TCG)
 //                    id_last = i_conse;
-            }
+        }
 
 //            time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
 //            printf("step3 timepoint 3 took %f seconds to execute\n", time_taken);
 //            t_time = clock();
-            // note v_dif and v_dif_mag are all reversed order by date
-            for (conse_last = 1; conse_last <= conse; conse_last++)  // equal to *n_clr - 1 to *n_clr - 1 - conse + 1
-            {
-                v_diff_tmp =(float **) allocate_2d_array(NUM_LASSO_BANDS, conse_last, sizeof (float));
-                v_dif_mag_tmp = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, conse_last,
-                            sizeof (float));
-                for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++){
-                    for (b = 0; b < NUM_LASSO_BANDS; b++)
-                    {
-                        if (i_b == lasso_blist_sccd[b])
-                        {
-                            for(j = 0; j < conse_last; j++)
-                                v_diff_tmp[b][j] = v_dif[b][j];
-                        }
-                    }
-                    for(j = 0; j < conse_last; j++)
-                        v_dif_mag_tmp[i_b][j] = v_dif_mag[i_b][j];
-                }
-
-
-                // mean_angle = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, conse_last, lasso_blist_sccd);
-                mean_angle_scale100 = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last) * 100;
-
-                // NOTE THAT USE THE DEFAULT CHANGE THRESHOLD (0.99) TO CALCULATE PROBABILITY
-                if (v_dif_mag_norm[conse_last - 1] <= T_MIN_CG_SCCD)
-                //if (v_dif_mag_norm[conse_last - 1] <= DEFAULT_COLD_TCG)
+        // note v_dif and v_dif_mag are all reversed order by date
+        for (conse_last = 1; conse_last <= conse; conse_last++)  // equal to *n_clr - 1 to *n_clr - 1 - conse + 1
+        {
+            v_diff_tmp =(float **) allocate_2d_array(NUM_LASSO_BANDS, conse_last, sizeof (float));
+            v_dif_mag_tmp = (float **) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, conse_last,
+                        sizeof (float));
+            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++){
+                for (b = 0; b < NUM_LASSO_BANDS; b++)
                 {
-                    /**************************************************/
-                    /*                                                */
-                    /* The last stable ID.                            */
-                    /*                                                */
-                    /**************************************************/
-
-                    if (conse_last > 1)
+                    if (i_b == lasso_blist_sccd[b])
                     {
-                        float min_cm = 999999;
-                        for(j = 0; j < conse_last - 1; j++)
-                            if(v_dif_mag_norm[j] * 100 < min_cm)
-                                min_cm = v_dif_mag_norm[j] * 100;
-
-                        if (min_cm > MAX_SHORT)
-                            min_cm = MAX_SHORT;
-                        if (mean_angle_scale100 > MAX_SHORT)
-                            mean_angle_scale100 = MAX_SHORT;
-
-
-                        nrt_model->cm_outputs = (short int) (min_cm);
-                        nrt_model->cm_outputs_date = (short int) (clrx[*n_clr - conse_last + 1] - JULIAN_LANDSAT4_LAUNCH);
-                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-                        {
-                            quick_sort_float(v_dif_mag_tmp[i_b], 0, conse_last - 1);
-                            matlab_2d_float_median(v_dif_mag_tmp, i_b, conse_last,
-                                                   &tmp);
-                            nrt_model->cm_bands[i_b] = (short int) (tmp);
-                        }
-                        nrt_model->conse_last = conse_last - 1;   // for new change, at last conse
-                        nrt_model->cm_angle = (short int)mean_angle_scale100;
-
-                    }
-                    else{
-                        nrt_model->cm_outputs = NA_VALUE;
-                        nrt_model->cm_outputs_date = NA_VALUE;
-                        nrt_model->cm_angle = NA_VALUE;
-                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-                        {
-                            nrt_model->cm_bands[i_b] = NA_VALUE;
-                        }
-                        nrt_model->conse_last = 0;   // for new change, at last conse
-                    }
-
-
-                    status = free_2d_array ((void **) v_diff_tmp);
-                    if (status != SUCCESS)
-                    {
-                        RETURN_ERROR ("Freeing memory: v_diff_tmp\n",
-                                      FUNC_NAME, FAILURE);
-                    }
-                    status = free_2d_array ((void **) v_dif_mag_tmp);
-                    if (status != SUCCESS)
-                    {
-                        RETURN_ERROR ("Freeing memory: v_dif_mag_tmp\n",
-                                      FUNC_NAME, FAILURE);
-                    }
-                    break;
-                }else{
-                    if(conse_last == conse){ // all observation in the last conse passed T_MIN_CG_SCCD
-                        float min_cm = 999999;
-                        for(j = 0; j < conse_last - 1; j++)
-                            if(v_dif_mag_norm[j] * 100 < min_cm)
-                                min_cm =  v_dif_mag_norm[j] * 100;
-                        if (min_cm > MAX_SHORT)
-                            min_cm = MAX_SHORT;
-                        if (mean_angle_scale100 > MAX_SHORT)
-                            mean_angle_scale100 = MAX_SHORT;
-
-                        nrt_model->cm_outputs = (short int)min_cm;
-                        nrt_model->cm_outputs_date = (short int) (clrx[*n_clr - 1 - conse_last + 1] - JULIAN_LANDSAT4_LAUNCH);
-                        nrt_model->cm_angle = (short int)mean_angle_scale100;
-                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-                        {
-                            quick_sort_float(v_dif_mag_tmp[i_b], 0, conse_last - 1);
-                            matlab_2d_float_median(v_dif_mag_tmp, i_b, conse_last,
-                                                   &tmp);
-                            nrt_model->cm_bands[i_b] = (short int) (tmp);
-                        }
-                        nrt_model->conse_last = conse_last;   // for new change, at last conse
+                        for(j = 0; j < conse_last; j++)
+                            v_diff_tmp[b][j] = v_dif[b][j];
                     }
                 }
+                for(j = 0; j < conse_last; j++)
+                    v_dif_mag_tmp[i_b][j] = v_dif_mag[i_b][j];
+            }
+
+
+            // mean_angle = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, conse_last, lasso_blist_sccd);
+            mean_angle_scale100 = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last) * 100;
+
+            // NOTE THAT USE THE DEFAULT CHANGE THRESHOLD (0.99) TO CALCULATE PROBABILITY
+            if (v_dif_mag_norm[conse_last - 1] <= gate_tcg)
+            //if (v_dif_mag_norm[conse_last - 1] <= DEFAULT_COLD_TCG)
+            {
+                /**************************************************/
+                /*                                                */
+                /* The last stable ID.                            */
+                /*                                                */
+                /**************************************************/
+
+                if (conse_last > 1)
+                {
+                    float min_cm = 999999;
+                    for(j = 0; j < conse_last - 1; j++)
+                        if(v_dif_mag_norm[j] * 100 < min_cm)
+                            min_cm = v_dif_mag_norm[j] * 100;
+
+                    if (min_cm > MAX_SHORT)
+                        min_cm = MAX_SHORT;
+                    if (mean_angle_scale100 > MAX_SHORT)
+                        mean_angle_scale100 = MAX_SHORT;
+
+
+                    nrt_model->norm_cm = (short int) (min_cm);
+//                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+//                        {
+//                            quick_sort_float(v_dif_mag_tmp[i_b], 0, conse_last - 1);
+//                            matlab_2d_float_median(v_dif_mag_tmp, i_b, conse_last,
+//                                                   &tmp);
+//                            nrt_model->cm_bands[i_b] = (short int) (tmp);
+//                        }
+                    nrt_model->conse_last = conse_last - 1;   // meaning change happens in the last obs, so conse_last - 1
+                    nrt_model->cm_angle = (short int)mean_angle_scale100;
+
+                }
+                else{
+                    nrt_model->norm_cm = NA_VALUE;
+                    nrt_model->cm_angle = NA_VALUE;
+//                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+//                        {
+//                            nrt_model->cm_bands[i_b] = NA_VALUE;
+//                        }
+                    nrt_model->conse_last = 0;   // for new change, at last conse
+                }
+
 
                 status = free_2d_array ((void **) v_diff_tmp);
                 if (status != SUCCESS)
@@ -2425,24 +2396,49 @@ int step3_processing_end
                     RETURN_ERROR ("Freeing memory: v_dif_mag_tmp\n",
                                   FUNC_NAME, FAILURE);
                 }
-            }
-        }else if (nrt_mode == NRT_QUEUE_RECENT){
-            nrt_model->cm_outputs = cm_outputs;
-            nrt_model->cm_outputs_date = cm_outputs_date;
-            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-            {
-                nrt_model->cm_bands[i_b] = (short int)(rec_cg[num_fc-1].magnitude[i_b]);
-            }
-            nrt_model->conse_last = (unsigned char)conse;   // for new change, at last conse
-            if (cm_angle > MAX_SHORT)
-                cm_angle = MAX_SHORT;
-            nrt_model->cm_angle = (short int)cm_angle;
+                break;
+            }else{
+                if(conse_last == conse){ // all observation in the last conse passed T_MIN_CG_SCCD
+                    float min_cm = 999999;
+                    for(j = 0; j < conse_last; j++)
+                        if(v_dif_mag_norm[j] * 100 < min_cm)
+                            min_cm =  v_dif_mag_norm[j] * 100;
+                    if (min_cm > MAX_SHORT)
+                        min_cm = MAX_SHORT;
+                    if (mean_angle_scale100 > MAX_SHORT)
+                        mean_angle_scale100 = MAX_SHORT;
 
+                    nrt_model->norm_cm = (short int)min_cm;
+                    nrt_model->cm_angle = (short int)mean_angle_scale100;
+//                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+//                        {
+//                            quick_sort_float(v_dif_mag_tmp[i_b], 0, conse_last - 1);
+//                            matlab_2d_float_median(v_dif_mag_tmp, i_b, conse_last,
+//                                                   &tmp);
+//                            nrt_model->cm_bands[i_b] = (short int) (tmp);
+//                        }
+                    nrt_model->conse_last = conse_last;   // for new change, at last conse
+                }
+            }
+
+            status = free_2d_array ((void **) v_diff_tmp);
+            if (status != SUCCESS)
+            {
+                RETURN_ERROR ("Freeing memory: v_diff_tmp\n",
+                              FUNC_NAME, FAILURE);
+            }
+            status = free_2d_array ((void **) v_dif_mag_tmp);
+            if (status != SUCCESS)
+            {
+                RETURN_ERROR ("Freeing memory: v_dif_mag_tmp\n",
+                              FUNC_NAME, FAILURE);
+            }
         }
+
 //        time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
 //        printf("step3 timepoint 4 took %f seconds to execute\n", time_taken);
 //        t_time = clock();
-    }
+    } // if (nrt_mode == NRT_MONITOR_STANDARD)
 
     if((nrt_mode == NRT_QUEUE_STANDARD) | (nrt_mode == NRT_QUEUE_RECENT))
     {
@@ -2509,12 +2505,13 @@ int sccd_standard
     int conse,
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
-    int *num_fc_pinpoint
+    int *num_fc_pinpoint,
+    double gate_tcg
 )
 {
     int i_b;
     int status;
-    int i, k1, k2;
+    int i, k, k1, k2;
     char FUNC_NAME[] = "sccd_standard";
     //char msg_str[MAX_STR_LEN];       /* Input data scene name                 */
     float **fit_cft;                 /* Fitted coefficients 2-D array.        */
@@ -2538,9 +2535,9 @@ int sccd_standard
     int i_dense = 0;
     int t_start;
     bool change_detected = FALSE;
-    float cm_angle = 0;
-    short int cm_outputs = NA_VALUE;      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    short int cm_outputs_date = NA_VALUE;      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
+    short int cm_angle_scale100 = 0;
+    short int norm_cm_scale100 = NA_VALUE;      /* I/O: maximum change magnitudes at every norm_cm_INTERVAL days */
+    short int norm_cm_date = NA_VALUE;      /* I/O: dates for maximum change magnitudes at every norm_cm_INTERVAL days */
 
     cov_p = (gsl_matrix **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, 1, sizeof(gsl_matrix));
     if (cov_p == NULL)
@@ -2649,7 +2646,7 @@ int sccd_standard
     /* While loop - process til the conse -1 observation remains  */
     /*                                                            */
     /**************************************************************/
-    while (i + conse - 1 <= n_clr-1)
+    while (i + conse  <= n_clr-1)  // the first conse obs have been investigated in the last run
     {
 
         if(0 == bl_train)
@@ -2757,14 +2754,16 @@ int sccd_standard
             if(*nrt_mode == NRT_VOID)
             {
                 status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
-                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed, &cm_outputs, &cm_outputs_date, &cm_angle,
-                                                  t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint);
+                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed,
+                                                  t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg,
+                                                  &norm_cm_scale100, &cm_angle_scale100);
             }
             else
             {
                 status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
-                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed, &cm_outputs, &cm_outputs_date, &cm_angle,
-                                                  t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint);
+                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed,
+                                                  t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg,
+                                                  &norm_cm_scale100, &cm_angle_scale100);
             }
             if(status == CHANGEDETECTED)
             {
@@ -2784,6 +2783,63 @@ int sccd_standard
                 bl_train = 0;
                 change_detected = TRUE;
 
+
+                /****************************************************/
+                /*   need to save nrt records into nrt_model        */
+                /****************************************************/
+                for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                {
+                    /*   1. covariance matrix   */
+                     for(k1 = 0; k1 < DEFAULT_N_STATE; k1++)
+                     {
+                         for(k2 = 0; k2 < DEFAULT_N_STATE; k2++){
+                             // printf("k1 = %d, k2 = %d,  p = %f \n", k1, k2, gsl_matrix_get(cov_p[i_b], k1, k2));
+                             nrt_model->covariance[i_b][k1 * DEFAULT_N_STATE + k2] = (float)gsl_matrix_get(cov_p[i_b], k1, k2);
+                         }
+                     }
+                     /*   2. nrt harmonic coefficients   */
+                     for(k2 = 0; k2 < SCCD_NUM_C; k2++)
+                         nrt_model->nrt_coefs[i_b][k2] = fit_cft[i_b][k2];
+                }
+
+                /*     3. t_start  !!     */
+                nrt_model->t_start_since1982 = (short int)(t_start - JULIAN_LANDSAT4_LAUNCH);
+
+                /*     4. number of observations !!      */
+                nrt_model->num_obs = (short int)(num_obs_processed);
+
+                /*     5. observations in tail       */
+                for(k = 0; k < DEFAULT_CONSE; k ++)
+                {
+                    if (k < conse)
+                    {
+                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                        {
+                            nrt_model->obs[i_b][k] = (short int)clry[i_b][i + k];
+                        }
+                        nrt_model->obs_date_since1982[k] = (short int)(clrx[i  + k] - JULIAN_LANDSAT4_LAUNCH);
+                    }else{
+                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                        {
+                            nrt_model->obs[i_b][k] = 0;
+                        }
+                        nrt_model->obs_date_since1982[k] = 0;
+                    }
+                }
+
+                /*     6. square adjust rmse, H, sum       */
+                for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                {
+                    // nrt_model->min_rmse[i_b] = (short int)min_rmse[i_b];
+                    nrt_model->H[i_b] = instance[i_b].H;
+                    nrt_model->rmse_sum[i_b] = sum_square_vt[i_b];
+                }
+
+                /*     7. square adjust rmse, H, sum       */
+
+                nrt_model->norm_cm = (short int)norm_cm_scale100;
+                nrt_model->cm_angle = (short int)cm_angle_scale100;
+                nrt_model->conse_last = (unsigned char)conse;   // for new change, at last conse
             }
             else if(status == FALSECHANGE)
             {
@@ -2825,8 +2881,7 @@ int sccd_standard
     status = step3_processing_end(instance, cov_p, fit_cft, clrx, clry, i, &n_clr, *nrt_mode,
                                   i_start, prev_i_break, nrt_model, num_obs_queue,
                                   obs_queue, sum_square_vt, num_obs_processed, t_start,
-                                  conse, min_rmse,tcg,
-                                  cm_outputs, cm_outputs_date, cm_angle, rec_cg, *num_fc);
+                                  conse, min_rmse, gate_tcg);
 
 //    time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
 //    printf("processing_end took %f seconds to execute \n", time_taken);
@@ -3022,13 +3077,13 @@ int sccd_snow
     nrt_model[0].t_start_since1982 = (short int)(clrx[i_start] - JULIAN_LANDSAT4_LAUNCH);
     nrt_model[0].num_obs = (short int)(n_clr);
 
-    for(k = 0; k < DEFAULT_CONSE - 1; k++)
+    for(k = 0; k < DEFAULT_CONSE; k++)
     {
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
-            nrt_model[0].obs[i_b][k] = (short int)clry[i_b][n_clr - DEFAULT_CONSE + 1  + k];
+            nrt_model[0].obs[i_b][k] = (short int)clry[i_b][n_clr - DEFAULT_CONSE + k];
         }
-        nrt_model[0].obs_date_since1982[k] = (short int)(clrx[n_clr - DEFAULT_CONSE + 1 + k] - JULIAN_LANDSAT4_LAUNCH);
+        nrt_model[0].obs_date_since1982[k] = (short int)(clrx[n_clr - DEFAULT_CONSE + k] - JULIAN_LANDSAT4_LAUNCH);
     }
 
     for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)

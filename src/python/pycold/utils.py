@@ -12,13 +12,13 @@ import gdal
 SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
 
 sccd_dt = np.dtype([('t_start', np.int32), ('t_break', np.int32), ('num_obs', np.int32),
-                        ('coefs', np.float32, (6, 6)), ('rmse', np.float32, 6), ('magnitude', np.float32, 6)], align=True)
+                    ('coefs', np.float32, (6, 6)), ('rmse', np.float32, 6), ('magnitude', np.float32, 6)], align=True)
 
 nrtqueue_dt = np.dtype([('clry', np.short, 6), ('clrx_since1982', np.short)], align=True)
-nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (6, 5)),
-                            ('obs_date_since1982', np.short, 5), ('covariance', np.float32, (6, 36)),
-                            ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
-                            ('cm_outputs', np.short), ('cm_outputs_date', np.short), ('change_prob', np.ubyte)], align=True)
+nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (6, 6)),
+                        ('obs_date_since1982', np.short, 6), ('covariance', np.float32, (6, 36)),
+                        ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
+                        ('norm_cm', np.short), ('cm_angle', np.short), ('conse_last', np.ubyte)], align=True)
 
 
 def get_block_y(block_id, n_block_x):

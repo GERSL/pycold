@@ -526,7 +526,7 @@ class PyClassifierHPC(PyClassifier):
 
         full_yearlyclass_array = assemble_array(self._get_fullclassification_forcertainyear('now'),
                                                 self.config['n_block_x'])[:, :, 0]
-        self._save_covermaps(full_yearlyclass_array, 'now')
+        self._save_covermaps(full_yearlyclass_array.astype(np.uint8), 'now')
 
         # for year in self.year_list_to_predict:
         #     full_yearlyclass_array = assemble_array(self._get_fullclassification_forcertainyear(year),

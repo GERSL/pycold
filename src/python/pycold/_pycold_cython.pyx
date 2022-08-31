@@ -23,6 +23,7 @@ cdef int NUM_FC_SCCD = 20
 cdef int NUM_NRT_QUEUE = 240
 DEF DEFAULT_CONSE = 6
 DEF NRT_BAND = 6
+DEF SCCD_NUM_C = 6
 
 reccg_dt = np.dtype([('t_start', np.int32),  # time when series model gets started
                      ('t_end', np.int32),  # time when series model gets ended
@@ -39,16 +40,16 @@ reccg_dt = np.dtype([('t_start', np.int32),  # time when series model gets start
 sccd_dt = np.dtype([('t_start', np.int32),
                         ('t_break', np.int32),
                         ('num_obs', np.int32),
-                        ('coefs', np.float32, (6, 6)),
+                        ('coefs', np.float32, (SCCD_NUM_C, SCCD_NUM_C)),
                         ('rmse', np.float32, NRT_BAND),
                         ('magnitude', np.float32, NRT_BAND)],
                         align=True)
 
 nrtqueue_dt = np.dtype([('clry', np.short, NRT_BAND), ('clrx_since1982', np.short)], align=True)
-nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (NRT_BAND, DEFAULT_CONSE-1)),
-                         ('obs_date_since1982', np.short, DEFAULT_CONSE-1), ('covariance', np.float32, (NRT_BAND, 36)),
-                         ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, NRT_BAND), ('rmse_sum', np.uint32, 6), ('cm_bands', np.short, NRT_BAND),
-                         ('cm_outputs', np.short), ('cm_outputs_date', np.short), ('cm_angle', np.short), ('conse_last', np.ubyte)], align=True)
+nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (NRT_BAND, DEFAULT_CONSE)),
+                         ('obs_date_since1982', np.short, DEFAULT_CONSE), ('covariance', np.float32, (NRT_BAND, 36)),
+                         ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, NRT_BAND), ('rmse_sum', np.uint32, 6),
+                         ('norm_cm', np.short), ('cm_angle', np.short), ('conse_last', np.ubyte)], align=True)
 
 
 cdef extern from "../../cxx/output.h":
@@ -69,7 +70,7 @@ cdef extern from "../../cxx/output.h":
         int t_start
         int t_break
         int num_obs
-        float coefs[NRT_BAND][6]
+        float coefs[NRT_BAND][SCCD_NUM_C]
         float rmse[NRT_BAND]
         float magnitude[NRT_BAND]
 
@@ -82,23 +83,23 @@ cdef extern from "../../cxx/output.h":
     ctypedef struct output_nrtmodel:
         short int t_start_since1982
         short int num_obs
-        short int obs[NRT_BAND][DEFAULT_CONSE-1]
-        short int obs_date_since1982[DEFAULT_CONSE-1]
+        short int obs[NRT_BAND][DEFAULT_CONSE]
+        short int obs_date_since1982[DEFAULT_CONSE]
         float covariance[NRT_BAND][36]
-        float nrt_coefs[NRT_BAND][6]
+        float nrt_coefs[NRT_BAND][SCCD_NUM_C]
         float H[NRT_BAND]
         unsigned int rmse_sum[NRT_BAND]
-        short cm_bands[NRT_BAND]
-        short int cm_outputs;
-        short int cm_outputs_date;
+        short int norm_cm;
         short int cm_angle;
         unsigned char conse_last;
 
 cdef extern from "../../cxx/output.h":
     ctypedef struct Output_sccd_pinpoint:
         int t_break
-        short int cm_bands[DEFAULT_CONSE][NRT_BAND]
-        short int cm_outputs[DEFAULT_CONSE]
+        float coefs[NRT_BAND][SCCD_NUM_C]
+        short int obs[NRT_BAND][DEFAULT_CONSE]
+        short int obs_date_since1982[DEFAULT_CONSE]
+        short int norm_cm[DEFAULT_CONSE]
         short int cm_angle[DEFAULT_CONSE]
  
 cdef Output_sccd t
@@ -111,7 +112,7 @@ cdef extern from "../../cxx/cold.h":
     cdef int cold(long *buf_b, long *buf_g, long *buf_r, long *buf_n, long *buf_s1, long *buf_s2,
                   long *buf_t, long *fmask_buf, long *valid_date_array, int valid_num_scenes, int pos, 
                   double tcg, int conse, bool b_output_cm, int starting_date, bool b_c2, Output_t *rec_cg,
-                  int *num_fc, int cm_output_interval, short int *cm_outputs, 
+                  int *num_fc, int cm_output_interval, short int *cm_outputs,
                   short int *cm_outputs_date);
 
 
@@ -127,7 +128,7 @@ cdef extern from "../../cxx/s_ccd.h":
                   long *fmask_buf, long *valid_date_array, int valid_num_scenes, double tcg, int *num_fc, int *nrt_mode,
                   Output_sccd *rec_cg, output_nrtmodel *nrt_model, int *num_nrt_queue, output_nrtqueue *nrt_queue,
                   short int *min_rmse, int conse, bool b_c2, bool b_pinpoint, Output_sccd_pinpoint *rec_cg_pinpoint, 
-                  int *num_fc_pinpoint)
+                  int *num_fc_pinpoint, double gate_tcg)
 
 
 
@@ -333,7 +334,7 @@ def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64
 def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
                 np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
-                double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False, b_pinpoint=False):
+                double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False, b_pinpoint=False, double gate_tcg=9.236):
     """
     S-CCD processing. It is required to be done before near real time monitoring
 
@@ -424,7 +425,8 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
 
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, rec_cg,
-                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], conse, b_c2, b_pinpoint, rec_cg_pinpoint, &num_fc_pinpoint)
+                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], conse, b_c2, b_pinpoint, rec_cg_pinpoint,
+                  &num_fc_pinpoint, gate_tcg)
     if result != 0:
         raise RuntimeError("S-CCD function fails for pos = {} ".format(pos))
     else:
@@ -478,7 +480,8 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
                 np.ndarray[np.int64_t, ndim=1] ts_g, np.ndarray[np.int64_t, ndim=1] ts_r,
                 np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t,
-                np.ndarray[np.int64_t, ndim=1] qas, double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False):
+                np.ndarray[np.int64_t, ndim=1] qas, double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False,
+                double gate_tcg=9.236):
     """
     SCCD online update for new observations
        Parameters
@@ -549,7 +552,7 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     if num_nrt_queue > 0:
         nrt_queue_new[0:num_nrt_queue] = sccd_pack.nrt_queue[0:num_nrt_queue]
 
-    if nrt_mode == 1 or nrt_mode == 3:
+    if nrt_mode == 1 or nrt_mode == 3 or nrt_mode == 5:
         nrt_model_new = sccd_pack.nrt_model.copy()
     else:
         nrt_model_new = np.empty(1, dtype=nrtmodel_dt)
@@ -585,7 +588,8 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, &rec_cg_view[0],
-                  &nrt_model_view[0], &num_nrt_queue, &nrt_queue_view[0], &min_rmse_view[0], conse, b_c2, False, rec_cg_pinpoint, &num_fc_pinpoint)
+                  &nrt_model_view[0], &num_nrt_queue, &nrt_queue_view[0], &min_rmse_view[0], conse, b_c2, False,
+                  rec_cg_pinpoint, &num_fc_pinpoint, gate_tcg)
     if result != 0:
         raise RuntimeError("sccd_update function fails for pos = {} ".format(pos))
     else:

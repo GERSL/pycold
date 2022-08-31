@@ -33,6 +33,7 @@ def cmname_fromdate(ordinal_date):
                              pd.Timestamp.fromordinal(ordinal_date).year,
                              str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3))
 
+
 def cmdatename_fromdate(ordinal_date):
     """
     get date file name from ordinate date
@@ -253,7 +254,7 @@ def mode_median_by(input_array_mode, input_array_median, index_array):
 
 
 def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_l1_date=None,  floodfill_ratio=None,
-                           parameters=None):
+                           parameters=None, b_dist_prob_map=False, date_interval=60):
     """
     hierachical segmentation based on floodfill
     Parameters
@@ -264,7 +265,9 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
     cm_array_l1_date: 2-d numpy array
     floodfill_ratio: float
         the change magnitude ratio of the considered pixel over the seed pixel to be included into the cluster
-
+    b_dist_prob_map: boolean
+        if true, cm_array is probability
+    date_interval: the date interval for cm_date_array to connect adjacent pixels within the floodfill process
     Returns
     -------
     [object_map_s1, cm_date_array, object_map_s2, s1_info]:
@@ -283,19 +286,26 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
     if parameters is None:
         parameters = defaults
 
-    peak_threshold = chi2.ppf(0.90, 5)
     [n_rows, n_cols] = cm_array.shape
     if floodfill_ratio is None:
         floodfill_ratio = parameters['OBCOLD']['floodfill_thres']
-    if cm_array_l1 is None:
-        cm_array_l1 = np.full((n_rows, n_cols), parameters['COMMON']['NAN_VAL'], dtype=np.int16)
     if cm_array_l1_date is None:
         cm_array_l1_date = np.full((n_rows, n_cols), parameters['COMMON']['NAN_VAL'], dtype=np.int32)
     
     # assign valid CM values in the stack into current cm array where NA values are
-    cm_array_l1[cm_array_l1 < (chi2.ppf(0.90, 5)*parameters['OBCOLD']['cm_scale'])] = parameters['COMMON']['NAN_VAL']
-    cm_array[cm_array == parameters['COMMON']['NAN_VAL']] = cm_array_l1[cm_array == parameters['COMMON']['NAN_VAL']]
-    cm_array = cm_array.astype(float) / parameters['OBCOLD']['cm_scale']
+    if b_dist_prob_map:
+        peak_threshold = 0.5
+        if cm_array_l1 is None:
+            cm_array_l1 = np.full((n_rows, n_cols), 0, dtype=np.float32)
+        cm_array_l1[cm_array_l1 < peak_threshold] = 0
+        cm_array[cm_array == 0] = cm_array_l1[cm_array == 0]
+    else:
+        peak_threshold = chi2.ppf(0.90, 5)
+        if cm_array_l1 is None:
+            cm_array_l1 = np.full((n_rows, n_cols), parameters['COMMON']['NAN_VAL'], dtype=np.int16)
+        cm_array_l1[cm_array_l1 < (chi2.ppf(0.90, 5)*parameters['OBCOLD']['cm_scale'])] = parameters['COMMON']['NAN_VAL']
+        cm_array[cm_array == parameters['COMMON']['NAN_VAL']] = cm_array_l1[cm_array == parameters['COMMON']['NAN_VAL']]
+        cm_array = cm_array.astype(float) / parameters['OBCOLD']['cm_scale']
 
     cm_date_array[cm_date_array == parameters['COMMON']['NAN_VAL']] = \
         cm_array_l1_date[cm_date_array == parameters['COMMON']['NAN_VAL']]
@@ -314,11 +324,15 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
     # using gaussian kernel ( with 1 sigma value) to smooth images in hpc_preparation for floodfill
     kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
     cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary='extend', preserve_nan=True)
-    cm_array_gaussian_s1[np.isnan(cm_array)] = parameters['COMMON']['NAN_VAL']
+    if b_dist_prob_map:
+        cm_array_gaussian_s1[np.isnan(cm_array)] = 0
+    else:
+        cm_array_gaussian_s1[np.isnan(cm_array)] = parameters['COMMON']['NAN_VAL']
     del cm_array
 
     # seed_index = peak_local_max(cm_array_gaussian_s1, threshold_abs=peak_threshold,
     #                             exclude_border=False, min_distance=0)
+
     seed_index = np.where(cm_array_gaussian_s1 > peak_threshold)
     cm_seed = cm_array_gaussian_s1[seed_index]
     zip_list = sorted(zip(cm_seed, np.transpose(seed_index)), key=lambda t: t[0], reverse=True)
@@ -339,8 +353,8 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
         # gradiant = np.max([seedcm*floodfill_ratio, (seedcm-peak_threshold)])
         gradiant = seedcm * floodfill_ratio
         num, im, mask_s1, rect = floodFill(cm_stack, mask_s1, tuple(reversed(seed_index[i])), 0,
-                                           loDiff=[gradiant, gradiant, 60],
-                                           upDiff=[gradiant, gradiant, 60],
+                                           loDiff=[gradiant, gradiant, date_interval],
+                                           upDiff=[gradiant, gradiant, date_interval],
                                            flags=floodflags)
         # the opencv mask only supports 8-bit, we hack it by updating the label value for every 255 object
         if remainder == 254:

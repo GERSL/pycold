@@ -31,7 +31,8 @@ int sccd
     bool b_c2,                  /* I: a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band due to the current low quality  */
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
-    int *num_fc_b_pinpoint
+    int *num_fc_b_pinpoint,
+    double gate_tcg
 );
 
 int step1_cold_initialize
@@ -84,13 +85,13 @@ int step2_KF_ChangeDetection
     Output_sccd* rec_cg,           /* I/O: the outputted S-CCD result structure   */
     unsigned int *sum_square_vt,              /* I/O:  the sum of predicted square of residuals  */
     int *num_obs_processed,             /* I/O:  the number of current non-noise observations being processed */
-    short int* cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    short int* cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days */
-    float* cm_angle,
     int t_start,
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
-    int *num_fc_b_pinpoint
+    int *num_fc_b_pinpoint,
+    double gate_tcg,
+    short int *norm_cm_scale100,
+    short int *mean_angle_scale100
 );
 
 int KF_ts_predict_conse
@@ -160,12 +161,7 @@ int step3_processing_end
     int t_start,
     int conse,
     short int *min_rmse,
-    double tcg,                /* I: the change threshold  */
-    short int cm_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
-    short int cm_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days*/
-    float cm_angle,
-    Output_sccd* rec_cg,
-    int num_fc
+    double gate_tcg
 );
 
 
@@ -198,7 +194,8 @@ int sccd_standard
     int conse,
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
-    int *num_fc_b_pinpoint
+    int *num_fc_b_pinpoint,
+    double gate_tcg
 );
 
 
