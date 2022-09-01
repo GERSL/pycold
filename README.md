@@ -44,7 +44,13 @@ sudo apt-get install gfortran -y
 
 ```bash
 pip install -r requirements.txt
-conda install gdal  # the easiest way to install gdal 
+
+# Install gdal wheels 
+pip install -r requirements/gdal.txt
+
+# Alternatively you could use conda
+# conda install gdal  # the easiest way to install gdal 
+
 bash run_developer_setup.sh
 ```
 
