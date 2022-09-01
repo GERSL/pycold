@@ -43,14 +43,16 @@ def parse_version(fpath):
     return visitor.version
 
 
-def parse_requirements(fname='requirements.txt', with_version=False):
+def parse_requirements(fname='requirements.txt', versions=False):
     """
     Parse the package dependencies listed in a requirements file but strips
     specific versioning information.
 
     Args:
         fname (str): path to requirements file
-        with_version (bool, default=False): if true include version specs
+        versions (bool | str, default=False):
+            If true include version specs.
+            If strict, then pin to the minimum version.
 
     Returns:
         List[str]: list of requirements items
@@ -118,8 +120,15 @@ def parse_requirements(fname='requirements.txt', with_version=False):
         if exists(require_fpath):
             for info in parse_require_file(require_fpath):
                 parts = [info['package']]
-                if with_version and 'version' in info:
-                    parts.extend(info['version'])
+                if versions and 'version' in info:
+                    if versions == 'strict':
+                        # In strict mode, we pin to the minimum version
+                        if info['version']:
+                            # Only replace the first >= instance
+                            verstr = ''.join(info['version']).replace('>=', '==', 1)
+                            parts.append(verstr)
+                    else:
+                        parts.extend(info['version'])
                 if not sys.version.startswith('3.4'):
                     # apparently package_deps are broken in 3.4
                     plat_deps = info.get('platform_deps')
@@ -130,6 +139,24 @@ def parse_requirements(fname='requirements.txt', with_version=False):
 
     packages = list(gen_packages_items())
     return packages
+
+
+def parse_description():
+    """
+    Parse the description in the README file
+
+    CommandLine:
+        pandoc --from=markdown --to=rst --output=README.rst README.md
+        python -c "import setup; print(setup.parse_description())"
+    """
+    from os.path import dirname, join, exists
+    readme_fpath = join(dirname(__file__), 'README.md')
+    # This breaks on pip install, so check that it exists.
+    if exists(readme_fpath):
+        with open(readme_fpath, 'r') as f:
+            text = f.read()
+        return text
+    return ''
 
 
 VERSION = parse_version('src/python/pycold/__init__.py')  # needs to be a global var for git tags
@@ -146,9 +173,12 @@ if __name__ == '__main__':
             '': 'src/python',
         },
         name='pycold',
+        url='https://github.com/GERSL/pycold',
         version=VERSION,
         description='python implementation of COntinuous monitoring of Land disturbances algorithm',
         install_requires=parse_requirements('requirements/runtime.txt'),
+        long_description=parse_description(),
+        long_description_content_type='text/markdown',
         extras_require={
             'all': parse_requirements('requirements.txt'),
             'tests': parse_requirements('requirements/tests.txt'),
@@ -159,4 +189,5 @@ if __name__ == '__main__':
         author_email='remotesensingsuy@gmail.com',
         packages=packages,
         include_package_data=True,
+        python_requires='>=3.6',
     )
