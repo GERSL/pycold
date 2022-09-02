@@ -129,7 +129,7 @@ source $HOME/activate
 # Always use the latest Python build tools
 python -m pip install pip setuptools wheel build -U
 
-./run_developer_setup.py
+bash run_developer_setup.py
 
 #if [ "$BUILD_STRICT" -eq 1 ]; then
 #    echo "BUILDING STRICT VARIANT"
