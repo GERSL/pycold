@@ -129,16 +129,18 @@ source $HOME/activate
 # Always use the latest Python build tools
 python -m pip install pip setuptools wheel build -U
 
-if [ "$BUILD_STRICT" -eq 1 ]; then
-    echo "BUILDING STRICT VARIANT"
-    #pip install -e /pycold[runtime-strict,optional-strict,headless-strict]
-    pip install -e /pycold[runtime-strict,optional-strict]
-else
-    echo "BUILDING LOOSE VARIANT"
-    pip install -e /pycold[optional]
-    # python -m pip install dvc[all]>=2.13.0
-    # pip install awscli
-fi
+./run_developer_setup.py
+
+#if [ "$BUILD_STRICT" -eq 1 ]; then
+#    echo "BUILDING STRICT VARIANT"
+#    #pip install -e /pycold[runtime-strict,optional-strict,headless-strict]
+#    pip install -e /pycold[runtime-strict,optional-strict]
+#else
+#    echo "BUILDING LOOSE VARIANT"
+#    pip install -e /pycold[optional]
+#    # python -m pip install dvc[all]>=2.13.0
+#    # pip install awscli
+#fi
 
 EOF
 
