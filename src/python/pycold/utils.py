@@ -2,12 +2,11 @@ import numpy as np
 from datetime import datetime
 import pandas as pd
 from os.path import join
-# import gdal
 import os
 import datetime as dt
 from collections import namedtuple
 from pycold.app import defaults
-import gdal
+from osgeo import gdal
 
 SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
 
@@ -79,7 +78,7 @@ def get_row_index(pos, n_cols, current_block_y, block_height):
 
     """
     return int((pos - 1) / n_cols) - (current_block_y - 1) * block_height
-    
+
 
 def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, prefix, clean=True):
     """
@@ -102,7 +101,7 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
     -------
 
     """
-    anchor_dates_list = None
+    # anchor_dates_list = None
     if prefix == 'CM':
         output_type = np.int16
     elif prefix == 'CM_date':
@@ -138,8 +137,9 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
         hori_profile = np.hsplit(cm_block_reshape, n_cm_maps)
         for count, maps in enumerate(cm_map_list):
             maps[(current_block_y - 1) * config['block_height']:current_block_y * config['block_height'],
-                (current_block_x - 1) * config['block_width']:current_block_x * config['block_width']] = \
-                hori_profile[count].reshape(config['block_height'], config['block_width'])
+                 (current_block_x - 1) * config['block_width']:current_block_x * config['block_width']] = (
+                     hori_profile[count].reshape(config['block_height'], config['block_width'])
+                 )
 
     # output cm images
     for count, cm_map in enumerate(cm_map_list):
@@ -148,10 +148,10 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
                                                                 pd.Timestamp.fromordinal(ordinal_date).year,
                                                                 get_doy(ordinal_date)))
         np.save(outfile, cm_map)
-    
+
     if clean is True:
         tmp_filenames = [file for file in os.listdir(result_path)
-                         if file.startswith(prefix+'_x')]
+                         if file.startswith(prefix + '_x')]
         for file in tmp_filenames:
             os.remove(join(result_path, file))
 
@@ -340,9 +340,9 @@ def save_nrtfiles(out_folder, outfile_prefix, sccd_pack, data_ext):
     save all files for C debug
     :param out_folder: the outputted folder
     :param outfile_prefix: the prefix of outputted files
-    :param sccd_pack: 
-    :param data_ext: 
-    :return: 
+    :param sccd_pack:
+    :param data_ext:
+    :return:
     """
     data_ext.to_csv(join(out_folder, 'spectral_{}_extension.csv').format(outfile_prefix), index=False, header=False)
     # data_ini_current.to_csv(join(out_path, 'spectral_{}_ini.csv').format(pid), index=False, header=False)
@@ -495,12 +495,3 @@ def generate_rowcolimage(ref_image_path, out_path):
     outdata.SetProjection(proj)
     outdata.FlushCache()
     del ref_image
-
-
-
-
-
-
-
-    
-

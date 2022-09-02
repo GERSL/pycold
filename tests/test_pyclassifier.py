@@ -1,10 +1,10 @@
 import yaml
 import os
-from pycold.pyclassifier import PyClassifierHPC
 import shutil
 import numpy as np
 import joblib
 from osgeo import gdal_array
+from pycold.pyclassifier import PyClassifierHPC
 from pycold.utils import assemble_array
 
 with open('tests/resources/test_config_pyclassifier.yaml', 'r') as yaml_obj:
@@ -19,7 +19,7 @@ testing_folder = 'tests/resources/tmp'
 def test_step1_4():
     pyclassifier = PyClassifierHPC(test_config, record_path='tests/resources', tmp_path=testing_folder,
                                    output_path=testing_folder,
-                                   year_list_to_predict=list(range(year_lowbound, year_uppbound+1)),
+                                   year_list_to_predict=list(range(year_lowbound, year_uppbound + 1)),
                                    seedmap_path=ref_path)
 
     # delete testing folder if it has
@@ -30,7 +30,7 @@ def test_step1_4():
 
     for iblock in range(pyclassifier.config['n_blocks']):
         pyclassifier.step1_feature_generation(iblock + 1)
-        for year in range(year_lowbound, year_uppbound+1):
+        for year in range(year_lowbound, year_uppbound + 1):
             assert os.path.exists(os.path.join(pyclassifier.tmp_path,
                                                'tmp_feature_year{}_block{}.npy'.format(year, iblock + 1)))
 
@@ -53,11 +53,11 @@ def test_step1_4():
 
 def test_predict_features():
     pyclassifier = PyClassifierHPC(test_config, record_path='tests/resources',
-                                   year_list_to_predict=list(range(year_lowbound, year_uppbound+1)),
+                                   year_list_to_predict=list(range(year_lowbound, year_uppbound + 1)),
                                    seedmap_path=ref_path)
     cold_block = np.load(os.path.join('tests/resources', 'record_change_x1_y1_cold.npy'))
-    block_features = pyclassifier.predict_features(1, cold_block, list(range(year_lowbound, year_uppbound+1)))
-    assert np.shape(block_features) == (6, pyclassifier.config['block_width']*pyclassifier.config['block_height'],
+    block_features = pyclassifier.predict_features(1, cold_block, list(range(year_lowbound, year_uppbound + 1)))
+    assert np.shape(block_features) == (6, pyclassifier.config['block_width'] * pyclassifier.config['block_height'],
                                         21)   # 6 years, 2500 pixels (50, 50), 21 features
 
 
@@ -82,4 +82,3 @@ def test_classification_block():
     cmap = pyclassifier.classification_block(rf_model, tmp_feature_block)
     print(cmap.shape)
     assert cmap.shape == (50, 50)
-

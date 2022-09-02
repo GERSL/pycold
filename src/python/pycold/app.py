@@ -37,5 +37,3 @@ class Defaults(dict):
 
 
 defaults = Defaults(os.path.join(os.path.dirname(__file__), 'constants.yaml'))
-
-

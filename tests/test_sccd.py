@@ -1,4 +1,3 @@
-import numpy as np
 from pycold import sccd_detect, sccd_update
 from pycold.utils import read_data
 import pickle

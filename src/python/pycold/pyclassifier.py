@@ -1,19 +1,16 @@
-import warnings
-warnings.filterwarnings("ignore") # mainly to filter out lzma warnings
-import numpy as np
-import pandas as pd
 import os
 import datetime as dt
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-from sklearn.ensemble import RandomForestClassifier
 from os.path import join, exists
-from pycold.app import defaults
-from pycold.utils import get_block_y, get_block_x, get_col_index, get_row_index, assemble_array, predict_ref
 import joblib
 import time
-from osgeo import gdal_array
 import logging
 import sys
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from osgeo import gdal_array
+from pycold.app import defaults
+from pycold.utils import get_block_y, get_block_x, get_col_index, get_row_index, assemble_array
 
 
 def extract_features(cold_plot, band, ordinal_day_list, nan_val, feature_outputs=['a0', 'a1', 'b1']):
@@ -103,7 +100,7 @@ def generate_sample_num(label, sample_parameters):
                                                         return_counts=True)
     counts_category = np.array([0] * sample_parameters['total_landcover_category'])
     for x in range(len(unique_counts_category)):
-        counts_category[int(unique_category[x]-1)] = unique_counts_category[x]
+        counts_category[int(unique_category[x] - 1)] = unique_counts_category[x]
     percate_samples = np.array([round(x * sample_parameters['total_samples'] / sum(counts_category)) for x in
                                 counts_category])
     percate_samples[percate_samples > sample_parameters['max_category_samples']] = \
@@ -179,7 +176,7 @@ class PyClassifier:
         ordinal_day_list = [pd.Timestamp.toordinal(dt.date(year, 7, 1)) for year
                             in year_list_to_predict]
         if len(cold_block) == 0:
-            self.logger.warning('the rec_cg file for block_id has no records'.format(block_id))
+            self.logger.warning('the rec_cg file for block_id={} has no records'.format(block_id))
             return block_features
 
         cold_block_split = np.split(cold_block, np.argwhere(np.diff(cold_block['pos']) != 0)[:, 0] + 1)
@@ -196,7 +193,7 @@ class PyClassifier:
                 feature_row = extract_features(element, band, ordinal_day_list, defaults['COMMON']['NAN_VAL'],
                                                feature_outputs=self.feature_outputs)
                 for index in range(int(self.n_features / self.band_num)):
-                    block_features[:, i_row * self.config['block_width'] + i_col, 
+                    block_features[:, i_row * self.config['block_width'] + i_col,
                                    int(band * self.n_features / self.band_num) + index] \
                         = feature_row[index]
 
@@ -244,7 +241,7 @@ class PyClassifier:
         """
         cmap = rf_model.predict(tmp_feature).reshape(self.config['block_height'], self.config['block_width'])
         mask = np.all(tmp_feature == defaults['COMMON']['NAN_VAL'], axis=1).reshape(self.config['block_height'],
-                                                                          self.config['block_width'])
+                                                                                    self.config['block_width'])
         cmap[mask] = 255
         return cmap
 
@@ -365,7 +362,7 @@ class PyClassifierHPC(PyClassifier):
 
     def _is_finished_step1_predict_features(self):
         for iblock in range(self.config['n_blocks']):
-            if not exists(join(self.tmp_path, 'tmp_step1_predict_{}_finished.txt'.format(iblock+1))):
+            if not exists(join(self.tmp_path, 'tmp_step1_predict_{}_finished.txt'.format(iblock + 1))):
                 return False
         return True
 
@@ -391,7 +388,7 @@ class PyClassifierHPC(PyClassifier):
             if not exists(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(iblock + 1))):
                 return False
         return True
-    
+
     def _save_covermaps(self, full_yearlyclass_array, year):
         np.save(join(self.output_path, 'yearlyclassification_{}.npy'.format(year)), full_yearlyclass_array)
 
@@ -406,7 +403,7 @@ class PyClassifierHPC(PyClassifier):
                                      if file.startswith('tmp_yearlyclassification{}'.format(year))]
 
         # sort to guarantee order follows low to high rows
-        tmp_yearlyclass_filenames.sort(key=lambda t: int(t[t.find('block')+5: t.find('.npy')]))
+        tmp_yearlyclass_filenames.sort(key=lambda t: int(t[t.find('block') + 5: t.find('.npy')]))
         return [np.load(join(self.tmp_path, file)).reshape(self.config['block_height'],
                                                                         self.config['block_width'], 1)
                 for file in tmp_yearlyclass_filenames]
@@ -416,10 +413,10 @@ class PyClassifierHPC(PyClassifier):
                                  if file.startswith('tmp_feature_year{}'.format(year))]
         if len(tmp_feature_filenames) < self.config['n_blocks']:
             self.logger.warning('tmp features are incomplete! should have {}; but actually have {} feature images'.
-                           format(self.config['n_blocks'], len(tmp_feature_filenames)))
+                                format(self.config['n_blocks'], len(tmp_feature_filenames)))
 
         tmp_feature_filenames.sort(
-            key=lambda t: int(t[t.find('block')+5: t.find('.npy')]))  # sorted by row number
+            key=lambda t: int(t[t.find('block') + 5: t.find('.npy')]))  # sorted by row number
 
         return [np.load(join(self.tmp_path, file)).reshape(self.config['block_height'], self.config['block_width'],
                 self.n_features) for file in tmp_feature_filenames]
@@ -449,7 +446,7 @@ class PyClassifierHPC(PyClassifier):
                              get_block_y(block_id, self.config['n_block_x'])))
         block_features = self.predict_features(block_id, cold_block, self.year_list_to_predict)
         self._save_features(block_id, block_features)
-        with open(join(self.tmp_path, 'tmp_step1_predict_{}_finished.txt'.format(block_id)), 'w') as fp:
+        with open(join(self.tmp_path, 'tmp_step1_predict_{}_finished.txt'.format(block_id)), 'w'):
             pass
 
     def step2_train_rf(self, ref_year=None, rf_path=None):
@@ -482,11 +479,10 @@ class PyClassifierHPC(PyClassifier):
                    " {}".format(e))
 
         for year in self.year_list_to_predict:
-            tmp_feature_block = get_features(join(self.tmp_path, 'tmp_feature_year{}_block{}.npy'.format(year,
-                                                                                                        block_id)))
+            tmp_feature_block = get_features(join(self.tmp_path, 'tmp_feature_year{}_block{}.npy'.format(year, block_id)))
             cmap = self.classification_block(rf_model, tmp_feature_block)
             self._save_yearlyclassification_maps(block_id, year, cmap)
-        with open(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(block_id)), 'w') as fp:
+        with open(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(block_id)), 'w'):
             pass
 
     def step3_classification_sccd(self, block_id):
@@ -507,7 +503,7 @@ class PyClassifierHPC(PyClassifier):
         tmp_feature_block = get_features(join(self.tmp_path, 'tmp_feature_now_block{}.npy'.format(block_id)))
         cmap = self.classification_block(rf_model, tmp_feature_block)
         self._save_yearlyclassification_maps(block_id, 'now', cmap)
-        with open(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(block_id)), 'w') as fp:
+        with open(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(block_id)), 'w'):
             pass
 
     def step4_assemble(self, clean=True):
@@ -541,4 +537,3 @@ class PyClassifierHPC(PyClassifier):
                 return False
         else:
             return True
-

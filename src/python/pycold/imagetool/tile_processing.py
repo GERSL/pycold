@@ -17,12 +17,13 @@ import click
 import time
 from pycold import cold_detect, sccd_detect
 from scipy.stats import chi2
-from pycold.utils import assemble_cmmaps, get_rowcol_intile, get_time_now, get_doy, unindex_sccdpack, predict_ref
+import pickle
+from dateutil.parser import parse
+
+from pycold.utils import assemble_cmmaps, get_rowcol_intile, get_doy, unindex_sccdpack
 from pycold.ob_analyst import ObjectAnalystHPC
 from pycold.pyclassifier import PyClassifierHPC
 from pycold.app import defaults
-import pickle
-from dateutil.parser import parse
 
 
 def tileprocessing_report(result_log_path, stack_path, version, algorithm, config, startpoint, cold_timepoint, tz,
@@ -104,9 +105,8 @@ def reading_start_dates_nmaps(stack_path, cm_interval):
     """
     # read starting and ending dates, note that all blocks only has one starting and last date (mainly for obcold)
     try:
-        f = open(join(stack_path, "starting_last_dates.txt"),
-                 "r")  # read starting and ending date info from stack files
-    except IOError as e:
+        f = open(join(stack_path, "starting_last_dates.txt"), "r")  # read starting and ending date info from stack files
+    except IOError:
         raise
     else:
         starting_date = int(f.readline().rstrip('\n'))
@@ -129,7 +129,7 @@ def is_finished_cold_blockfinished(result_path, nblocks):
         True -> all block finished
     """
     for n in range(nblocks):
-        if not os.path.exists(os.path.join(result_path, 'COLD_block{}_finished.txt'.format(n+1))):
+        if not os.path.exists(os.path.join(result_path, 'COLD_block{}_finished.txt'.format(n + 1))):
             return False
     return True
 
@@ -214,17 +214,17 @@ def get_stack_date(config, block_x, block_y, stack_path, low_datebound=0, high_d
 @click.option('--b_c2', is_flag=True, show_default=True, default=False, help='indicate if it is c2 or hls; if so, '
                                                                              'thermal bands will not be considered for observation selection ')
 def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path, low_datebound, upper_datebound, b_c2):
-# def main():
-#     rank = 29
-#     n_cores = 200
-#     stack_path = '/gpfs/sharedfs1/zhulab/Jiwon/HLS/Stack/10SEG/10SEG_stack_0.2'
-#     result_path = '/scratch/suy20004/suy20004/test'
-#     yaml_path = '/home/suy20004/Document/pycold-uconnhpc/config_hls.yaml'
-#     method = 'COLD'
-#     seedmap_path = None
-#     low_datebound = None
-#     upper_datebound = None
-#     b_c2 =True
+    # def main():
+    #     rank = 29
+    #     n_cores = 200
+    #     stack_path = '/gpfs/sharedfs1/zhulab/Jiwon/HLS/Stack/10SEG/10SEG_stack_0.2'
+    #     result_path = '/scratch/suy20004/suy20004/test'
+    #     yaml_path = '/home/suy20004/Document/pycold-uconnhpc/config_hls.yaml'
+    #     method = 'COLD'
+    #     seedmap_path = None
+    #     low_datebound = None
+    #     upper_datebound = None
+    #     b_c2 =True
 
     tz = timezone('US/Eastern')
     start_time = datetime.now(tz)
@@ -257,8 +257,8 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         try:
             starting_date, n_cm_maps = reading_start_dates_nmaps(stack_path, config['CM_OUTPUT_INTERVAL'])
             year_lowbound = pd.Timestamp.fromordinal(starting_date).year
-            year_uppbound = pd.Timestamp.fromordinal(starting_date + (n_cm_maps-1)*config['CM_OUTPUT_INTERVAL']).year
-        except IOError as e:
+            year_uppbound = pd.Timestamp.fromordinal(starting_date + (n_cm_maps - 1) * config['CM_OUTPUT_INTERVAL']).year
+        except IOError:
             print("reading start dates errors: {}".format(start_time.strftime('%Y-%m-%d %H:%M:%S')))
             exit()
 
@@ -287,7 +287,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         block_y = int((block_id - 1) / config['n_block_x']) + 1  # note that block_x and block_y start from 1
         block_x = int((block_id - 1) % config['n_block_x']) + 1
         if os.path.exists(join(result_path, 'COLD_block{}_finished.txt'.format(block_id))):
-            print("Per-pixel COLD processing is finished for block_x{}_y{} ({})".format(block_x, block_y, 
+            print("Per-pixel COLD processing is finished for block_x{}_y{} ({})".format(block_x, block_y,
                                                                                         datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
             continue
         img_tstack, img_dates_sorted = get_stack_date(config, block_x, block_y, stack_path, low_datebound,
@@ -327,9 +327,8 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                                                   pos=config['n_cols'] * (original_row - 1) + original_col)
                     except RuntimeError:
                         print("S-CCD fails at original_row {}, original_col {} ({})".format(original_row, original_col,
-                                                                                           datetime.now(tz)
-                                                                                           .strftime(
-                                                                                               '%Y-%m-%d %H:%M:%S')))
+                                                                                            datetime.now(tz).strftime(
+                                                                                                '%Y-%m-%d %H:%M:%S')))
                     else:
                         # replace structural array to list for saving storage space
                         pickle.dump(unindex_sccdpack(sccd_result), f)
@@ -347,8 +346,8 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 # del block_last_change_date
             else:
                 # start looping every pixel in the block
-                for pos in range(block_width * block_height):
                 # for pos in [17682]:
+                for pos in range(block_width * block_height):
                     original_row, original_col = get_rowcol_intile(pos, block_width,
                                                                    block_height, block_x, block_y)
                     try:
@@ -387,7 +386,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                                                                                            datetime.now(tz)
                                                                                            .strftime(
                                                                                                '%Y-%m-%d %H:%M:%S')))
-                    except Exception as e:
+                    except Exception:
                         if method == 'OBCOLD':
                             CM = np.full(n_cm_maps, -9999, dtype=np.short)
                             CM_date = np.full(n_cm_maps, -9999, dtype=np.short)
@@ -407,7 +406,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                     np.save(join(result_path, 'CM_date_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(date_collect))
                     np.save(join(result_path, 'CM_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(CM_collect))
 
-        with open(join(result_path, 'COLD_block{}_finished.txt'.format(block_id)), 'w') as fp:
+        with open(join(result_path, 'COLD_block{}_finished.txt'.format(block_id)), 'w'):
             pass
 
         print("Per-pixel COLD processing is finished for block_x{}_y{} ({})"
@@ -437,7 +436,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
             if seedmap_path is not None:
                 pyclassifier.hpc_preparation()
             ob_analyst.hpc_preparation()
-        
+
         #########################################################################
         #                        reorganize cm snapshots                        #
         #########################################################################
@@ -485,7 +484,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
         #                      object-based image analysis                      #
         #########################################################################
         if not ob_analyst.is_finished_object_analysis(np.arange(starting_date,
-                                                                starting_date+config['CM_OUTPUT_INTERVAL']*n_cm_maps,
+                                                                starting_date + config['CM_OUTPUT_INTERVAL'] * n_cm_maps,
                                                       config['CM_OUTPUT_INTERVAL'])):
             n_map_percore = int(np.ceil(n_cm_maps / n_cores))
             max_date = starting_date + (n_cm_maps - 1) * config['CM_OUTPUT_INTERVAL']
@@ -496,7 +495,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 ob_analyst.obia_execute(date)
 
             while not ob_analyst.is_finished_object_analysis(np.arange(starting_date,
-                                                                       starting_date+config['CM_OUTPUT_INTERVAL']*n_cm_maps,
+                                                                       starting_date + config['CM_OUTPUT_INTERVAL'] * n_cm_maps,
                                                                        config['CM_OUTPUT_INTERVAL'])):
                 time.sleep(15)
         if rank == 1:
@@ -531,4 +530,3 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
 
 if __name__ == '__main__':
     main()
-

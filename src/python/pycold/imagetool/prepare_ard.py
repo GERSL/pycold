@@ -10,31 +10,29 @@
 
 # For a 42-year Landsat ARD C1 tile (~3000 images), this script averagely produces ~350 G intermediate disk
 # files, and takes ~12 mins to finish if 200 EPYC 7452 cores are used.
-
-import warnings
 import os
-from osgeo import gdal_array
-import numpy as np
-import gdal
-import tarfile
-from os import listdir
-import logging
-import numpy as geek
-from datetime import datetime
-import datetime as dt
-import click
+import sys
 import shutil
-from pytz import timezone
+import tarfile
+import logging
 import time
+import datetime as dt
 import xml.etree.ElementTree as ET
 import yaml
-import pandas as pd
+import click
+from pytz import timezone
+from datetime import datetime
+from os import listdir
 from os.path import isfile, join, isdir
-warnings.filterwarnings("ignore")
-# import geopandas as gpd
-import fiona
 from pathlib import Path
+
+import pandas as pd
+import numpy as geek
+import numpy as np
 from glob import glob
+from osgeo import gdal_array
+from osgo import gdal
+import fiona
 
 
 # define constant here
@@ -56,6 +54,7 @@ res = 30
 
 s2_stack_bands = ['B02', 'B03', 'B04', 'B8A', 'B11', 'B12', 'Fmask']
 l8_stack_bands = ['B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'Fmask']
+
 
 def mask_value(vector, val):
     """
@@ -110,11 +109,11 @@ def qabitval_array(packedint_array):
         offset value to use
     """
     unpacked = np.full(packedint_array.shape, QA_FILL)
-    QA_CLOUD_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_CLOUD+1))
-    QA_SHADOW_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_SHADOW+1))
-    QA_SNOW_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_SNOW+1))
-    QA_WATER_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_WATER+1))
-    QA_CLEAR_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_CLEAR+1))
+    QA_CLOUD_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_CLOUD + 1))
+    QA_SHADOW_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_SHADOW + 1))
+    QA_SNOW_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_SNOW + 1))
+    QA_WATER_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_WATER + 1))
+    QA_CLEAR_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_CLEAR + 1))
 
     unpacked[QA_CLEAR_unpacked > 0] = QA_CLEAR
     unpacked[QA_WATER_unpacked > 0] = QA_WATER
@@ -167,7 +166,7 @@ def load_data(file_name, gdal_driver='GTiff'):
     image array
     (geotransform, inDs)
     '''
-    driver_t = gdal.GetDriverByName(gdal_driver) ## http://www.gdal.org/formats_list.html
+    driver_t = gdal.GetDriverByName(gdal_driver)  # http://www.gdal.org/formats_list.html
     driver_t.Register()
 
     inDs = gdal.Open(file_name, gdal.GA_ReadOnly)
@@ -209,7 +208,6 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
         # logger.error('Cannot open QA band for {}: {}'.format(folder, e))
         logger.error('Cannot open QA band for {}: {}'.format(folder, e))
         return False
-
 
     # convertQA = np.vectorize(qabitval)
     QA_band_unpacked = qabitval_array_HLS(QA_band).astype(np.short)
@@ -321,9 +319,9 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
                                                         shape=(config['n_block_y'],
                                                                config['n_block_x'], b_height,
                                                                b_width),
-                                                        strides=(config['n_cols']*b_height*bytesize,
+                                                        strides=(config['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 config['n_cols']*bytesize,
+                                                                 config['n_cols'] * bytesize,
                                                                  bytesize))
             for i in range(config['n_block_y']):
                 for j in range(config['n_block_x']):
@@ -356,7 +354,7 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
 
 
 def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=True, clear_threshold=0,
-                              low_year_bound=1, upp_year_bound=9999):
+                                low_year_bound=1, upp_year_bound=9999):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy
     :param source_dir: the parent folder to save image 'folder'
@@ -477,9 +475,9 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
                                                         shape=(config['n_block_y'],
                                                                config['n_block_x'], b_height,
                                                                b_width),
-                                                        strides=(config['n_cols']*b_height*bytesize,
+                                                        strides=(config['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 config['n_cols']*bytesize,
+                                                                 config['n_cols'] * bytesize,
                                                                  bytesize))
             for i in range(config['n_block_y']):
                 for j in range(config['n_block_x']):
@@ -536,10 +534,10 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
         shutil.rmtree(join(tmp_path, folder.replace("SR", "BT")), ignore_errors=True)
 
     try:
-        with tarfile.open(join(source_dir, folder+'.tar')) as tar_ref:
+        with tarfile.open(join(source_dir, folder + '.tar')) as tar_ref:
             try:
                 tar_ref.extractall(join(tmp_path, folder))
-            except:
+            except Exception:
                 # logger.warning('Unzip fails for {}'.format(folder))
                 logger.error('Unzip fails for {}'.format(folder))
                 return
@@ -549,10 +547,10 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
 
     # unzip BT
     try:
-        with tarfile.open(join(source_dir, folder.replace("SR", "BT")+'.tar')) as tar_ref:
+        with tarfile.open(join(source_dir, folder.replace("SR", "BT") + '.tar')) as tar_ref:
             try:
                 tar_ref.extractall(join(tmp_path, folder.replace("SR", "BT")))
-            except:
+            except Exception:
                 # logger.warning('Unzip fails for {}'.format(folder.replace("SR", "BT")))
                 logger.error('Unzip fails for {}'.format(folder.replace("SR", "BT")))
                 return
@@ -660,8 +658,7 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
         # if path_array is not None, we will eliminate those observation that has different path with its assigned path
         if path_array is not None:  # meaning that single-path processing
             if not os.path.exists(join(join(tmp_path, folder), folder.replace("_SR", ".xml"))):
-                logger.error('Cannot find xml file for {}'.format(join(join(tmp_path, folder),
-                                                                      folder.replace("_SR", ".xml"))))
+                logger.error('Cannot find xml file for {}'.format(join(join(tmp_path, folder), folder.replace("_SR", ".xml"))))
                 return
             tree = ET.parse(join(join(tmp_path, folder), folder.replace("_SR", ".xml")))
 
@@ -722,9 +719,9 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                                                         shape=(config['n_block_y'],
                                                                config['n_block_x'], b_height,
                                                                b_width),
-                                                        strides=(config['n_cols']*b_height*bytesize,
+                                                        strides=(config['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 config['n_cols']*bytesize,
+                                                                 config['n_cols'] * bytesize,
                                                                  bytesize))
             for i in range(config['n_block_y']):
                 for j in range(config['n_block_x']):
@@ -746,12 +743,11 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                                        QA_blocks[i][j]]).astype(np.int16))
 
         else:
-            np.save(join(out_dir, file_name), np.dstack([B1, B2, B3, B4, B5,B6, B7, QA_band_unpacked]).astype(np.int16))
+            np.save(join(out_dir, file_name), np.dstack([B1, B2, B3, B4, B5, B6, B7, QA_band_unpacked]).astype(np.int16))
         # scene_list.append(folder_name)
     else:
         # logger.info('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
         logger.warn('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
-
 
     # delete unzip folder
     shutil.rmtree(join(tmp_path, folder), ignore_errors=True)
@@ -780,10 +776,10 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
         shutil.rmtree(join(tmp_path, folder), ignore_errors=True)
 
     try:
-        with tarfile.open(join(source_dir, folder+'.tar')) as tar_ref:
+        with tarfile.open(join(source_dir, folder + '.tar')) as tar_ref:
             try:
                 tar_ref.extractall(join(tmp_path, folder))
-            except:
+            except Exception:
                 # logger.warning('Unzip fails for {}'.format(folder))
                 logger.error('Unzip fails for {}'.format(folder))
                 return
@@ -829,7 +825,7 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
         year = folder[17:21]
         doy = datetime(int(year), int(folder[21:23]), int(folder[23:25])).strftime('%j')
         collection = "C2"
-        version = folder[len(folder)-2:len(folder)]
+        version = folder[len(folder) - 2:len(folder)]
         file_name = sensor + path + row + year + doy + collection + version
         if low_year_bound != 0:
             if int(year) < low_year_bound:
@@ -973,9 +969,9 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
                                                         shape=(config['n_block_y'],
                                                                config['n_block_x'], b_height,
                                                                b_width),
-                                                        strides=(config['n_cols']*b_height*bytesize,
+                                                        strides=(config['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 config['n_cols']*bytesize,
+                                                                 config['n_cols'] * bytesize,
                                                                  bytesize))
             for i in range(config['n_block_y']):
                 for j in range(config['n_block_x']):
@@ -1002,7 +998,6 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
         # logger.info('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
         logger.warn('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
 
-
     # delete unzip folder
     shutil.rmtree(join(tmp_path, folder), ignore_errors=True)
     shutil.rmtree(join(tmp_path, folder.replace("SR", "BT")), ignore_errors=True)
@@ -1025,7 +1020,7 @@ def checkfinished_step2(out_dir, n_cores):
     :return:
     """
     for i in range(n_cores):
-        if not os.path.exists(join(out_dir, 'rank{}_finished.txt'.format(i+1))):
+        if not os.path.exists(join(out_dir, 'rank{}_finished.txt'.format(i + 1))):
             return False
     return True
 
@@ -1068,12 +1063,12 @@ def get_extent(extent_geojson, res, buf=0):
     txmax = extent_geojson['bbox'][2] + res * buf
     tymin = extent_geojson['bbox'][1] - res * buf
     tymax = extent_geojson['bbox'][3] + res * buf
-    n_row = ceil((tymax - tymin)/res)
-    n_col = ceil((txmax - txmin)/res)
-    txmin_new = (txmin + txmax)/2 - n_col / 2 * res
-    txmax_new = (txmin + txmax)/2 + n_col / 2 * res
-    tymin_new = (tymin + tymax)/2 - n_row / 2 * res
-    tymax_new = (tymin + tymax)/2 + n_row / 2 * res
+    n_row = np.ceil((tymax - tymin) / res)
+    n_col = np.ceil((txmax - txmin) / res)
+    txmin_new = (txmin + txmax) / 2 - n_col / 2 * res
+    txmax_new = (txmin + txmax) / 2 + n_col / 2 * res
+    tymin_new = (tymin + tymax) / 2 - n_row / 2 * res
+    tymax_new = (tymin + tymax) / 2 + n_row / 2 * res
     return (txmin_new, txmax_new, tymin_new, tymax_new), (n_row, n_col)
 
 
@@ -1171,7 +1166,7 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             with tarfile.open(join(source_dir, folder_list[0] + '.tar')) as tar_ref:
                 try:
                     tar_ref.extractall(join(tmp_path, folder_list[0]))
-                except:
+                except Exception:
                     logger.error('Unzip fails for {}'.format(folder_list[0]))
             ref_image = gdal.Open(join(join(tmp_path, folder_list[0]), "{}B1.tif".format(folder_list[0])))
             trans = ref_image.GetGeoTransform()
@@ -1185,8 +1180,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             dst = gdal.Warp(join(out_dir, 'singlepath_landsat_tile.tif'), conus_path_image,
                             options=params)
             # must close the dst
-            dst = None
-            out_img = None
+            dst = None  # NOQA
+            out_img = None  # NOQA
             shutil.rmtree(join(tmp_path, folder_list[0]), ignore_errors=True)
 
         if collection == 'ARD':
@@ -1283,10 +1278,10 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                 break
             folder = folder_list[new_rank]
             single_image_stacking_hls14(out_dir, logger, config, folder, clear_threshold=clear_threshold,
-                                      is_partition=is_partition, low_year_bound=low_year_bound,
-                                      upp_year_bound=upp_year_bound)
+                                        is_partition=is_partition, low_year_bound=low_year_bound,
+                                        upp_year_bound=upp_year_bound)
     # create an empty file for signaling the core that has been finished
-    with open(os.path.join(out_dir, 'rank{}_finished.txt'.format(rank)), 'w') as fp:
+    with open(os.path.join(out_dir, 'rank{}_finished.txt'.format(rank)), 'w'):
         pass
 
     # wait for other cores assigned
