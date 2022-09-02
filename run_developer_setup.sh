@@ -100,6 +100,10 @@ SITE_DPATH=$(python -c "import distutils.sysconfig; print(distutils.sysconfig.ge
 PYCOLD_EGG_LINK_FPATH="$SITE_DPATH"/pycold.egg-link
 echo "PYCOLD_EGG_LINK_FPATH = $PYCOLD_EGG_LINK_FPATH"
 
+
+PYCOLD_EDITABLE_PTH_FPATH="$SITE_DPATH"/__editable__.pycold-0.1.0.pth
+echo "PYCOLD_EDITABLE_PTH_FPATH = $PYCOLD_EDITABLE_PTH_FPATH"
+
 # Need to get rid of the easy install entry if it exists
 EASY_INSTALL_FPATH=$SITE_DPATH/easy-install.pth
 if cat "$EASY_INSTALL_FPATH" | grep "$REPO_DPATH" ; then
@@ -108,6 +112,11 @@ if cat "$EASY_INSTALL_FPATH" | grep "$REPO_DPATH" ; then
 else
     echo "Easy install pth seems clean"
 fi
+
+
+# Hack for setuptools while scikit-build sorts things out
+# https://github.com/scikit-build/scikit-build/issues/740
+export SETUPTOOLS_ENABLE_FEATURES="legacy-editable"
 
 
 ###  COMPILE STEP ###

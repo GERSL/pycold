@@ -236,6 +236,7 @@ class ProjectStructure():
         console.print(rich_file_content(egg_link_fpath))
 
         # Note: (recently 2022-08-ish) python switched to a new type of
+        # This is not present in setuptools==63.2.0 but is in 65.3.0
         # editable install. TODO: incomporate this.
         # editable_fpaths = list(site_dpath.glob('__editable__*' + self.mod_name.replace('_', '*') + '*'))
 
