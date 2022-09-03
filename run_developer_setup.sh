@@ -113,6 +113,40 @@ else
     echo "Easy install pth seems clean"
 fi
 
+### Handle installing some of the tricker requirements. ###
+
+fix_opencv_conflicts(){
+    __doc__="
+    Check to see if the wrong opencv is installed, and perform steps to clean
+    up the incorrect libraries and install the desired (headless) ones.
+    "
+    # Fix opencv issues
+    python -m pip freeze | grep "opencv-python=="
+    HAS_OPENCV_RETCODE="$?"
+    python -m pip freeze | grep "opencv-python-headless=="
+    HAS_OPENCV_HEADLESS_RETCODE="$?"
+
+    # VAR == 0 means we have it
+    if [[ "$HAS_OPENCV_HEADLESS_RETCODE" == "0" ]]; then
+        if [[ "$HAS_OPENCV_RETCODE" == "0" ]]; then
+            python -m pip uninstall opencv-python opencv-python-headless -y
+            python -m pip install opencv-python-headless
+        fi
+    else
+        if [[ "$HAS_OPENCV_RETCODE" == "0" ]]; then
+            python -m pip uninstall opencv-python -y
+        fi
+        python -m pip install opencv-python-headless
+    fi
+}
+
+fix_opencv_conflicts
+python -m pip install -r requirements/build.txt
+python -m pip install -r requirements/runtime.txt
+python -m pip install -r requirements/optional.txt
+python -m pip install -r requirements/tests.txt
+python -m pip install -r requirements/gdal.txt
+
 
 # Hack for setuptools while scikit-build sorts things out
 # https://github.com/scikit-build/scikit-build/issues/740

@@ -42,17 +42,17 @@ sudo apt-get install gfortran -y
 ### 2.2 install pycold
 **Option 1: Install in development mode**
 
+Inside of a Python virtual environment run:
+
 ```bash
-pip install -r requirements.txt
-
-# Install gdal wheels 
-pip install -r requirements/gdal.txt
-
-# Alternatively you could use conda
-# conda install gdal  # the easiest way to install gdal 
-
 bash run_developer_setup.sh
 ```
+
+Will install all of the developer requirements and ensure you are setup with a
+working opencv-python-headless and gdal Python modules, as well as other
+requirements and then it will compile and install pycold in editable
+development mode.
+
 
 **Option 2: Build and install a wheel** 
 
@@ -77,6 +77,10 @@ cd build
 cmake ..
 make 
 ```
+
+**Option 4: Use a docker image.
+
+See [dockerfiles/README.rst](dockerfiles/README.rst) for details.
 
 ## 3. Using pycold for pixel-based processing
 
