@@ -6,7 +6,7 @@
 
 FROM pyenv:310
 
-ARG HOME=/root
+ENV HOME=/root
 
 RUN <<EOF
 #!/bin/bash
@@ -34,53 +34,99 @@ cd /pycold
 python -m pip install pip -U 
 python -m pip install -r requirements.txt
 python -m pip install -r requirements/build.txt
+python -m pip install -r requirements/headless.txt
+python -m pip install -r requirements/runtime.txt
+python -m pip install -r requirements/optional.txt
+python -m pip install -r requirements/tests.txt
 python -m pip install -r requirements/gdal.txt
 python -m pip install setuptools==63.2.0  
 EOF
 
 
-# Stage the pycold source
-COPY run_developer_setup.sh /pycold/
-COPY setup.py /pycold/
-COPY pyproject.toml /pycold/
-COPY CMakeLists.txt /pycold/
-COPY requirements.txt /pycold/
-COPY requirements /pycold/requirements
-COPY src /pycold/src
-COPY tool /pycold/tool
-COPY tests /pycold/tests
-#COPY . /pycold
+# Copy the pycold source (being careful to not copy host build artifacts)
 
-#ARG BUILD_STRICT=0
+COPY .git /pycold/.git
+
+#### Repo root files
+#COPY *.sh /pycold/
+#COPY *.py /pycold/
+#COPY *.toml /pycold/
+#COPY *.txt /pycold/
+
+#### Subdirectory: resources
+#COPY requirements/*.txt /pycold/requirements/
+
+#### Subdirectory: tool/notebook
+#COPY tool/notebook/*.ipynb /pycold/tool/notebook/
+
+#### Subdirectory: tool/matlab
+#COPY tool/matlab/*.m /pycold/tool/matlab/
+
+#### Subdirectory: tests
+#COPY tests/*.py /pycold/tests/
+
+#### Subdirectory: tests/resources/feature_maps
+#COPY tests/resources/*.npy /pycold/tests/resources
+#COPY tests/resources/*.csv /pycold/tests/resources
+#COPY tests/resources/*.yaml /pycold/tests/resources
+#COPY tests/resources/*.pickle /pycold/tests/resources
+#COPY tests/resources/*.pickle /pycold/tests/resources
+
+#### Subdirectory: tests/resources/feature_maps
+#COPY tests/resources/feature_maps/*.npy   /pycold/tests/resources/feature_maps/
+#COPY tests/resources/feature_maps/*.model /pycold/tests/resources/feature_maps/
+#COPY tests/resources/feature_maps/*.npy   /pycold/tests/resources/feature_maps/
+
+#### Subdirectory: tests/resources/cm_maps
+#COPY tests/resources/cm_maps/*.npy        /pycold/tests/resources/cm_maps/
+
+#### Subdirectory: src/cxx
+#COPY src/cxx/*.c /pycold/src/cxx/
+#COPY src/cxx/*.h /pycold/src/cxx/
+#COPY src/cxx/*.txt /pycold/src/cxx/
+
+#### Subdirectory: src/python/pycold
+#COPY src/python/pycold/*.py /pycold/src/python/pycold/
+#COPY src/python/pycold/*.yaml /pycold/src/python/pycold/
+#COPY src/python/pycold/*.txt /pycold/src/python/pycold/
+#COPY src/python/pycold/*.pyx /pycold/src/python/pycold/
+
+#### Subdirectory: src/python/pycold/imagetool
+#COPY src/python/pycold/imagetool/*.py /pycold/src/python/pycold/imagetool/
+#COPY src/python/pycold/imagetool/*.yaml /pycold/src/python/pycold/imagetool/
+#COPY src/python/pycold/imagetool/*.tif /pycold/src/python/pycold/imagetool/
+
+
+WORKDIR /pycold
 
 RUN <<EOF
 #!/bin/bash
-source $HOME/activate
-set -x
-cd /pycold
-ls 
-pwd
-pip install -r requirements/build.txt
-chmod +x run_developer_setup.sh
-source run_developer_setup.sh
+ls -al
+tree
+git reset --hard HEAD
+ls -al
 EOF
 
 
-# Run simple tests
 RUN <<EOF
 #!/bin/bash
 source $HOME/activate
-cd /pycold
-ls 
+pip install -r requirements/build.txt
+python -m pip install setuptools==63.2.0  
+chmod +x run_developer_setup.sh
+./run_developer_setup.sh
+EOF
+
+
+## Run simple tests
+RUN <<EOF
+#!/bin/bash
+source $HOME/activate
 tree
 echo "Start simple tests"
 python -c "import pycold; print(pycold.__file__)"
-EAGER_IMPORT=1 python -c "import pycold; print(pycold.__version__)"
-EAGER_IMPORT=1 python -m pycold --help
+python -c "import pycold; print(pycold.__version__)"
 EOF
-
-# Copy over the rest of the repo
-COPY . /pycold
 
 
 ################
@@ -104,7 +150,7 @@ DOCKER_BUILDKIT=1 docker build --progress=plain \
     -t "pycold:310" \
     -f ./dockerfiles/pycold.Dockerfile .
 
-docker run --runtime=nvidia -it pycold:310 bash
+docker run -w /pycold -it pycold:310 bash
 # docker buildx build -t "pyenv3.10" -f ./pyenv.Dockerfile --build-arg BUILD_STRICT=1 .
 "
 
