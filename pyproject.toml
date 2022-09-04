@@ -16,7 +16,7 @@ test-requires = [ "-r requirements/tests.txt",]
 ignore_missing_imports = true
 
 [tool.cibuildwheel.linux]
-before-all = "yum install gcc gcc-c++ make zlib-devel gcc-gfortran -y && curl https://ftp.gnu.org/gnu/gsl/gsl-2.7.1.tar.gz  > gsl.tar.gz && tar xfv gsl.tar.gz && cd gsl-2.7.1 && ./configure --prefix=/usr --disable-static && make && make install"
+before-build = "yum install gcc gcc-c++ make zlib-devel gcc-gfortran -y && curl https://ftp.gnu.org/gnu/gsl/gsl-2.7.1.tar.gz  > gsl.tar.gz && tar xfv gsl.tar.gz && cd gsl-2.7.1 && ./configure --prefix=/usr --disable-static && make && make install"
 
 [tool.pytest.ini_options]
 addopts = "-p no:doctest --xdoctest --xdoctest-style=google --ignore-glob=setup.py --ignore-glob=dev"
