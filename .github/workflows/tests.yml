@@ -106,11 +106,15 @@ jobs:
         arch:
         - auto
     steps:
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-      if: runner.os == 'Linux' && matrix.arch != 'auto'
-      with:
-        platforms: all
+
+    - name: Checkout source
+      uses: actions/checkout@v3
+
+    #- name: Set up QEMU
+    #  uses: docker/setup-qemu-action@v2
+    #  if: runner.os == 'Linux' && matrix.arch != 'auto'
+    #  with:
+    #    platforms: all
     - name: Build binary wheels
       uses: pypa/cibuildwheel@v2.9.0
       with:
