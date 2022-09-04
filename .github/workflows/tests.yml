@@ -27,12 +27,12 @@ jobs:
     - name: Lint with flake8
       run: |-
         # stop the build if there are Python syntax errors or undefined names
-        flake8 ./pycold --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 ./src/python/pycold --count --select=E9,F63,F7,F82 --show-source --statistics
     - name: Typecheck with mypy
       run: |-
         python -m pip install mypy
-        mypy --install-types --non-interactive ./pycold
-        mypy ./pycold
+        mypy --install-types --non-interactive ./src/python/pycold
+        mypy ./src/python/pycold
   build_and_test_sdist:
     name: Test sdist Python 3.8
     runs-on: ubuntu-latest
@@ -112,7 +112,7 @@ jobs:
       with:
         platforms: all
     - name: Build binary wheels
-      uses: pypa/cibuildwheel@v2.8.1
+      uses: pypa/cibuildwheel@v2.9.0
       with:
         output-dir: wheelhouse
         config-file: pyproject.toml
