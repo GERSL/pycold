@@ -6,5 +6,5 @@ from . import monkey  # NOQA
 from . import _pycold_cython  # NOQA
 
 from ._pycold_cython import (  # NOQA
-    cold, obcold_reconstruction_procedure, sccd, test_func, cold_detect,
+    test_func, cold_detect,
     obcold_reconstruct, sccd_detect, sccd_update)
