@@ -3,7 +3,7 @@ requires = ["setuptools>=41.0.1", "scikit-build>=0.11.1", "numpy", "ninja>=1.10.
 
 [tool.cibuildwheel]
 #build = "cp38-* cp310-*"
-build = "cp310-*"
+build = "cp310-manylinux_x86_64"
 build-frontend = "build"
 skip = "pp* *-musllinux_* *_i686"
 archs = ["x86_64"]
