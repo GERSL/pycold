@@ -5,7 +5,7 @@ requires = ["setuptools>=41.0.1", "scikit-build>=0.11.1", "numpy", "ninja>=1.10.
 #build = "cp38-* cp310-*"
 build = "cp310-*"
 build-frontend = "build"
-skip = "pp* *-musllinux_*"
+skip = "pp* *-musllinux_* *_i686"
 archs = ["x86_64"]
 #archs = ["i686"]
 build-verbosity = 1

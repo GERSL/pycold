@@ -104,7 +104,8 @@ jobs:
         cibw_skip:
         - '*-win32'
         arch:
-        - auto
+        - x86_64
+        #- auto
     steps:
 
     - name: Checkout source
