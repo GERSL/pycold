@@ -18,11 +18,37 @@ def test_sccd_detect():
 
 
 def test_sccd_update():
+    import numpy as np
     pickle_file = open('tests/resources/spectral_15043028_sccdplot.pickle', 'rb')
+
     sccd_plot = SccdOutput(*pickle.load(pickle_file))
+
+    # Test that the named tuple structure is the same
+    from pycold._pycold_cython import SccdOutput as SccdOutputCy
+    assert SccdOutputCy._fields == SccdOutput._fields
+    assert sccd_plot._fields == SccdOutput._fields
+
     in_path = 'tests/resources/spectral_15043028_ext.csv'
     data = read_data(in_path)
     dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, sensor = data.copy()  # exclude header
-    sccd_plot_new = sccd_update(sccd_plot, dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
+
+    for idx, (key, item) in enumerate(zip(sccd_plot._fields, sccd_plot)):
+        print('----------')
+        print(f'idx={idx}, key={key}')
+        if isinstance(item, np.ndarray):
+            item.shape
+            print(f'item.shape={item.shape}')
+            print(f'item.dtype={item.dtype}')
+        else:
+            print(f'item={item}')
+
+    # Check that the packed numpy dtype hasn't unexpectedly changed between
+    # testdata and the current library version.
+    from pycold._pycold_cython import nrtmodel_dt
+    sccd_pack = sccd_plot
+    assert nrtmodel_dt.itemsize == sccd_pack.nrt_model.dtype.itemsize, (
+        'The test data does not correspond to the current code')
+
+    sccd_plot_new = sccd_update(sccd_pack, dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
     assert sccd_plot_new.nrt_model['num_obs'] == 64
     assert sccd_plot_new.nrt_model['obs_date_since1982'][0][3] == 9059
