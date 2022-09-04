@@ -1,2 +1,44 @@
 [build-system]
-requires = ["setuptools>=41.0.1", "wheel", "scikit-build>=0.9.0", "numpy", "cmake", "cython", "ninja", "cffi"]
+requires = ["setuptools>=41.0.1", "scikit-build>=0.11.1", "numpy", "ninja>=1.10.2", "cmake>=3.21.2", "cython>=0.29.24",]
+
+[tool.cibuildwheel]
+#build = "cp38-* cp310-*"
+build = "cp310-*"
+build-frontend = "build"
+skip = "pp* *-musllinux_*"
+build-verbosity = 1
+test-requires = [ "-r requirements/tests.txt",]
+#test-command = "python -m pytest"
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.cibuildwheel.linux]
+before-all = "yum install gcc gcc-c++ make zlib-devel gcc-gfortran -y && curl https://ftp.gnu.org/gnu/gsl/gsl-2.7.1.tar.gz  > gsl.tar.gz && tar xfv gsl.tar.gz && cd gsl-2.7.1 && ./configure --prefix=/usr --disable-static && make && make install"
+
+[tool.pytest.ini_options]
+addopts = "-p no:doctest --xdoctest --xdoctest-style=google --ignore-glob=setup.py --ignore-glob=dev"
+norecursedirs = ".git ignore build __pycache__ dev _skbuild"
+filterwarnings = [
+    "default",
+    "ignore:.*No cfgstr given in Cacher constructor or call.*:Warning", 
+    "ignore:.*Define the __nice__ method for.*:Warning", "ignore:.*private pytest class or function.*:Warning",
+]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+     ".*  # pragma: no cover",
+     ".*  # nocover", 
+    "def __repr__",
+     "raise AssertionError",
+     "raise NotImplementedError",
+     "if 0:",
+     "^ *raise",
+     "^ *pass *$",
+     "if __name__ == .__main__.:",
+]
+omit = ["*/setup.py",]

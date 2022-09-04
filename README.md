@@ -34,10 +34,24 @@ The ZLIB, GSL, and OpenMP libraries are required.
 For Ubuntu/Debian systems, they can be installed via:
 
 ```bash
-sudo apt-get install build-essential zlib1g-dev -y
-sudo apt-get install libgsl-dev -y
+sudo apt-get install build-essential 
+sudo apt-get install zlib1g-dev -y
 sudo apt-get install gfortran -y
+sudo apt-get install libgsl-dev -y
 ```
+
+On CentOS systems run:
+
+
+```bash
+sudo apt-get install gcc gcc-c++ make  
+sudo apt-get install zlib-devel -y
+sudo apt-get install gcc-gfortran -y
+# Yum provides an gsl 1.5, but we need 2.7
+# sudo apt-get install gsl-devel -y
+curl https://ftp.gnu.org/gnu/gsl/gsl-2.7.1.tar.gz  > gsl.tar.gz && tar xfv gsl.tar.gz && cd gsl-2.7.1 && ./configure --prefix=/usr --disable-static && make && make install
+```
+
 
 ### 2.2 install pycold
 **Option 1: Install in development mode**
