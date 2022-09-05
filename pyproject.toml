@@ -9,7 +9,7 @@ skip = "pp* *-musllinux_* *_i686"
 archs = ["x86_64"]
 #archs = ["i686"]
 build-verbosity = 1
-test-requires = [ "-r requirements/tests.txt",]
+test-requires = ["-r requirements/tests.txt", "-r requirements/headless.txt", "-r requirements/gdal.txt"]
 test-command = "python {project}/run_tests.py"
 
 
