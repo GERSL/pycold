@@ -100,6 +100,10 @@ SITE_DPATH=$(python -c "import distutils.sysconfig; print(distutils.sysconfig.ge
 PYCOLD_EGG_LINK_FPATH="$SITE_DPATH"/pycold.egg-link
 echo "PYCOLD_EGG_LINK_FPATH = $PYCOLD_EGG_LINK_FPATH"
 
+
+PYCOLD_EDITABLE_PTH_FPATH="$SITE_DPATH"/__editable__.pycold-0.1.0.pth
+echo "PYCOLD_EDITABLE_PTH_FPATH = $PYCOLD_EDITABLE_PTH_FPATH"
+
 # Need to get rid of the easy install entry if it exists
 EASY_INSTALL_FPATH=$SITE_DPATH/easy-install.pth
 if cat "$EASY_INSTALL_FPATH" | grep "$REPO_DPATH" ; then
@@ -108,6 +112,45 @@ if cat "$EASY_INSTALL_FPATH" | grep "$REPO_DPATH" ; then
 else
     echo "Easy install pth seems clean"
 fi
+
+### Handle installing some of the tricker requirements. ###
+
+fix_opencv_conflicts(){
+    __doc__="
+    Check to see if the wrong opencv is installed, and perform steps to clean
+    up the incorrect libraries and install the desired (headless) ones.
+    "
+    # Fix opencv issues
+    python -m pip freeze | grep "opencv-python=="
+    HAS_OPENCV_RETCODE="$?"
+    python -m pip freeze | grep "opencv-python-headless=="
+    HAS_OPENCV_HEADLESS_RETCODE="$?"
+
+    # VAR == 0 means we have it
+    if [[ "$HAS_OPENCV_HEADLESS_RETCODE" == "0" ]]; then
+        if [[ "$HAS_OPENCV_RETCODE" == "0" ]]; then
+            python -m pip uninstall opencv-python opencv-python-headless -y
+            python -m pip install opencv-python-headless
+        fi
+    else
+        if [[ "$HAS_OPENCV_RETCODE" == "0" ]]; then
+            python -m pip uninstall opencv-python -y
+        fi
+        python -m pip install opencv-python-headless
+    fi
+}
+
+fix_opencv_conflicts
+python -m pip install -r requirements/build.txt
+python -m pip install -r requirements/runtime.txt
+python -m pip install -r requirements/optional.txt
+python -m pip install -r requirements/tests.txt
+python -m pip install -r requirements/gdal.txt
+
+
+# Hack for setuptools while scikit-build sorts things out
+# https://github.com/scikit-build/scikit-build/issues/740
+export SETUPTOOLS_ENABLE_FEATURES="legacy-editable"
 
 
 ###  COMPILE STEP ###

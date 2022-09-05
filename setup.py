@@ -184,10 +184,22 @@ if __name__ == '__main__':
             'tests': parse_requirements('requirements/tests.txt'),
             'build': parse_requirements('requirements/build.txt'),
             'optional': parse_requirements('requirements/optional.txt'),
+            'headless': parse_requirements('requirements/headless.txt'),
+            'graphics': parse_requirements('requirements/graphics.txt'),
         },
         author='Su Ye',
         author_email='remotesensingsuy@gmail.com',
         packages=packages,
         include_package_data=True,
+        package_data={
+            'pycold': [
+                'ob_parameters.yaml',
+                'constants.yaml',
+            ],
+            'pycold.imagetool': [
+                'config.yaml',
+                'singlepath_landsat_conus.tif',
+            ],
+        },
         python_requires='>=3.6',
     )

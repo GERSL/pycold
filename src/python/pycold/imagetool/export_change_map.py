@@ -23,6 +23,7 @@ output_nrtmodel = np.dtype([('t_start_since1982', np.short), ('num_obs', np.shor
                             ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
                             ('cm_outputs', np.short), ('cm_outputs_date', np.short)], align=True)
 
+
 # copy from /pycold/src/python/pycold/pyclassifier.py because MPI has conflicts with the pycold package in UCONN HPC.
 # Dirty approach!
 def extract_features(cold_plot, band, ordinal_day_list, nan_val, feature_outputs=['a0', 'a1', 'b1']):
@@ -151,11 +152,11 @@ def getcategory_obcold(cold_plot, i_curve, last_dist_type):
             return 2  # regrowth
     else:
         if i_curve > 0:
-            if (cold_plot[i_curve]['t_break'] - cold_plot[i_curve-1]['t_break'] > 365.25 * 5) or (last_dist_type != 1):
+            if (cold_plot[i_curve]['t_break'] - cold_plot[i_curve - 1]['t_break'] > 365.25 * 5) or (last_dist_type != 1):
                 return 1
             flip_count = 0
             for b in range(5):
-                if cold_plot[i_curve]['magnitude'][b+1] * cold_plot[i_curve-1]['magnitude'][b+1] < 0:
+                if cold_plot[i_curve]['magnitude'][b + 1] * cold_plot[i_curve - 1]['magnitude'][b + 1] < 0:
                     flip_count = flip_count + 1
             if flip_count >= 4:
                 return 4
@@ -279,7 +280,7 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
         if not os.path.exists(os.path.join(reccg_path, filename)):
             # reccg_path = '/home/coloury'
             print('the rec_cg file {} is missing'.format(os.path.join(reccg_path, filename)))
-            for year in range(year_lowbound, year_uppbound+1):
+            for year in range(year_lowbound, year_uppbound + 1):
                 outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
                 np.save(outfile, results_block[year - year_lowbound])
             continue
@@ -339,8 +340,8 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
                 i_row = int((curve["pos"] - 1) / config['n_cols']) - \
                         (current_block_y - 1) * config['block_height']
                 if i_col < 0:
-                    print('Processing {} failed: i_row={}; i_col={} for {}'.format(filename,
-                                                                                      i_row, i_col, dat_pth))
+                    dat_pth = '?'
+                    print('Processing {} failed: i_row={}; i_col={} for {}'.format(filename, i_row, i_col, dat_pth))
                     return
 
                 if method == 'OBCOLD':
@@ -365,14 +366,14 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
     if rank == 0:
         # assemble
         for year in range(year_lowbound, year_uppbound + 1):
-            tmp_map_blocks = [np.load(os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(x+1, year)))
+            tmp_map_blocks = [np.load(os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(x + 1, year)))
                               for x in range(config['n_blocks'])]
 
             results = np.hstack(tmp_map_blocks)
             results = np.vstack(np.hsplit(results, config['n_block_x']))
 
             for x in range(config['n_blocks']):
-                os.remove(os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(x+1, year)))
+                os.remove(os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(x + 1, year)))
             mode_string = str(year) + '_break_map'
             outname = '{}_{}.tif'.format(mode_string, method)
             outfile = os.path.join(out_path, outname)
