@@ -80,68 +80,41 @@ On CentOS systems run:
 2.2 Compile and Install PYCOLD
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Option 1: Install in development mode**
-
 The following instructure assume you are inside a Python virtual environment
-(e.g. via conda or pyenv).
+(e.g. via conda or pyenv). 
 
-The first step is to install GDAL, which does not currently have a binary
-distribution on pypi. The following step will install GDAL from a 
-`custom pypi server <https://girder.github.io/large_image_wheels>`_ 
-containing precompiled wheels. 
-
+Note that in all cases gdal will need to be manually installed.  The following
+step will install GDAL from a `custom pypi server
+<https://girder.github.io/large_image_wheels>`_ containing precompiled wheels. 
 
 .. code:: bash
 
     # Install GDAL (note-this must be done manually)
     pip install -r requirements/gdal.txt
 
-We must also manually install the Python build dependencies. This is done via:
+Additionally, to access the ``cv2`` module, pycold will require either
+``opencv-python`` or ``opencv-python-headless``, which are mutually exclusive.
+This is exposed as optional dependencies in the package via either "graphics"
+or "headless" extras.  Headless mode is recommended as it is more compatible
+with other libraries. These can be obtained manually via:
 
 .. code:: bash
 
-    # In the future the pyproject.toml should take care of this, but 
-    # for now, we must do it manually.
-    pip install -r requirements/build.txt
-   
-While the next command will take care of installing all other non-gdal Python
-runtime dependencies, if desired these runtime dependencies can be installed manually via:
-``pip install -r requirements.txt`` or via invoking
-``pip install -r`` on a specific files in the ``requirements`` subdirectory.
+    pip install -r requirements/headless.txt
+    
+    # XOR (choose only one!)
 
-Once GDAL and the Pyton build dependences are installed, pycold can be compiled
-and installed in development mode via:
-
-.. code:: bash
-
-    export SETUPTOOLS_ENABLE_FEATURES="legacy-editable"
-    pip install --no-build-isolation --verbose -e .[headless]
-
-This will install the Python dependencies, then compile the C dependencies
-in-place, and finally install the pycold Python package in development mode.
-Note specifying "headless" tells pycold which version of opencv to use. The
-alternative is "graphics", which is not recommended for fresh builds. Note: you
-may need to remove any existing ``_skbuild`` directly if you encounter a build
-error.
-
-NOTE: Due to a bug in scikit-build, the editable install link does not point to
-the correct path. This can be corrected via:
+    pip install -r requirements/graphics.txt
 
 
-.. code:: bash
+**Option 1: Install in development mode**
 
-    # Workaround for a scikit-build editable install bug
-    REPO_DPATH=$(pwd)
-    SITE_DPATH=$(python -c "import distutils.sysconfig; print(distutils.sysconfig.get_python_lib())")
-    PYCOLD_EGG_LINK_FPATH="$SITE_DPATH"/pycold.egg-link
-    EASY_INSTALL_FPATH=$SITE_DPATH/easy-install.pth
-    echo "$REPO_DPATH/src/python" > "$PYCOLD_EGG_LINK_FPATH"
-    echo "../../" >> "$PYCOLD_EGG_LINK_FPATH"
-    mv pycold.egg-info ./src/python/
-    echo "$REPO_DPATH/src/python" >> "$EASY_INSTALL_FPATH"
+For details on installing in development mode see the
+`developer install instructions <docs/source/developer_install.rst>`_.
 
-Again we note that the above steps and other minor details are consolidated in
-the ``run_developer_setup.sh`` script.
+We note that all steps in the above document and other minor details are
+consolidated in the ``run_developer_setup.sh`` script.
+
 
 **Option 2: Build and install a wheel**
 
@@ -177,7 +150,9 @@ for C development)**
 
 **Option 4: Use a docker image.**
 
-See `dockerfiles/README.rst <dockerfiles/README.rst>`__ for details.
+This repo provides dockerfiles that illustrate a reproduceable method for
+compling and installing PYCOLD. See `dockerfiles/README.rst
+<dockerfiles/README.rst>`__ for details.
 
 3. Using pycold for pixel-based processing
 ------------------------------------------
