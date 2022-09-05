@@ -3,23 +3,34 @@ from pycold.ob_analyst import segmentation_floodfill
 from pycold.ob_analyst import object_analysis
 from pycold.ob_analyst import ObjectAnalystHPC
 import yaml
-# import matplotlib.pyplot as plt
 import shutil
+import pathlib
 
-with open('tests/resources/test_config_obanalyst.yaml', 'r') as yaml_obj:
+# Use this file to determine where the resources are.  If for some reason we
+# are do not have __file__ available (e.g.  copy/pasting in IPython) then
+# assume we are in the repo reoot.
+# TODO: should likely use pkg_resources instead
+try:
+    TEST_RESOURCE_DPATH = (pathlib.Path(__file__).parent / 'resources').resolve()
+except NameError:
+    TEST_RESOURCE_DPATH = pathlib.Path('tests/resources').resolve()
+
+with open(TEST_RESOURCE_DPATH / 'test_config_obanalyst.yaml', 'r') as yaml_obj:
     test_config = yaml.safe_load(yaml_obj)
 
 date = 730329
 
-cm_array = np.load('tests/resources/cm_maps/CM_maps_730329_2000210.npy')
-cm_array_l1 = np.load('tests/resources/cm_maps/CM_maps_730297_2000178.npy')
-cm_date_array = np.load('tests/resources/cm_maps/CM_date_maps_730329_2000210.npy')
-cm_array_l1_date = np.load('tests/resources/cm_maps/CM_date_maps_730297_2000178.npy')
+cm_array = np.load(TEST_RESOURCE_DPATH / 'cm_maps/CM_maps_730329_2000210.npy')
+cm_array_l1 = np.load(TEST_RESOURCE_DPATH / 'cm_maps/CM_maps_730297_2000178.npy')
+cm_date_array = np.load(TEST_RESOURCE_DPATH / 'cm_maps/CM_date_maps_730329_2000210.npy')
+cm_array_l1_date = np.load(TEST_RESOURCE_DPATH / 'cm_maps/CM_date_maps_730297_2000178.npy')
 
 
 def test_workflow():
-    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date, stack_path='tests/resources', result_path='tests/resources',
-                                  thematic_path='tests/resources/feature_maps')
+    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date,
+                                  stack_path=TEST_RESOURCE_DPATH,
+                                  result_path=TEST_RESOURCE_DPATH,
+                                  thematic_path=TEST_RESOURCE_DPATH / 'feature_maps')
     ob_analyst.hpc_preparation()
     ob_analyst.obia_execute(date, method='slic')
     assert ob_analyst.is_finished_object_analysis(date_list=[date])
@@ -37,7 +48,7 @@ def test_segmentation():
 def test_object_analysis():
     [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation_floodfill(
         cm_array, cm_date_array, cm_array_l1, cm_array_l1_date)
-    classification_map = np.load('tests/resources/feature_maps/yearlyclassification_1999.npy')
+    classification_map = np.load(TEST_RESOURCE_DPATH / 'feature_maps/yearlyclassification_1999.npy')
     change_map = object_analysis(object_map_s1, object_map_s2, s1_info, classification_map)
     # import matplotlib.pyplot as plt
     # plt.imshow(change_map)
@@ -53,7 +64,9 @@ def test_object_analysis():
 
 
 def test_get_lastyear_cmap_fromdate():
-    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date - 366, stack_path='tests/resources', result_path='tests/resources',
-                                  thematic_path='tests/resources/feature_maps')
+    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date - 366,
+                                  stack_path=TEST_RESOURCE_DPATH,
+                                  result_path=TEST_RESOURCE_DPATH,
+                                  thematic_path=TEST_RESOURCE_DPATH / 'feature_maps')
     cmap = ob_analyst.get_lastyear_cmap_fromdate(date)
     assert cmap is not None

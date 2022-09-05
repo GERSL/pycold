@@ -463,7 +463,8 @@ class PyClassifierHPC(PyClassifier):
 
         full_feature_array = assemble_array(self.get_fullfeature_forcertainyear(ref_year),
                                             self.config['n_block_x'])
-        rf_model = self.train_rfmodel(full_feature_array, gdal_array.LoadFile(self.seedmap_path))
+        label_array = gdal_array.LoadFile(os.fspath(self.seedmap_path))
+        rf_model = self.train_rfmodel(full_feature_array, label_array)
         if rf_path is None:
             self._save_rf_model(rf_model, self.rf_path)
         else:

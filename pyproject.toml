@@ -10,7 +10,8 @@ archs = ["x86_64"]
 #archs = ["i686"]
 build-verbosity = 1
 test-requires = [ "-r requirements/tests.txt",]
-#test-command = "python -m pytest"
+test-command = "python {project}/run_tests.py"
+
 
 [tool.mypy]
 ignore_missing_imports = true

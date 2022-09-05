@@ -10,3 +10,5 @@ dist/*.whl
 build
 .idea
 wheelhouse
+tests/coverage.xml
+tests/.coverage
