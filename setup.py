@@ -191,5 +191,15 @@ if __name__ == '__main__':
         author_email='remotesensingsuy@gmail.com',
         packages=packages,
         include_package_data=True,
+        package_data={
+            'pycold': [
+                'ob_parameters.yaml',
+                'constants.yaml',
+            ],
+            'pycold.imagetool': [
+                'config.yaml',
+                'singlepath_landsat_conus.tif',
+            ],
+        },
         python_requires='>=3.6',
     )

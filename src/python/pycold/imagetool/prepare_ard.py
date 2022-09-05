@@ -25,6 +25,7 @@ from datetime import datetime
 from os import listdir
 from os.path import isfile, join, isdir
 from pathlib import Path
+from importlib import resources as importlib_resources
 
 import pandas as pd
 import numpy as geek
@@ -1160,7 +1161,11 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
 
         if hpc is True and collection == 'ARD':
             # warp a tile-based single path tif
-            conus_path_image = gdal.Open(join(Path(os.path.realpath(__file__)).parent, 'singlepath_landsat_conus.tif'))
+
+            with importlib_resources.path('pycold.imagetool', 'singlepath_landsat_conus.tif') as conus_image_fpath:
+                # conus_image_fpath = (Path(__file__).parent / 'singlepath_landsat_conus.tif').resolve()
+                conus_image = gdal.Open(os.fspath(conus_image_fpath))
+
             if os.path.exists(join(tmp_path, folder_list[0])):
                 shutil.rmtree(join(tmp_path, folder_list[0]), ignore_errors=True)
             with tarfile.open(join(source_dir, folder_list[0] + '.tar')) as tar_ref:
@@ -1177,8 +1182,9 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             ymin = ymax + trans[5] * ref_image.RasterYSize
             params = gdal.WarpOptions(dstSRS=proj, outputBounds=[xmin, ymin, xmax, ymax],
                                       width=ref_image.RasterXSize, height=ref_image.RasterYSize)
-            dst = gdal.Warp(join(out_dir, 'singlepath_landsat_tile.tif'), conus_path_image,
-                            options=params)
+
+            out_fpath = join(out_dir, 'singlepath_landsat_tile.tif')
+            dst = gdal.Warp(out_fpath, conus_image, options=params)
             # must close the dst
             dst = None  # NOQA
             out_img = None  # NOQA
