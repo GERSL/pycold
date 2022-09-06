@@ -32,6 +32,8 @@ import numpy as geek
 import numpy as np
 from glob import glob
 from dateutil.parser import parse
+from osgeo import gdal_array
+import gdal
 
 
 # define constant here
