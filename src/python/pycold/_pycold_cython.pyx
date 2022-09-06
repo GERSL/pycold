@@ -193,24 +193,24 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     cdef Output_t* rec_cg = <Output_t*> PyMem_Malloc(NUM_FC * sizeof(t))
 
     # make sure it is c contiguous array
-#    if dates.flags['C_CONTIGUOUS'] == False:
-#        dates = np.ascontiguousarray(dates)
-#    if ts_b.flags['C_CONTIGUOUS'] == False:
-#        ts_b = np.ascontiguousarray(ts_b)
-#    if ts_g.flags['C_CONTIGUOUS'] == False:
-#        ts_g = np.ascontiguousarray(ts_g)
-#    if ts_r.flags['C_CONTIGUOUS'] == False:
-#        ts_r = np.ascontiguousarray(ts_r)
-#    if ts_n.flags['C_CONTIGUOUS'] == False:
-#        ts_n = np.ascontiguousarray(ts_n)
-#    if ts_s1.flags['C_CONTIGUOUS'] == False:
-#        ts_s1 = np.ascontiguousarray(ts_s1)
-#    if ts_s2.flags['C_CONTIGUOUS'] == False:
-#        ts_s2 = np.ascontiguousarray(ts_s2)
-#    if ts_t.flags['C_CONTIGUOUS'] == False:
-#        ts_t = np.ascontiguousarray(ts_t)
-#    if qas.flags['C_CONTIGUOUS'] == False:
-#        qas = np.ascontiguousarray(qas)
+    if dates.flags['C_CONTIGUOUS'] == False:
+        dates = np.ascontiguousarray(dates)
+    if ts_b.flags['C_CONTIGUOUS'] == False:
+        ts_b = np.ascontiguousarray(ts_b)
+    if ts_g.flags['C_CONTIGUOUS'] == False:
+        ts_g = np.ascontiguousarray(ts_g)
+    if ts_r.flags['C_CONTIGUOUS'] == False:
+        ts_r = np.ascontiguousarray(ts_r)
+    if ts_n.flags['C_CONTIGUOUS'] == False:
+        ts_n = np.ascontiguousarray(ts_n)
+    if ts_s1.flags['C_CONTIGUOUS'] == False:
+        ts_s1 = np.ascontiguousarray(ts_s1)
+    if ts_s2.flags['C_CONTIGUOUS'] == False:
+        ts_s2 = np.ascontiguousarray(ts_s2)
+    if ts_t.flags['C_CONTIGUOUS'] == False:
+        ts_t = np.ascontiguousarray(ts_t)
+    if qas.flags['C_CONTIGUOUS'] == False:
+        qas = np.ascontiguousarray(qas)
     
     cdef long [:] dates_view = dates
     cdef long [:] ts_b_view = ts_b

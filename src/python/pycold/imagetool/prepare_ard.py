@@ -35,6 +35,7 @@ warnings.filterwarnings("ignore")
 import fiona
 from pathlib import Path
 from glob import glob
+from dateutil.parser import parse
 
 
 # define constant here
@@ -189,7 +190,7 @@ def load_data(file_name, gdal_driver='GTiff'):
 
 
 def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_partition=True, clear_threshold=0,
-                              low_year_bound=1, upp_year_bound=9999):
+                              low_date_bound=None, upp_date_bound=None):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy
     :param source_dir: the parent folder to save image 'folder'
@@ -199,8 +200,8 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
     :param config
     :param is_partition: True, partition each image into blocks; False, save original size of image
     :param clear_threshold: threshold of clear pixel percentage, if lower than threshold, won't be processed
-    :param low_year_bound: the lower bound of user interested year range
-    :param upp_year_bound: the upper bound of user interested year range
+    :param low_date_bound: the lower date of user interested year range
+    :param upp_date_bound: the upper date of user interested year range
     :return:
     """
     try:
@@ -225,12 +226,14 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
         year = imagetime[0:4]
         doy = imagetime[4:7]
         file_name = sensor + tile_id + year + doy + collection + version1
-        if low_year_bound != 0:
-            if int(year) < low_year_bound:
-                return False
-        if upp_year_bound != 9999:
-            if int(year) > upp_year_bound:
-                return False
+        if low_date_bound is not None:
+            if pd.Timestamp.toordinal((dt.datetime(year, 1, 1) + dt.timedelta(doy - 1)).strftime('%Y-%m-%d')) < \
+                    low_date_bound:
+                return True
+        if upp_date_bound is not None:
+            if pd.Timestamp.toordinal((dt.datetime(year, 1, 1) + dt.timedelta(doy - 1)).strftime('%Y-%m-%d')) > \
+                    upp_date_bound:
+                return True
 
         if sensor == 'L30':
             try:
@@ -356,7 +359,7 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
 
 
 def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=True, clear_threshold=0,
-                              low_year_bound=1, upp_year_bound=9999):
+                              low_date_bound=None, upp_date_bound=None):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy
     :param source_dir: the parent folder to save image 'folder'
@@ -366,8 +369,8 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
     :param config
     :param is_partition: True, partition each image into blocks; False, save original size of image
     :param clear_threshold: threshold of clear pixel percentage, if lower than threshold, won't be processed
-    :param low_year_bound: the lower bound of user interested year range
-    :param upp_year_bound: the upper bound of user interested year range
+    :param low_date_bound: the lower bound of user interested date range
+    :param upp_date_bound: the upper bound of user interested date range
     :return:
     """
     try:
@@ -393,12 +396,15 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
         year = imagetime[0:4]
         doy = imagetime[4:7]
         file_name = sensor + tile_id + year + doy + collection + version1
-        if low_year_bound != 0:
-            if int(year) < low_year_bound:
-                return False
-        if upp_year_bound != 9999:
-            if int(year) > upp_year_bound:
-                return False
+        if low_date_bound is not None:
+            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
+                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) < low_date_bound:
+                return True
+            
+        if upp_date_bound is not None:
+            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
+                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) > upp_date_bound:
+                return True
 
         if sensor == 'L30':
             try:
@@ -512,7 +518,7 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
 
 
 def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger, config,
-                            is_partition=True, low_year_bound=1, upp_year_bound=9999):
+                            is_partition=True, low_date_bound=None, upp_date_bound=None):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy
     :param tmp_path: tmp folder to save unzip image
@@ -525,8 +531,8 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
     :param logger: the handler of logger file
     :param config
     :param is_partition: True, partition each image into blocks; False, save original size of image
-    :param low_year_bound: the lower bound of user interested year range
-    :param upp_year_bound: the upper bound of user interested year range
+    :param low_date_bound: the lower bound of user interested year range
+    :param upp_date_bound: the upper bound of user interested year range
     :return:
     """
     # unzip SR
@@ -602,11 +608,13 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
         collection = "C{}".format(folder[35:36])
         version = folder[37:40]
         file_name = sensor + col + row + year + doy + collection + version
-        if low_year_bound != 0:
-            if int(year) < low_year_bound:
+        if low_date_bound is not None:
+            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
+                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) < low_date_bound:
                 return
-        if upp_year_bound != 9999:
-            if int(year) > upp_year_bound:
+        if upp_date_bound is not None:
+            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
+                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) > upp_date_bound:
                 return
 
         if sensor == 'LT5' or sensor == 'LE7' or sensor == 'LT4':
@@ -759,7 +767,7 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
 
 
 def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, clear_threshold, logger, config, bounds,
-                                      is_partition=True, low_year_bound=1, upp_year_bound=9999):
+                                      is_partition=True, low_date_bound=None, upp_date_bound=None):
     """
     for collection 2
     :param tmp_path: tmp folder to save unzip image
@@ -770,8 +778,8 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
     :param logger: the handler of logger file
     :param config
     :param is_partition: True, partition each image into blocks; False, save original size of image
-    :param low_year_bound: the lower bound of user interested year range
-    :param upp_year_bound: the upper bound of user interested year range
+    :param low_date_bound: the lower bound of user interested date range
+    :param upp_date_bound: the upper bound of user interested date range
     :param bounds
     :return:
     """
@@ -831,12 +839,15 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
         collection = "C2"
         version = folder[len(folder)-2:len(folder)]
         file_name = sensor + path + row + year + doy + collection + version
-        if low_year_bound != 0:
-            if int(year) < low_year_bound:
-                return
-        if upp_year_bound != 9999:
-            if int(year) > upp_year_bound:
-                return
+        if low_date_bound is not None:
+            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
+                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) < low_date_bound:
+                return True
+
+        if upp_date_bound is not None:
+            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
+                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) > upp_date_bound:
+                return True
 
         if sensor == 'LT5' or sensor == 'LE7' or sensor == 'LT4':
             try:
@@ -1111,14 +1122,14 @@ def bbox(f):
 @click.option('--is_partition/--continuous', default=True, help='partition the output to blocks')
 @click.option('--yaml_path', type=str, help='yaml file path')
 @click.option('--hpc/--dhtc', default=True, help='if it is set for HPC or DHTC environment')
-@click.option('--low_year_bound', type=int, default=1, help='the lower bound of the year range of user interest')
-@click.option('--upp_year_bound', type=int, default=9999, help='the upper bound of the year range of user interest')
+@click.option('--low_date_bound', type=str, default=None, help='the lower bound of the year range of user interest')
+@click.option('--upp_date_bound', type=str, default=None, help='the upper bound of the year range of user interest')
 @click.option('--collection',  type=click.Choice(['ARD', 'C2', 'HLS', 'HLS14']), default='ARD',
               help='image source')
 @click.option('--shapefile_path', type=str, default=None)
 @click.option('--id', type=int, default=0)
-def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_partition, yaml_path, hpc, low_year_bound,
-         upp_year_bound, collection, shapefile_path, id):
+def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_partition, yaml_path, hpc, low_date_bound,
+         upp_date_bound, collection, shapefile_path, id):
     if not os.path.exists(source_dir):
         print('Source directory not exists!')
 
@@ -1207,9 +1218,9 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         file = open(join(out_dir, "starting_last_dates.txt"), "w+")  # need to save out starting and
         # lasting date for this tile
         file.writelines("{}\n".format(str(np.max([ordinal_dates[0],
-                                                 pd.Timestamp.toordinal(dt.datetime(low_year_bound, 1, 1))]))))
+                                                 pd.Timestamp.toordinal(dt.datetime(parse(low_date_bound)))]))))
         file.writelines("{}\n".format(str(np.min([ordinal_dates[-1],
-                                                 pd.Timestamp.toordinal(dt.datetime(upp_year_bound, 12, 31))]))))
+                                                 pd.Timestamp.toordinal(dt.datetime(parse(upp_date_bound)))]))))
         file.close()
     else:
         logging.basicConfig(filename=join(os.getcwd(), 'prepare_ard.log'),
@@ -1253,8 +1264,7 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             folder = folder_list[new_rank]
             single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, clear_threshold, logger,
                                               config, bounds, is_partition=is_partition,
-                                              low_year_bound=low_year_bound,
-                                               upp_year_bound=upp_year_bound)
+                                              low_date_bound=low_date_bound, upp_date_bound=upp_date_bound)
     elif collection == 'ARD':
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
@@ -1263,8 +1273,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                 break
             folder = folder_list[new_rank]
             single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger,
-                                  config, is_partition=is_partition, low_year_bound=low_year_bound,
-                                  upp_year_bound=upp_year_bound)
+                                  config, is_partition=is_partition, low_date_bound=low_date_bound,
+                                  upp_date_bound=upp_date_bound)
     elif collection == 'HLS':
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
@@ -1273,8 +1283,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                 break
             folder = folder_list[new_rank]
             single_image_stacking_hls(source_dir, out_dir, logger, config, folder, clear_threshold=clear_threshold,
-                                      is_partition=is_partition, low_year_bound=low_year_bound,
-                                      upp_year_bound=upp_year_bound)
+                                      is_partition=is_partition, low_date_bound=low_date_bound,
+                                      upp_date_bound=upp_date_bound)
     elif collection == 'HLS14':
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
@@ -1283,8 +1293,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                 break
             folder = folder_list[new_rank]
             single_image_stacking_hls14(out_dir, logger, config, folder, clear_threshold=clear_threshold,
-                                      is_partition=is_partition, low_year_bound=low_year_bound,
-                                      upp_year_bound=upp_year_bound)
+                                      is_partition=is_partition, low_date_bound=low_date_bound,
+                                      upp_date_bound=upp_date_bound)
     # create an empty file for signaling the core that has been finished
     with open(os.path.join(out_dir, 'rank{}_finished.txt'.format(rank)), 'w') as fp:
         pass
