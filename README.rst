@@ -83,6 +83,11 @@ On CentOS systems run:
 The following instructure assume you are inside a Python virtual environment
 (e.g. via conda or pyenv). 
 
+.. code:: bash
+
+    # Install required packages
+    pip install -r requirements.txt
+
 Note that in all cases gdal will need to be manually installed.  The following
 step will install GDAL from a `custom pypi server
 <https://girder.github.io/large_image_wheels>`_ containing precompiled wheels. 
