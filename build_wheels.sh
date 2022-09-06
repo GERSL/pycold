@@ -3,6 +3,12 @@ __doc__="""
 SeeAlso:
     pyproject.toml
 """
-#pip wheel -w wheelhouse .
-# python -m build --wheel -o wheelhouse  #  pycold: +COMMENT_IF(binpy)
-cibuildwheel --config-file pyproject.toml --platform linux --arch x86_64  #  pycold: +UNCOMMENT_IF(binpy)
+if ! which docker ; then 
+    echo "Missing requirement: docker. Please install docker before running build_wheels.sh"
+    exit 1
+fi
+if ! which cibuildwheel ; then 
+    echo "The cibuildwheel module is not installed. Please pip install cibuildwheel before running build_wheels.sh"
+    exit 1
+fi
+cibuildwheel --config-file pyproject.toml --platform linux --arch x86_64 
