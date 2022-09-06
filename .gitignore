@@ -12,3 +12,4 @@ build
 wheelhouse
 tests/coverage.xml
 tests/.coverage
+tmpfile
