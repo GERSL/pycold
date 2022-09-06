@@ -1,5 +1,3 @@
-import warnings
-warnings.filterwarnings("ignore") # mainly to filter out lzma warnings
 import numpy as np
 import pandas as pd
 import os
@@ -30,8 +28,9 @@ def cmname_fromdate(ordinal_date):
         CM file name
     """
     return 'CM_maps_{}_{}{}'.format(str(ordinal_date),
-                             pd.Timestamp.fromordinal(ordinal_date).year,
-                             str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3))
+                                    pd.Timestamp.fromordinal(ordinal_date).year,
+                                    str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3))
+
 
 
 def cmdatename_fromdate(ordinal_date):
@@ -55,8 +54,8 @@ def obiaresname_fromdate(ordinal_date):
         CM file name
     """
     return 'obiaresult_{}_{}{}'.format(str(ordinal_date),
-                                    pd.Timestamp.fromordinal(ordinal_date).year,
-                                    str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3))
+                                       pd.Timestamp.fromordinal(ordinal_date).year,
+                                       str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3))
 
 
 def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keyword, classification_map, parameters=None):
@@ -291,7 +290,7 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
         floodfill_ratio = parameters['OBCOLD']['floodfill_thres']
     if cm_array_l1_date is None:
         cm_array_l1_date = np.full((n_rows, n_cols), parameters['COMMON']['NAN_VAL'], dtype=np.int32)
-    
+
     # assign valid CM values in the stack into current cm array where NA values are
     if b_dist_prob_map:
         peak_threshold = 0.5
@@ -309,7 +308,7 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
 
     cm_date_array[cm_date_array == parameters['COMMON']['NAN_VAL']] = \
         cm_array_l1_date[cm_date_array == parameters['COMMON']['NAN_VAL']]
-    
+
     # free memory
     del cm_array_l1
     del cm_array_l1_date
@@ -371,7 +370,7 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
             int) + no * 255
 
     object_map_s1 = mask_label_s1[1:n_rows + 1, 1:n_cols + 1].astype(np.int32)
-    
+
     # free memory
     del cm_stack
     del mask_label_s1
@@ -395,7 +394,7 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
     object_map_s2[object_map_s2 > 0] = 1
     object_map_s2 = sklabel(object_map_s2, connectivity=2, background=0)
     # object_map_s2 = object_map_s1   # only superpixel
-    # for only patch level 
+    # for only patch level
     # unq_s1, ids_s1, count_s1 = np.unique(object_map_s2, return_inverse=True, return_counts=True)
     # mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
     # mean_list = np.sqrt(np.bincount(ids_s1.astype(int),
@@ -406,7 +405,7 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
     return object_map_s1, cm_date_array, object_map_s2, s1_info
 
 
-def normalize_clip(data, min, max, na_val = None):
+def normalize_clip(data, min, max, na_val=None):
     if max == min:
         tmp = np.full_like(data, fill_value=0)
     else:
@@ -460,7 +459,6 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
     cm_date_array[cm_date_array == parameters['COMMON']['NAN_VAL']] = \
         cm_array_l1_date[cm_date_array == parameters['COMMON']['NAN_VAL']]
 
-
     #######################################################################################
     #                               Scale 1: change superpixel                            #
     #######################################################################################
@@ -475,7 +473,7 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
     mask = np.full_like(cm_array_gaussian_s1, fill_value=0)
     mask[cm_array_gaussian_s1 > low_bound] = 1
 
-    cm_date_selected = cm_date_array[cm_date_array > 0]
+    # cm_date_selected = cm_date_array[cm_date_array > 0]
     # if len(cm_date_selected) > 0:
     #     cm_date_min = np.min(cm_date_selected)
     #     cm_date_max = np.max(cm_date_selected)
@@ -484,16 +482,16 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
     #     cm_date_max = parameters['COMMON']['NAN_VAL']
     cm_stack = cm_array_gaussian_s1
 
-    n_segments = int(np.ceil(len(mask[mask == 1])/25))
-    l = np.unique(sklabel(mask))
-    # n_segments = len(l) * 2
+    n_segments = int(np.ceil(len(mask[mask == 1]) / 25))
+    ell = np.unique(sklabel(mask))
+    # n_segments = len(ell) * 2
     #if n_segments == 0:
     #    object_map_s1 = np.full_like(mask, 0)
-    if len(l) == 1 and l[0] == 0:
+    if len(ell) == 1 and ell[0] == 0:
         object_map_s1 = np.full_like(mask, 0)
     else:
         object_map_s1 = slic(cm_stack, mask=mask, n_segments=n_segments, compactness=0.01,
-                             min_size_factor=n_segments/cm_stack.shape[0]/cm_stack.shape[1])
+                             min_size_factor=n_segments / cm_stack.shape[0] / cm_stack.shape[1])
 
     # superpixel-level object status
     # s1_info = pd.DataFrame(regionprops_table(object_map_s1, cm_array_gaussian_s1, cache=False,
@@ -526,8 +524,8 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
     #                                       loDiff=[10],
     #                                       upDiff=[10],
     #                                       flags=floodflags)  # assign an extremely large value
-        # to connect any polygon adjacent to each other
-        # the opencv mask only supports 8-bit, so every 255 seed needs to update values in mask_label
+    #   # to connect any polygon adjacent to each other
+    #   # the opencv mask only supports 8-bit, so every 255 seed needs to update values in mask_label
     #    if remainder == 254:
     #        no = int(i / 255)
     #        mask_label_s2[(mask_label_s2 == 0) & (mask_s2 > 0)] = mask_s2[
@@ -535,7 +533,7 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
     #                                                                  astype(int) + no * 255
 
     # if len(seed_index) > 0:
-        # processing the rest that hasn't be recorded into mask_label
+    #   # processing the rest that hasn't be recorded into mask_label
     #    no = int(i / 255)
     #    mask_label_s2[(mask_label_s2 == 0) & (mask_s2 > 0)] = mask_s2[(mask_label_s2 == 0) & (mask_s2 > 0)].astype(
     #        int) + no * 255
@@ -797,29 +795,26 @@ class ObjectAnalystHPC:
                                             dtype=np.int32)
         else:
             if method == 'floodfill':
-                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] \
-                    = segmentation_floodfill(np.load(join(self.cmmap_path, cmname_fromdate(date)+'.npy')),
-                                   np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy')),
-                                   np.load(join(self.cmmap_path, cmname_fromdate(date -
-                                                                                 self.config['CM_OUTPUT_INTERVAL'])+'.npy')),
-                                   np.load(join(self.cmmap_path,
-                                                cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL'])+'.npy')))
+                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = (
+                    segmentation_floodfill(np.load(join(self.cmmap_path, cmname_fromdate(date) + '.npy')),
+                                           np.load(join(self.cmmap_path, cmdatename_fromdate(date) + '.npy')),
+                                           np.load(join(self.cmmap_path, cmname_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')),
+                                           np.load(join(self.cmmap_path, cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')))
+                )
             elif method == 'slic':
-                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] \
-                    = segmentation_slic(np.load(join(self.cmmap_path, cmname_fromdate(date)+'.npy')),
-                                        np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy')),
-                                        np.load(join(self.cmmap_path, cmname_fromdate(date -
-                                                                                 self.config['CM_OUTPUT_INTERVAL'])+'.npy')),
-                                        np.load(join(self.cmmap_path,
-                                                cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL'])+'.npy')))
+                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = (
+                    segmentation_slic(np.load(join(self.cmmap_path, cmname_fromdate(date) + '.npy')),
+                                      np.load(join(self.cmmap_path, cmdatename_fromdate(date) + '.npy')),
+                                      np.load(join(self.cmmap_path, cmname_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')),
+                                      np.load(join(self.cmmap_path, cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')))
+                )
             elif method == 'watershed':
-                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] \
-                    = segmentation_watershed(np.load(join(self.cmmap_path, cmname_fromdate(date)+'.npy')),
-                                             np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy')),
-                                             np.load(join(self.cmmap_path,
-                                                          cmname_fromdate(date - self.config['CM_OUTPUT_INTERVAL'])+'.npy')),
-                                             np.load(join(self.cmmap_path,
-                                                          cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL'])+'.npy')))
+                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = (
+                    segmentation_watershed(np.load(join(self.cmmap_path, cmname_fromdate(date) + '.npy')),
+                                           np.load(join(self.cmmap_path, cmdatename_fromdate(date) + '.npy')),
+                                           np.load(join(self.cmmap_path, cmname_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')),
+                                           np.load(join(self.cmmap_path, cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')))
+                )
 
             if self.thematic_path is not None:
                 classification_map = self.get_lastyear_cmap_fromdate(date)
@@ -859,13 +854,13 @@ class ObjectAnalystHPC:
                 np.save(join(self.obia_path, filenm + '_x{}_y{}.npy'.format(j + 1, i + 1)),
                         result_blocks[i][j])
 
-        with open(join(self.obia_path, 'tmp_OBIA_{}_finished.txt'.format(date)), 'w') as fp:
+        with open(join(self.obia_path, 'tmp_OBIA_{}_finished.txt'.format(date)), 'w'):
             pass
 
     def is_finished_object_analysis(self, date_list):
         """
         Args:
-            date_list: a list of dates for the whole period of the dataset 
+            date_list: a list of dates for the whole period of the dataset
 
         Returns:
             True -> finished; False -> not finished
@@ -888,7 +883,7 @@ class ObjectAnalystHPC:
                       and f.endswith('_x{}_y{}.npy'.format(block_x, block_y))]
         # sort image files by dates
         cm_dates = [int(f[f.find('obiaresult_') + len('obiaresult_'):
-                          f.find('obiaresult_') + len('obiaresult_')+6])
+                          f.find('obiaresult_') + len('obiaresult_') + 6])
                     for f in obia_files]
         files_date_zip = sorted(zip(cm_dates, obia_files))
 
@@ -920,8 +915,8 @@ class ObjectAnalystHPC:
         block_x = get_block_x(block_id, self.config['n_block_x'])
         if img_stack is None and img_dates_sorted is None:
             block_folder = join(self.stack_path, 'block_x{}_y{}'.format(block_x, block_y))
-            img_stack, img_dates_sorted = read_blockdata(block_folder, self.config['n_cols']*self.config['n_rows'],
-                                                         self.band_num+1)
+            img_stack, img_dates_sorted = read_blockdata(block_folder, self.config['n_cols'] * self.config['n_rows'],
+                                                         self.band_num + 1)
         obia_breaks = self.get_allobiaresult_asarray(block_x, block_y)
         result_collect = []
         for pos in range(self.config['block_width'] * self.config['block_height']):
@@ -943,7 +938,7 @@ class ObjectAnalystHPC:
                                                    pos=self.config['n_cols'] * (original_row - 1) + original_col)
             except RuntimeError:
                 logger.error("COLD fails at original_row {}, original_col {}".format(original_row, original_col))
-            except Exception as e:  # pass exception
+            except Exception:  # pass exception
                 pass
             else:
                 result_collect.append(obcold_result)

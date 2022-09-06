@@ -34,19 +34,39 @@ The ZLIB, GSL, and OpenMP libraries are required.
 For Ubuntu/Debian systems, they can be installed via:
 
 ```bash
-sudo apt-get install build-essential zlib1g-dev -y
-sudo apt-get install libgsl-dev -y
+sudo apt-get install build-essential 
+sudo apt-get install zlib1g-dev -y
 sudo apt-get install gfortran -y
+sudo apt-get install libgsl-dev -y
 ```
+
+On CentOS systems run:
+
+
+```bash
+sudo apt-get install gcc gcc-c++ make  
+sudo apt-get install zlib-devel -y
+sudo apt-get install gcc-gfortran -y
+# Yum provides an gsl 1.5, but we need 2.7
+# sudo apt-get install gsl-devel -y
+curl https://ftp.gnu.org/gnu/gsl/gsl-2.7.1.tar.gz  > gsl.tar.gz && tar xfv gsl.tar.gz && cd gsl-2.7.1 && ./configure --prefix=/usr --disable-static && make && make install
+```
+
 
 ### 2.2 install pycold
 **Option 1: Install in development mode**
 
+Inside of a Python virtual environment run:
+
 ```bash
-pip install -r requirements.txt
-conda install gdal  # the easiest way to install gdal 
 bash run_developer_setup.sh
 ```
+
+Will install all of the developer requirements and ensure you are setup with a
+working opencv-python-headless and gdal Python modules, as well as other
+requirements and then it will compile and install pycold in editable
+development mode.
+
 
 **Option 2: Build and install a wheel** 
 
@@ -71,6 +91,10 @@ cd build
 cmake ..
 make 
 ```
+
+**Option 4: Use a docker image.
+
+See [dockerfiles/README.rst](dockerfiles/README.rst) for details.
 
 ## 3. Using pycold for pixel-based processing
 

@@ -1,5 +1,6 @@
 # this script show how to run COLD from a csv file that store time series information
 import numpy as np
+import pathlib
 from pycold import cold_detect, obcold_reconstruct
 from pycold.utils import read_data
 
@@ -10,6 +11,16 @@ w = np.pi * 2 / 365.25
 # slope_in_rec_cg = original_slope * slope_scale, we used this way to keep precision for model coefficients in
 # float datatype
 slope_scale = 10000
+
+
+# Use this file to determine where the resources are.  If for some reason we
+# are do not have __file__ available (e.g.  copy/pasting in IPython) then
+# assume we are in the repo reoot.
+# TODO: should likely use pkg_resources instead
+try:
+    TEST_RESOURCE_DPATH = (pathlib.Path(__file__).parent / 'resources').resolve()
+except NameError:
+    TEST_RESOURCE_DPATH = pathlib.Path('tests/resources').resolve()
 
 
 def get_breakcategory(ccd_plot, i_curve):
@@ -35,7 +46,7 @@ def get_breakcategory(ccd_plot, i_curve):
 
 def test_cold_detect():
     # running COLD for a Landsat time series provided by a csv
-    in_path = 'tests/resources/spectral_336_3980_obs.csv'
+    in_path = TEST_RESOURCE_DPATH / 'spectral_336_3980_obs.csv'
     data = read_data(in_path)
     dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, sensor = data.copy()  # exclude header
     cold_result = cold_detect(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
@@ -46,8 +57,8 @@ def test_cold_detect():
 
 def test_obcold_reconstruct():
     # running reconstructing for a Landsat time series provided by a csv
-    in_path = 'tests/resources/spectral_336_3980_obs.csv'
-    break_path = 'tests/resources/spectral_336_3980_breaks.csv'
+    in_path = TEST_RESOURCE_DPATH / 'spectral_336_3980_obs.csv'
+    break_path = TEST_RESOURCE_DPATH / 'spectral_336_3980_breaks.csv'
     data = read_data(in_path)
     breaks = read_data(break_path)
     dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, sensor = data.copy()  # exclude header

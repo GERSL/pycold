@@ -6,7 +6,7 @@ from datetime import datetime
 from pytz import timezone
 import click
 import time
-from pycold.utils import assemble_array
+# from pycold.utils import assemble_array
 from pycold.pyclassifier import PyClassifierHPC
 from pycold.app import defaults
 from os.path import join

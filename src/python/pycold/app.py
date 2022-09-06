@@ -10,9 +10,8 @@ lifecycle, usually at the time of first import. This pattern is borrowed
 from Flask.
 source: https://github.com/repository-preservation/lcmap-pyclass/blob/develop/pyclass/app.py
 """
-
-import os
 import yaml
+from importlib import resources as importlib_resources
 
 
 class Defaults(dict):
@@ -36,6 +35,7 @@ class Defaults(dict):
             raise AttributeError('No such attribute: ' + name)
 
 
-defaults = Defaults(os.path.join(os.path.dirname(__file__), 'constants.yaml'))
-
-
+with importlib_resources.path('pycold', 'constants.yaml') as const_fpath:
+    # import pathlib
+    # const_fpath = pathlib.Path(__file__).parent / 'constants.yaml'
+    defaults = Defaults(const_fpath)

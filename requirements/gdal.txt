@@ -1,0 +1,5 @@
+# Use precompiled GDAL wheels from the Kitware server
+# This file has to be used directly. The setup file cannot point to
+# requirement files that contain find-links paths.
+--find-links https://girder.github.io/large_image_wheels
+GDAL>=3.4.1

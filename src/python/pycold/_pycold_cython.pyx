@@ -181,6 +181,7 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
         b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to the current low quality
     	cm_output_interval: the temporal interval of outputting change magnitudes
     	Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
+
     	Returns
     	----------
     	change records: the COLD outputs that characterizes each temporal segment
@@ -265,10 +266,17 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
                 return [np.asarray(<Output_t[:num_fc]>rec_cg), cm_outputs, cm_outputs_date]
 
 
-def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
-                np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
-                np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
-                np.ndarray[np.int64_t, ndim=1] break_dates, int pos=1, int conse=6, bint b_c2=False):
+def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates,
+                       np.ndarray[np.int64_t, ndim=1] ts_b,
+                       np.ndarray[np.int64_t, ndim=1] ts_g,
+                       np.ndarray[np.int64_t, ndim=1] ts_r,
+                       np.ndarray[np.int64_t, ndim=1] ts_n,
+                       np.ndarray[np.int64_t, ndim=1] ts_s1,
+                       np.ndarray[np.int64_t, ndim=1] ts_s2,
+                       np.ndarray[np.int64_t, ndim=1] ts_t,
+                       np.ndarray[np.int64_t, ndim=1] qas,
+                       np.ndarray[np.int64_t, ndim=1] break_dates, int pos=1,
+                       int conse=6, bint b_c2=False):
     """
     Helper function to do COLD algorithm.
 
@@ -287,6 +295,7 @@ def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64
     	conse: consecutive observation number (for calculating change magnitudes)
     	b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to its current low quality
     	Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
+
     	Returns
     	----------
     	change records: the COLD outputs that characterizes each temporal segment
@@ -355,6 +364,7 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     	b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to its current low quality
     	b_pinpoint: bool, output pinpoint break
     	Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
+        
     	Returns
     	----------
         namedtupe: SccdOutput
@@ -484,6 +494,7 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
                 double gate_tcg=9.236):
     """
     SCCD online update for new observations
+
        Parameters
        ----------
        sccd_pack: a namedtuple of SccdOutput
@@ -501,6 +512,7 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
        conse: consecutive observation number
        b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to its current low quality
        Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
+
        Returns
        ----------
        namedtupe: SccdOutput
@@ -584,12 +596,21 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
+<<<<<<< HEAD
 
     
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, &rec_cg_view[0],
                   &nrt_model_view[0], &num_nrt_queue, &nrt_queue_view[0], &min_rmse_view[0], conse, b_c2, False,
                   rec_cg_pinpoint, &num_fc_pinpoint, gate_tcg)
+=======
+    result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0],
+                  &ts_s1_view[0], &ts_s2_view[0], &ts_t_view[0], &qas_view[0],
+                  &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode,
+                  &rec_cg_view[0], &nrt_model_view[0], &num_nrt_queue,
+                  &nrt_queue_view[0], &min_rmse_view[0], conse, b_c2, False,
+                  rec_cg_pinpoint, &num_fc_pinpoint)
+>>>>>>> 7c6296c7b1e6e71b2afba6668ed5433fe0488e80
     if result != 0:
         raise RuntimeError("sccd_update function fails for pos = {} ".format(pos))
     else:
@@ -613,6 +634,3 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
                                   nrt_model_new, nrt_queue_new[0:num_nrt_queue])
             elif nrt_mode == 0:  # void mode
                 return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]), np.array([]))
-
-
-
