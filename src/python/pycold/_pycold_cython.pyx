@@ -596,21 +596,10 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
-<<<<<<< HEAD
-
-    
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, &rec_cg_view[0],
                   &nrt_model_view[0], &num_nrt_queue, &nrt_queue_view[0], &min_rmse_view[0], conse, b_c2, False,
                   rec_cg_pinpoint, &num_fc_pinpoint, gate_tcg)
-=======
-    result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0],
-                  &ts_s1_view[0], &ts_s2_view[0], &ts_t_view[0], &qas_view[0],
-                  &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode,
-                  &rec_cg_view[0], &nrt_model_view[0], &num_nrt_queue,
-                  &nrt_queue_view[0], &min_rmse_view[0], conse, b_c2, False,
-                  rec_cg_pinpoint, &num_fc_pinpoint)
->>>>>>> 7c6296c7b1e6e71b2afba6668ed5433fe0488e80
     if result != 0:
         raise RuntimeError("sccd_update function fails for pos = {} ".format(pos))
     else:
