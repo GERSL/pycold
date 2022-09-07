@@ -200,8 +200,8 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
     :param config
     :param is_partition: True, partition each image into blocks; False, save original size of image
     :param clear_threshold: threshold of clear pixel percentage, if lower than threshold, won't be processed
-    :param low_date_bound: the lower date of user interested year range
-    :param upp_date_bound: the upper date of user interested year range
+    :param low_date_bound: the lower date of user interested date range
+    :param upp_date_bound: the upper date of user interested date range
     :return:
     """
     try:
@@ -226,12 +226,10 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
         doy = imagetime[4:7]
         file_name = sensor + tile_id + year + doy + collection + version1
         if low_date_bound is not None:
-            if pd.Timestamp.toordinal((dt.datetime(year, 1, 1) + dt.timedelta(doy - 1)).strftime('%Y-%m-%d')) < \
-                    low_date_bound:
+            if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) < parse(low_date_bound):
                 return True
         if upp_date_bound is not None:
-            if pd.Timestamp.toordinal((dt.datetime(year, 1, 1) + dt.timedelta(doy - 1)).strftime('%Y-%m-%d')) > \
-                    upp_date_bound:
+            if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) > parse(upp_date_bound):
                 return True
 
         if sensor == 'L30':
@@ -396,13 +394,11 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
         doy = imagetime[4:7]
         file_name = sensor + tile_id + year + doy + collection + version1
         if low_date_bound is not None:
-            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
-                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) < low_date_bound:
+            if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) < parse(low_date_bound):
                 return True
             
         if upp_date_bound is not None:
-            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
-                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) > upp_date_bound:
+            if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) > parse(upp_date_bound):
                 return True
 
         if sensor == 'L30':
@@ -608,12 +604,10 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
         version = folder[37:40]
         file_name = sensor + col + row + year + doy + collection + version
         if low_date_bound is not None:
-            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
-                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) < low_date_bound:
+            if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) < parse(low_date_bound):
                 return
         if upp_date_bound is not None:
-            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
-                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) > upp_date_bound:
+            if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) > parse(upp_date_bound):
                 return
 
         if sensor == 'LT5' or sensor == 'LE7' or sensor == 'LT4':
@@ -837,13 +831,11 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
         version = folder[len(folder) - 2:len(folder)]
         file_name = sensor + path + row + year + doy + collection + version
         if low_date_bound is not None:
-            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
-                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) < low_date_bound:
+            if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) < parse(low_date_bound):
                 return True
 
         if upp_date_bound is not None:
-            if pd.Timestamp.toordinal(parse((dt.datetime(int(year), 1, 1) +
-                                             dt.timedelta(int(doy) - 1)).strftime('%Y-%m-%d'))) > upp_date_bound:
+            if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) > parse(upp_date_bound):
                 return True
 
         if sensor == 'LT5' or sensor == 'LE7' or sensor == 'LT4':
@@ -1118,8 +1110,8 @@ def bbox(f):
 @click.option('--is_partition/--continuous', default=True, help='partition the output to blocks')
 @click.option('--yaml_path', type=str, help='yaml file path')
 @click.option('--hpc/--dhtc', default=True, help='if it is set for HPC or DHTC environment')
-@click.option('--low_date_bound', type=str, default=None, help='the lower bound of the year range of user interest')
-@click.option('--upp_date_bound', type=str, default=None, help='the upper bound of the year range of user interest')
+@click.option('--low_date_bound', type=str, default=None, help='the lower bound of the date range of user interest')
+@click.option('--upp_date_bound', type=str, default=None, help='the upper bound of the date range of user interest')
 @click.option('--collection',  type=click.Choice(['ARD', 'C2', 'HLS', 'HLS14']), default='ARD',
               help='image source')
 @click.option('--shapefile_path', type=str, default=None)
@@ -1219,9 +1211,9 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         file = open(join(out_dir, "starting_last_dates.txt"), "w+")  # need to save out starting and
         # lasting date for this tile
         file.writelines("{}\n".format(str(np.max([ordinal_dates[0],
-                                                 pd.Timestamp.toordinal(dt.datetime(parse(low_date_bound)))]))))
+                                                 pd.Timestamp.toordinal(parse(low_date_bound))]))))
         file.writelines("{}\n".format(str(np.min([ordinal_dates[-1],
-                                                 pd.Timestamp.toordinal(dt.datetime(parse(upp_date_bound)))]))))
+                                                 pd.Timestamp.toordinal(parse(upp_date_bound))]))))
         file.close()
     else:
         logging.basicConfig(filename=join(os.getcwd(), 'prepare_ard.log'),

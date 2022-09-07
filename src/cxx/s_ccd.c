@@ -3014,9 +3014,29 @@ int sccd_snow
             RETURN_ERROR ("Freeing memory: rec_v_dif\n",
                           FUNC_NAME, FAILURE);
         }
-    
+
         free(rmse);
         rmse = NULL;
+
+        status = free_2d_array ((void **)cov_p);
+        if (status != SUCCESS)
+        {
+            RETURN_ERROR ("Freeing memory: cov_p\n", FUNC_NAME, FAILURE);
+        }
+        status = free_2d_array ((void **)state_a);
+        if (status != SUCCESS)
+        {
+            RETURN_ERROR ("Freeing memory: state_a\n", FUNC_NAME, FAILURE);
+        }
+
+        free(instance);
+        instance = NULL;
+
+        status = free_2d_array ((void **) fit_cft);
+        if (status != SUCCESS)
+        {
+            RETURN_ERROR ("Freeing memory: fit_cft\n", FUNC_NAME, FAILURE);
+        }
     
         return SUCCESS;
     }
