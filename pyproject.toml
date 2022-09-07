@@ -1,6 +1,9 @@
 [build-system]
 requires = ["setuptools>=41.0.1", "scikit-build>=0.11.1", "numpy", "ninja>=1.10.2", "cmake>=3.21.2", "cython>=0.29.24",]
 
+[tool.xcookie]
+url = 'https://github.com/GERSL/pycold'
+
 [tool.cibuildwheel]
 #build = "cp38-* cp310-*"
 build = "cp310-manylinux_x86_64"
