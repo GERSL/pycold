@@ -17,7 +17,6 @@ description = "python implementation of COntinuous monitoring of Land disturbanc
 dev_status = "alpha"
 license = "Apache 2"
 
-
 [tool.cibuildwheel]
 build = "cp38-* cp39-* cp310-*"
 #build = "cp310-manylinux_x86_64"
