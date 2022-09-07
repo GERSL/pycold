@@ -1,3 +1,25 @@
+"""
+This is a proof-of-concept for converting kwcoco files into the
+expected data structures for pycold.
+
+Relevant functions:
+    * grab_demo_kwcoco_dataset - downloads a small kwcoco dataset for testing
+    * stack_kwcoco - runs the stacking process on an entire kwcoco file
+    * process_one_coco_image - runs the stacking for a single coco image.
+
+Limitations:
+    * Currently only handles Landsat-8
+
+    * The quality bands are not exactly what I was expecting them to be,
+      some of the quality filtering is stubbed out or disabled.
+
+    * Not setup for an HPC environment yet, but that extension shouldn't be too
+      hard.
+
+    * Nodata values are currently not masked or handled
+
+    * Configurations are hard-coded
+"""
 import kwcoco
 import numpy as np
 import einops
@@ -28,7 +50,8 @@ SENSOR_TO_INFO['L8'] = {
 }
 
 
-# Register different quality bit standards.
+# Register different quality bit standards. (This could/should be moved to a
+# different module for for conciceness)
 QUALITY_BIT_INTERPRETATIONS = {}
 
 # These are specs for TA1 processed data
@@ -54,6 +77,11 @@ QUALITY_BIT_INTERPRETATIONS['FMASK'] = {
 }
 
 
+def setup_logging():
+    # TODO: handle HPC things here in addition to stdout for doctests
+    logging.basicConfig(level='INFO')
+
+
 def grab_demo_kwcoco_dataset():
     """
     Get a demo kwcoco dataset for use in testing
@@ -61,7 +89,7 @@ def grab_demo_kwcoco_dataset():
     Returns:
         Path: the path to the kwcoco dataset
     """
-    dpath = ub.Path.appdir('pycold/tests/kwcoco/demo0').ensuredir()
+    dpath = ub.Path.appdir('pycold/tests/demodata/kwcoco').ensuredir()
     coco_fpath = dpath / 'Aligned-DemoKHQ/data.kwcoco.json'
     if not coco_fpath.exists():
         # If the data does not already exist
@@ -82,17 +110,19 @@ def grab_demo_kwcoco_dataset():
     return coco_fpath
 
 
-def stack_kwcoco(coco_fpath, out_dpath):
+def stack_kwcoco(coco_fpath, out_dir):
     """
     Args:
         coco_fpath (str | PathLike): path to a kwcoco dataset
-        out_dpath (str | PathLike): path to write the data
+        out_dir (str | PathLike): path to write the data
 
     Example:
         >>> from pycold.imagetool.prepare_kwcoco import *  # NOQA
+        >>> setup_logging()
         >>> coco_fpath = grab_demo_kwcoco_dataset()
-        >>> out_dpath = dpath / 'stacked'
-        >>> stack_kwcoco(coco_fpath, out_dpath)
+        >>> dpath = ub.Path.appdir('pycold/tests/stack_kwcoco').ensuredir()
+        >>> out_dir = dpath / 'stacked'
+        >>> stack_kwcoco(coco_fpath, out_dir)
     """
 
     # TODO: determine the block settings from the config
@@ -102,7 +132,7 @@ def stack_kwcoco(coco_fpath, out_dpath):
     }
 
     # TODO: configure
-    out_dir = ub.Path(out_dpath)
+    out_dir = ub.Path(out_dir)
 
     # Load the kwcoco dataset
     dset = kwcoco.CocoDataset(coco_fpath)
@@ -145,7 +175,14 @@ def process_one_coco_image(coco_image, config, out_dir):
     is_partition = True  # hard coded
 
     # Use the COCO name as a unique filename id.
-    file_name = coco_image.img.get('name')
+    image_name = coco_image.img.get('name', None)
+    video_name = coco_image.video.get('name', None)
+    if image_name is None:
+        image_name = 'img_{:06d}'.format(coco_image.img['id'])
+    if video_name is None:
+        video_name = 'vid_{:06d}'.format(coco_image.video['id'])
+
+    video_dpath = (out_dir / video_name).ensuredir()
 
     # Other relevant coco metadata
     coco_image.img['date_captured']
@@ -239,7 +276,8 @@ def process_one_coco_image(coco_image, config, out_dir):
         clear_ratio = 1
 
     if clear_ratio <= clear_threshold:
-        logger.warn('Not enough clear observations for {}'.format(file_name))
+        logger.warn('Not enough clear observations for {}/{}'.format(
+            video_name, image_name))
         return False
 
     im_data = delayed_im.finalize(interpolation='cubic', antialias=True)
@@ -274,9 +312,12 @@ def process_one_coco_image(coco_image, config, out_dir):
                     continue
 
             block_dname = 'block_x{}_y{}'.format(j + 1, i + 1)
-            block_dpath = (out_dir / block_dname).ensuredir()
-            np.save(block_dpath / file_name, block)
-
+            block_dpath = (video_dpath / block_dname).ensuredir()
+            block_fpath = block_dpath / (image_name + '.npy')
+            np.save(block_fpath, block)
+        logger.info('Stacked blocked image {}/{}'.format(video_name, image_name))
     else:
-        np.save(out_dir / file_name, blocks)
+        full_fpath = video_dpath / (image_name + '.npy')
+        np.save(full_fpath, data)
+        logger.info('Stacked full image {}/{}'.format(video_name, image_name))
     return True
