@@ -158,21 +158,92 @@ jobs:
         path: ./wheelhouse/pycold*.whl
 
 
-###
-# Unfortunately we cant (yet) use the yaml docstring trick here
-# https://github.community/t/allow-unused-keys-in-workflow-yaml-files/172120
-#__doc__: |
-#    # How to run locally
-#    # https://packaging.python.org/guides/using-testpypi/
-#    git clone https://github.com/nektos/act.git $HOME/code/act
-#    chmod +x $HOME/code/act/install.sh
-#    (cd $HOME/code/act && ./install.sh -b $HOME/.local/opt/act)
-#
-#    load_secrets
-#    unset GITHUB_TOKEN
-#    $HOME/.local/opt/act/act \
-#        --secret=EROTEMIC_TWINE_PASSWORD=$EROTEMIC_TWINE_PASSWORD \
-#        --secret=EROTEMIC_TWINE_USERNAME=$EROTEMIC_TWINE_USERNAME \
-#        --secret=EROTEMIC_CI_SECRET=$EROTEMIC_CI_SECRET \
-#        --secret=EROTEMIC_TEST_TWINE_USERNAME=$EROTEMIC_TEST_TWINE_USERNAME \
-#        --secret=EROTEMIC_TEST_TWINE_PASSWORD=$EROTEMIC_TEST_TWINE_PASSWORD
+   test_deploy:
+     name: Uploading Test to PyPi
+     runs-on: ubuntu-latest
+     if: github.event_name == 'push' && ! startsWith(github.event.ref, 'refs/tags') && ! startsWith(github.event.ref, 'refs/heads/release')
+     needs:
+     - build_and_test_sdist
+     - build_and_test_binpy_wheels
+     steps:
+     - name: Checkout source
+       uses: actions/checkout@v3
+     - uses: actions/download-artifact@v3
+       name: Download wheels and sdist
+       with:
+         name: wheels
+         path: wheelhouse
+     - name: Show files to upload
+       shell: bash
+       run: ls -la wheelhouse
+     - name: Sign and Publish
+       env:
+         TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
+         TWINE_USERNAME: ${{ secrets.TEST_TWINE_USERNAME }}
+         TWINE_PASSWORD: ${{ secrets.TEST_TWINE_PASSWORD }}
+         CI_SECRET: ${{ secrets.CI_SECRET }}
+       run: |-
+         GPG_EXECUTABLE=gpg
+         $GPG_EXECUTABLE --version
+         openssl version
+         $GPG_EXECUTABLE --list-keys
+         echo "Decrypting Keys"
+         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import
+         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
+         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import
+         echo "Finish Decrypt Keys"
+         $GPG_EXECUTABLE --list-keys || true
+         $GPG_EXECUTABLE --list-keys  || echo "first invocation of gpg creates directories and returns 1"
+         $GPG_EXECUTABLE --list-keys
+         VERSION=$(python -c "import setup; print(setup.VERSION)")
+         pip install twine
+         pip install six pyopenssl ndg-httpsclient pyasn1 -U --user
+         pip install requests[security] twine --user
+         GPG_KEYID=$(cat dev/public_gpg_key)
+         echo "GPG_KEYID = '$GPG_KEYID'"
+         DO_GPG=True GPG_KEYID=$GPG_KEYID TWINE_REPOSITORY_URL=${TWINE_REPOSITORY_URL} TWINE_PASSWORD=$TWINE_PASSWORD TWINE_USERNAME=$TWINE_USERNAME GPG_EXECUTABLE=$GPG_EXECUTABLE DO_UPLOAD=True DO_TAG=False ./publish.sh
+
+   live_deploy:
+     name: Uploading Live to PyPi
+     runs-on: ubuntu-latest
+     if: github.event_name == 'push' && (startsWith(github.event.ref, 'refs/tags') || startsWith(github.event.ref, 'refs/heads/release'))
+     needs:
+     - build_and_test_sdist
+     - build_and_test_binpy_wheels
+     steps:
+     - name: Checkout source
+       uses: actions/checkout@v3
+     - uses: actions/download-artifact@v3
+       name: Download wheels and sdist
+       with:
+         name: wheels
+         path: wheelhouse
+     - name: Show files to upload
+       shell: bash
+       run: ls -la wheelhouse
+     - name: Sign and Publish
+       env:
+         TWINE_REPOSITORY_URL: https://upload.pypi.org/legacy/
+         TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+         TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+         CI_SECRET: ${{ secrets.CI_SECRET }}
+       run: |-
+         GPG_EXECUTABLE=gpg
+         $GPG_EXECUTABLE --version
+         openssl version
+         $GPG_EXECUTABLE --list-keys
+         echo "Decrypting Keys"
+         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import
+         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
+         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import
+         echo "Finish Decrypt Keys"
+         $GPG_EXECUTABLE --list-keys || true
+         $GPG_EXECUTABLE --list-keys  || echo "first invocation of gpg creates directories and returns 1"
+         $GPG_EXECUTABLE --list-keys
+         VERSION=$(python -c "import setup; print(setup.VERSION)")
+         pip install twine
+         pip install six pyopenssl ndg-httpsclient pyasn1 -U --user
+         pip install requests[security] twine --user
+         GPG_KEYID=$(cat dev/public_gpg_key)
+         echo "GPG_KEYID = '$GPG_KEYID'"
+         DO_GPG=True GPG_KEYID=$GPG_KEYID TWINE_REPOSITORY_URL=${TWINE_REPOSITORY_URL} TWINE_PASSWORD=$TWINE_PASSWORD TWINE_USERNAME=$TWINE_USERNAME GPG_EXECUTABLE=$GPG_EXECUTABLE DO_UPLOAD=True DO_TAG=False ./publish.sh
