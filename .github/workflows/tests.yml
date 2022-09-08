@@ -104,10 +104,7 @@ jobs:
         #- macOS-latest
         #- windows-latest
         cibw_skip:
-        - '*-win32'
-        - '*-musllinux_*'
-        - '*-i686*'
-        - 'pp*'
+        - '*-win32 *-musllinux_* *-i686* pp*'
         arch:
         - auto
         #include:
