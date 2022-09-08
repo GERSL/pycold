@@ -33,10 +33,10 @@ test-command = "python {project}/run_tests.py"
 manylinux-x86_64-image = "quay.io/erotemic/manylinux2014_x86_64_for:zlib-build-fortran-gsl"
 manylinux-i686-image = "quay.io/erotemic/manylinux2014_i686_for:zlib-build-fortran-gsl"
 
-[tool.cibuildwheel.linux]
+#[tool.cibuildwheel.linux]
 # Uncomment to work with official manylinux images  
 #before-build = "yum install gcc gcc-c++ make zlib-devel gcc-gfortran libgomp blas-devel -y && curl https://ftp.gnu.org/gnu/gsl/gsl-2.7.1.tar.gz  > gsl.tar.gz && tar xfv gsl.tar.gz && cd gsl-2.7.1 && ./configure --prefix=/usr --disable-static && make && make install"
-before-build = "yum install libgomp blas-devel -y"
+#before-build = "yum install libgomp blas-devel -y"
 
 [tool.mypy]
 ignore_missing_imports = true
