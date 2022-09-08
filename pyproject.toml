@@ -19,7 +19,7 @@ license = "Apache 2"
 
 
 [tool.cibuildwheel]
-build = "cp37-* cp38-* cp39-* cp310-*"
+build = "cp38-* cp39-* cp310-*"
 #build = "cp310-manylinux_x86_64"
 build-frontend = "build"
 skip = "pp* *-musllinux_* *_i686"
