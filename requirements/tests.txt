@@ -20,3 +20,5 @@ coverage>=6.1.1     ; python_version < '3.7' and python_version >= '3.6'    # Py
 codecov>=2.0.15
 
 requests>=2.25.1
+
+kwcoco>=0.4.2
