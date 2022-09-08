@@ -214,5 +214,5 @@ if __name__ == '__main__':
                 'singlepath_landsat_conus.tif',
             ],
         },
-        python_requires='>=3.7',
+        python_requires='>=3.8',
     )
