@@ -144,13 +144,9 @@ def parse_requirements(fname='requirements.txt', versions=False):
 def parse_description():
     """
     Parse the description in the README file
-
-    CommandLine:
-        pandoc --from=markdown --to=rst --output=README.rst README.md
-        python -c "import setup; print(setup.parse_description())"
     """
     from os.path import dirname, join, exists
-    readme_fpath = join(dirname(__file__), 'README.md')
+    readme_fpath = join(dirname(__file__), 'README.rst')
     # This breaks on pip install, so check that it exists.
     if exists(readme_fpath):
         with open(readme_fpath, 'r') as f:
@@ -166,7 +162,24 @@ if __name__ == '__main__':
     # References:
     # https://stackoverflow.com/questions/19602582/pip-install-editable-links-to-wrong-path
     packages = find_packages('./src/python')
-    print(f'packages={packages}')
+
+    setupkw = {}
+    setupkw["classifiers"] = [
+        # List of classifiers available at:
+        # https://pypi.python.org/pypi?%3Aaction=list_classifiers
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Topic :: Utilities",
+        # 'Operating System :: Microsoft :: Windows',  # TODO
+        # 'Operating System :: MacOS',  # TODO
+        'Operating System :: POSIX :: Linux',
+        'License :: OSI Approved :: Apache Software License',
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+    ]
+    setupkw['license'] = 'Apache 2',
 
     setup(
         package_dir={
@@ -178,7 +191,7 @@ if __name__ == '__main__':
         description='python implementation of COntinuous monitoring of Land disturbances algorithm',
         install_requires=parse_requirements('requirements/runtime.txt'),
         long_description=parse_description(),
-        long_description_content_type='text/markdown',
+        long_description_content_type='text/x-rst',
         extras_require={
             'all': parse_requirements('requirements.txt'),
             'tests': parse_requirements('requirements/tests.txt'),
@@ -201,5 +214,5 @@ if __name__ == '__main__':
                 'singlepath_landsat_conus.tif',
             ],
         },
-        python_requires='>=3.6',
+        python_requires='>=3.7',
     )

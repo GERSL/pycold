@@ -14,7 +14,8 @@ enable_gpg = false
 defaultbranch = "devel"
 author_email = "remotesensingsuy@gmail.com"
 description = "python implementation of COntinuous monitoring of Land disturbances algorithm"
-dev_status = "planning"
+dev_status = "alpha"
+license = "Apache 2"
 
 
 [tool.cibuildwheel]
