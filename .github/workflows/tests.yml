@@ -105,12 +105,15 @@ jobs:
         #- windows-latest
         cibw_skip:
         - '*-win32'
+        - '*-musllinux_*'
+        - '*-i686*'
+        - 'pp*'
         arch:
         - auto
-        include:
-        - os: windows-latest
-          arch: auto
-          cibw_skip: '*-win_amd64'
+        #include:
+        #- os: windows-latest
+        #  arch: auto
+        #  cibw_skip: '*-win_amd64'
     steps:
     - name: Checkout source
       uses: actions/checkout@v3
