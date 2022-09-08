@@ -1,13 +1,13 @@
 """
 Notes:
-    Based on template code in: ~/code/pycold/docs/source/conf.py
+    Based on template code in: ~/code/xcookie/docs/source/conf.py
 
     http://docs.readthedocs.io/en/latest/getting_started.html
 
     pip install sphinx sphinx-autobuild sphinx_rtd_theme sphinxcontrib-napoleon
 
     cd ~/code/pycold
-    mkdir docs
+    mkdir -p docs
     cd docs
 
     sphinx-quickstart
@@ -15,7 +15,7 @@ Notes:
     # need to edit the conf.py
 
     cd ~/code/pycold/docs
-    sphinx-apidoc -f -o ~/code/pycold/docs/source ~/code/pycold/pycold --separate
+    sphinx-apidoc -f -o ~/code/pycold/docs/source ~/code/pycold/src/python/pycold --separate
     make html
 
     Also:
@@ -96,7 +96,7 @@ copyright = '2022, Jon Crall'
 author = 'Jon Crall'
 modname = 'pycold'
 
-modpath = join(dirname(dirname(dirname(__file__))), modname, '__init__.py')
+modpath = join(dirname(dirname(dirname(__file__))), 'src', 'python', modname, '__init__.py')
 release = parse_version(modpath)
 version = '.'.join(release.split('.')[0:2])
 
