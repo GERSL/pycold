@@ -22,3 +22,4 @@ codecov>=2.0.15
 requests>=2.25.1
 
 kwcoco>=0.4.2
+einops>=0.4.1
