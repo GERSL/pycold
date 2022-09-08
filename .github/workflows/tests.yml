@@ -8,7 +8,7 @@ name: BinPy Build and Test
 on:
   push:
   pull_request:
-    branches: [ main, devel ]
+    branches: [ devel, main ]
 
 jobs:
   lint_job:
@@ -101,21 +101,32 @@ jobs:
       matrix:
         os:
         - ubuntu-latest
+        - macOS-latest
+        - windows-latest
         cibw_skip:
         - '*-win32'
         arch:
-        - x86_64
-        #- auto
+        - auto
+        include:
+        - os: windows-latest
+          arch: auto
+          cibw_skip: '*-win_amd64'
     steps:
-
     - name: Checkout source
       uses: actions/checkout@v3
-
-    #- name: Set up QEMU
-    #  uses: docker/setup-qemu-action@v2
-    #  if: runner.os == 'Linux' && matrix.arch != 'auto'
-    #  with:
-    #    platforms: all
+    - name: Enable MSVC 64bit
+      uses: ilammy/msvc-dev-cmd@v1
+      if: matrix.os == 'windows-latest' && matrix.cibw_skip == '*-win32'
+    - name: Enable MSVC 32bit
+      uses: ilammy/msvc-dev-cmd@v1
+      if: matrix.os == 'windows-latest' && matrix.cibw_skip == '*-win_amd64'
+      with:
+        arch: x86
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      if: runner.os == 'Linux' && matrix.arch != 'auto'
+      with:
+        platforms: all
     - name: Build binary wheels
       uses: pypa/cibuildwheel@v2.9.0
       with:
@@ -156,94 +167,53 @@ jobs:
       with:
         name: wheels
         path: ./wheelhouse/pycold*.whl
-
-
-   test_deploy:
-     name: Uploading Test to PyPi
-     runs-on: ubuntu-latest
-     if: github.event_name == 'push' && ! startsWith(github.event.ref, 'refs/tags') && ! startsWith(github.event.ref, 'refs/heads/release')
-     needs:
-     - build_and_test_sdist
-     - build_and_test_binpy_wheels
-     steps:
-     - name: Checkout source
-       uses: actions/checkout@v3
-     - uses: actions/download-artifact@v3
-       name: Download wheels and sdist
-       with:
-         name: wheels
-         path: wheelhouse
-     - name: Show files to upload
-       shell: bash
-       run: ls -la wheelhouse
-     - name: Sign and Publish
-       env:
-         TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
-         TWINE_USERNAME: ${{ secrets.TEST_TWINE_USERNAME }}
-         TWINE_PASSWORD: ${{ secrets.TEST_TWINE_PASSWORD }}
-         CI_SECRET: ${{ secrets.CI_SECRET }}
-       run: |-
-         GPG_EXECUTABLE=gpg
-         $GPG_EXECUTABLE --version
-         openssl version
-         $GPG_EXECUTABLE --list-keys
-         echo "Decrypting Keys"
-         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import
-         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
-         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import
-         echo "Finish Decrypt Keys"
-         $GPG_EXECUTABLE --list-keys || true
-         $GPG_EXECUTABLE --list-keys  || echo "first invocation of gpg creates directories and returns 1"
-         $GPG_EXECUTABLE --list-keys
-         VERSION=$(python -c "import setup; print(setup.VERSION)")
-         pip install twine
-         pip install six pyopenssl ndg-httpsclient pyasn1 -U --user
-         pip install requests[security] twine --user
-         GPG_KEYID=$(cat dev/public_gpg_key)
-         echo "GPG_KEYID = '$GPG_KEYID'"
-         DO_GPG=True GPG_KEYID=$GPG_KEYID TWINE_REPOSITORY_URL=${TWINE_REPOSITORY_URL} TWINE_PASSWORD=$TWINE_PASSWORD TWINE_USERNAME=$TWINE_USERNAME GPG_EXECUTABLE=$GPG_EXECUTABLE DO_UPLOAD=True DO_TAG=False ./publish.sh
-
-   live_deploy:
-     name: Uploading Live to PyPi
-     runs-on: ubuntu-latest
-     if: github.event_name == 'push' && (startsWith(github.event.ref, 'refs/tags') || startsWith(github.event.ref, 'refs/heads/release'))
-     needs:
-     - build_and_test_sdist
-     - build_and_test_binpy_wheels
-     steps:
-     - name: Checkout source
-       uses: actions/checkout@v3
-     - uses: actions/download-artifact@v3
-       name: Download wheels and sdist
-       with:
-         name: wheels
-         path: wheelhouse
-     - name: Show files to upload
-       shell: bash
-       run: ls -la wheelhouse
-     - name: Sign and Publish
-       env:
-         TWINE_REPOSITORY_URL: https://upload.pypi.org/legacy/
-         TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
-         TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
-         CI_SECRET: ${{ secrets.CI_SECRET }}
-       run: |-
-         GPG_EXECUTABLE=gpg
-         $GPG_EXECUTABLE --version
-         openssl version
-         $GPG_EXECUTABLE --list-keys
-         echo "Decrypting Keys"
-         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/ci_public_gpg_key.pgp.enc | $GPG_EXECUTABLE --import
-         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/gpg_owner_trust.enc | $GPG_EXECUTABLE --import-ownertrust
-         openssl enc -aes-256-cbc -pbkdf2 -md SHA512 -pass env:CI_SECRET -d -a -in dev/ci_secret_gpg_subkeys.pgp.enc | $GPG_EXECUTABLE --import
-         echo "Finish Decrypt Keys"
-         $GPG_EXECUTABLE --list-keys || true
-         $GPG_EXECUTABLE --list-keys  || echo "first invocation of gpg creates directories and returns 1"
-         $GPG_EXECUTABLE --list-keys
-         VERSION=$(python -c "import setup; print(setup.VERSION)")
-         pip install twine
-         pip install six pyopenssl ndg-httpsclient pyasn1 -U --user
-         pip install requests[security] twine --user
-         GPG_KEYID=$(cat dev/public_gpg_key)
-         echo "GPG_KEYID = '$GPG_KEYID'"
-         DO_GPG=True GPG_KEYID=$GPG_KEYID TWINE_REPOSITORY_URL=${TWINE_REPOSITORY_URL} TWINE_PASSWORD=$TWINE_PASSWORD TWINE_USERNAME=$TWINE_USERNAME GPG_EXECUTABLE=$GPG_EXECUTABLE DO_UPLOAD=True DO_TAG=False ./publish.sh
+  test_deploy:
+    name: Uploading Test to PyPi
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && ! startsWith(github.event.ref, 'refs/tags') && ! startsWith(github.event.ref, 'refs/heads/release')
+    needs:
+    - build_and_test_sdist
+    - build_and_test_binpy_wheels
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+    - uses: actions/download-artifact@v3
+      name: Download wheels and sdist
+      with:
+        name: wheels
+        path: wheelhouse
+    - name: Show files to upload
+      shell: bash
+      run: ls -la wheelhouse
+    - name: Sign and Publish
+      env:
+        TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
+        TWINE_PASSWORD: ${{ secrets.PYPI_TEST }}
+      run: |-
+        pip install requests[security] twine -U
+        twine upload --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
+  live_deploy:
+    name: Uploading Live to PyPi
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (startsWith(github.event.ref, 'refs/tags') || startsWith(github.event.ref, 'refs/heads/release'))
+    needs:
+    - build_and_test_sdist
+    - build_and_test_binpy_wheels
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+    - uses: actions/download-artifact@v3
+      name: Download wheels and sdist
+      with:
+        name: wheels
+        path: wheelhouse
+    - name: Show files to upload
+      shell: bash
+      run: ls -la wheelhouse
+    - name: Sign and Publish
+      env:
+        TWINE_REPOSITORY_URL: https://upload.pypi.org/legacy/
+        TWINE_PASSWORD: ${{ secrets.PYPI }}
+      run: |-
+        pip install requests[security] twine -U
+        twine upload --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
