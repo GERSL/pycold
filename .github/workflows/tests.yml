@@ -185,7 +185,7 @@ jobs:
     - name: Show files to upload
       shell: bash
       run: ls -la wheelhouse
-    - name: Sign and Publish
+    - name: Publish
       env:
         TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
         TWINE_PASSWORD: ${{ secrets.PYPY_TEST }}
@@ -210,7 +210,7 @@ jobs:
     - name: Show files to upload
       shell: bash
       run: ls -la wheelhouse
-    - name: Sign and Publish
+    - name: Publish
       env:
         TWINE_REPOSITORY_URL: https://upload.pypi.org/legacy/
         TWINE_PASSWORD: ${{ secrets.PYPI }}

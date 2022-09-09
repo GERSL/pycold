@@ -1,10 +1,10 @@
 PYCOLD
 ======
 
-|GithubActions| 
+|GithubActions| |Pypi| |Downloads| 
 
 .. .. TODO: uncomment these after docs / pypi / coverage are online
-.. .. |ReadTheDocs| |Pypi| |Downloads| |Codecov| 
+.. .. |ReadTheDocs| |Codecov| 
 
 A Python library for COntinuous monitoring of Land Disturbance (COLD) and its extension algorithms at the speed of C language
 =============================================================================================================================
@@ -235,4 +235,4 @@ of land disturbance. Submitted to Remote Sensing of Environment
 .. |ReadTheDocs| image:: https://readthedocs.org/projects/pycold/badge/?version=latest
     :target: http://pycold.readthedocs.io/en/latest/
 .. |GithubActions| image:: https://github.com/GERSL/pycold/actions/workflows/tests.yml/badge.svg?branch=devel
-    :target: https://github.com/GERSL/pycold/actions?query=branch%3Amain
+    :target: https://github.com/GERSL/pycold/actions?query=branch%3Adevel
