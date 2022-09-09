@@ -3,7 +3,7 @@
 import os
 import numpy as np
 import pandas as pd
-import gdal
+from osgeo import gdal
 import click
 import datetime as datetime
 from mpi4py import MPI

@@ -1,23 +1,45 @@
 [build-system]
 requires = ["setuptools>=41.0.1", "scikit-build>=0.11.1", "numpy", "ninja>=1.10.2", "cmake>=3.21.2", "cython>=0.29.24",]
 
+[tool.xcookie]
+url = 'https://github.com/GERSL/pycold'
+tags = [ "github", "binpy", "cv2", "gdal"]
+mod_name = "pycold"
+repo_name = "pycold"
+rel_mod_parent_dpath = "src/python"
+os = [ "osx", "linux", "win", "all"]
+min_python = 3.8
+author = "Su Ye"
+enable_gpg = false
+defaultbranch = "devel"
+author_email = "remotesensingsuy@gmail.com"
+description = "python implementation of COntinuous monitoring of Land disturbances algorithm"
+dev_status = "alpha"
+license = "Apache 2"
+
+
 [tool.cibuildwheel]
-#build = "cp38-* cp310-*"
-build = "cp310-manylinux_x86_64"
+build = "cp38-* cp39-* cp310-*"
+#build = "cp310-manylinux_x86_64"
 build-frontend = "build"
-skip = "pp* *-musllinux_* *_i686"
-archs = ["x86_64"]
+skip = "pp* *-musllinux_*"
+#archs = ["x86_64"]
 #archs = ["i686"]
 build-verbosity = 1
 test-requires = ["-r requirements/tests.txt", "-r requirements/headless.txt", "-r requirements/gdal.txt"]
 test-command = "python {project}/run_tests.py"
 
+# Use custom manylinux images to get precompiled build-time deps
+manylinux-x86_64-image = "quay.io/erotemic/manylinux2014_x86_64_for:zlib-build-fortran-gsl"
+manylinux-i686-image = "quay.io/erotemic/manylinux2014_i686_for:zlib-build-fortran-gsl"
+
+#[tool.cibuildwheel.linux]
+# Uncomment to work with official manylinux images  
+#before-build = "yum install gcc gcc-c++ make zlib-devel gcc-gfortran libgomp blas-devel -y && curl https://ftp.gnu.org/gnu/gsl/gsl-2.7.1.tar.gz  > gsl.tar.gz && tar xfv gsl.tar.gz && cd gsl-2.7.1 && ./configure --prefix=/usr --disable-static && make && make install"
+#before-build = "yum install libgomp blas-devel -y"
 
 [tool.mypy]
 ignore_missing_imports = true
-
-[tool.cibuildwheel.linux]
-before-build = "yum install gcc gcc-c++ make zlib-devel gcc-gfortran -y && curl https://ftp.gnu.org/gnu/gsl/gsl-2.7.1.tar.gz  > gsl.tar.gz && tar xfv gsl.tar.gz && cd gsl-2.7.1 && ./configure --prefix=/usr --disable-static && make && make install"
 
 [tool.pytest.ini_options]
 addopts = "-p no:doctest --xdoctest --xdoctest-style=google --ignore-glob=setup.py --ignore-glob=dev"
