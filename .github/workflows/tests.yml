@@ -190,7 +190,7 @@ jobs:
         TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
         TWINE_PASSWORD: ${{ secrets.PYPI_TEST }}
       run: |-
-        pip install pyopenssl ndg-httpsclient pyasn1 requests[security] twine -U
+        pip install urllib3 pyopenssl requests[security] twine -U
         twine upload --username=__token__ --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
   live_deploy:
     name: Uploading Live to PyPi
@@ -215,5 +215,5 @@ jobs:
         TWINE_REPOSITORY_URL: https://upload.pypi.org/legacy/
         TWINE_PASSWORD: ${{ secrets.PYPI }}
       run: |-
-        pip install pyopenssl ndg-httpsclient pyasn1 requests[security] twine -U
+        pip install urllib3 pyopenssl requests[security] twine -U
         twine upload --username=__token__ --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
