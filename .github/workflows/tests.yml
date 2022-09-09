@@ -188,10 +188,10 @@ jobs:
     - name: Sign and Publish
       env:
         TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
-        TWINE_PASSWORD: ${{ secrets.PYPI_TEST }}
+        TWINE_PASSWORD: ${{ secrets.PYPY_TEST }}
       run: |-
-        pip install requests[security] twine -U
-        twine upload --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
+        pip install urllib3 pyopenssl requests[security] twine -U
+        twine upload --username=__token__ --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
   live_deploy:
     name: Uploading Live to PyPi
     runs-on: ubuntu-latest
@@ -215,5 +215,5 @@ jobs:
         TWINE_REPOSITORY_URL: https://upload.pypi.org/legacy/
         TWINE_PASSWORD: ${{ secrets.PYPI }}
       run: |-
-        pip install requests[security] twine -U
-        twine upload --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
+        pip install urllib3 pyopenssl requests[security] twine -U
+        twine upload --username=__token__ --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
