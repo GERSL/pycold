@@ -327,7 +327,7 @@ int main(int argc, char *argv[])
     short min_rmse[TOTAL_IMAGE_BANDS] = {0,0,0,0,0,0,0};
     int cm_output_interval;
     bool b_c2 = TRUE;
-    bool b_header_csv = TRUE;
+    bool b_header_csv = FALSE;
     int headline = -1;
     bool b_pinpoint = FALSE;
     Output_sccd_pinpoint *rec_cg_pinpoint;
@@ -481,8 +481,12 @@ int main(int argc, char *argv[])
         row_count ++;
     }
     fclose(sampleFile);
+    if (sdate[valid_scene_count - 1] - sdate[0] == 0){
+        n_cm_maps = 1;
+    }else{
+            n_cm_maps = (sdate[valid_scene_count - 1] - sdate[0]) / cm_output_interval + 1;
+    }
 
-    n_cm_maps = (sdate[valid_scene_count - 1] - sdate[0]) / cm_output_interval + 1;
     if(method == SCCDONLINE)
         starting_date = 0;
     else

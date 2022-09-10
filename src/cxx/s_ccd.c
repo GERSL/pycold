@@ -2952,6 +2952,9 @@ int sccd_snow
     float **fit_cft;                 /* Fitted coefficients 2-D array.        */
     ssmodel_constants* instance;
     unsigned sum_square_vt[TOTAL_IMAGE_BANDS_SCCD] = {0, 0, 0, 0, 0, 0};
+    int i;
+    double vt;
+
 
     gsl_vector** state_a;          /* a vector of a for current i,  multiple band */
     gsl_matrix** cov_p;
@@ -2989,82 +2992,6 @@ int sccd_snow
        RETURN_ERROR ("Allocating instance memory", FUNC_NAME, FAILURE);
     }
 
-    fit_cft = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_SCCD, SCCD_NUM_C, sizeof (float));
-    if (fit_cft == NULL)
-    {
-        RETURN_ERROR ("Allocating fit_cft memory", FUNC_NAME, FAILURE);
-    }
-
-
-    /* if n_clr is not enough, save observations and return queue mode*/
-    if (n_clr < N_TIMES * SCCD_NUM_C)
-    {
-        *nrt_status = NRT_QUEUE_SNOW;
-        *num_obs_queue = n_clr;
-        for (k = 0; k < n_clr; k++)
-        {
-           obs_queue[k].clrx_since1982= clrx[k] - JULIAN_LANDSAT4_LAUNCH;
-           for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-               obs_queue[k].clry[i_b] = clry[i_b][k];
-        }
-        
-        status = free_2d_array ((void **) temp_v_dif);
-        if (status != SUCCESS)
-        {
-            RETURN_ERROR ("Freeing memory: rec_v_dif\n",
-                          FUNC_NAME, FAILURE);
-        }
-
-        free(rmse);
-        rmse = NULL;
-
-        status = free_2d_array ((void **)cov_p);
-        if (status != SUCCESS)
-        {
-            RETURN_ERROR ("Freeing memory: cov_p\n", FUNC_NAME, FAILURE);
-        }
-        status = free_2d_array ((void **)state_a);
-        if (status != SUCCESS)
-        {
-            RETURN_ERROR ("Freeing memory: state_a\n", FUNC_NAME, FAILURE);
-        }
-
-        free(instance);
-        instance = NULL;
-
-        status = free_2d_array ((void **) fit_cft);
-        if (status != SUCCESS)
-        {
-            RETURN_ERROR ("Freeing memory: fit_cft\n", FUNC_NAME, FAILURE);
-        }
-    
-        return SUCCESS;
-    }
-
-    /**********************************************************/
-    /*                                                        */
-    /* Treat saturated and unsaturated pixels differently.    */
-    /*                                                        */
-    /**********************************************************/
-
-    for (k = 0; k < TOTAL_IMAGE_BANDS_SCCD; k++)  //
-    {
-
-          status = auto_ts_fit_sccd(clrx, clry, k, k, 0, n_clr-1, MIN_NUM_C,
-                 fit_cft, &rmse[k], temp_v_dif);
-
-          if (status != SUCCESS)
-              RETURN_ERROR ("Calling auto_ts_fit_sccd\n",
-                   FUNC_NAME, EXIT_FAILURE);
-
-
-    }
-
-    /**************************************************************/
-    /*                                                            */
-    /* step 1 - conti: initialize ssm models .                    */
-    /*                                                            */
-    /**************************************************************/
     for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
     {
         instance[i_b].Z = gsl_vector_alloc(DEFAULT_N_STATE);
@@ -3084,18 +3011,153 @@ int sccd_snow
         }
         state_a[i_b] =  gsl_vector_alloc(DEFAULT_N_STATE);
         cov_p[i_b] = gsl_matrix_calloc(DEFAULT_N_STATE, DEFAULT_N_STATE);
-        initialize_ssmconstants(DEFAULT_N_STATE, rmse[i_b], &instance[i_b]);
-        /**************************************************************/
-        /*                                                            */
-        /*  initialize a and p                                        */
-        /*                                                            */
-        /**************************************************************/
-        step1_ssm_initialize(&instance[i_b], clrx, clry[i_b], i_start, n_clr - 1,
-                             fit_cft, cov_p[i_b], i_b, sum_square_vt, n_clr);
     }
-    
-    nrt_model[0].t_start_since1982 = (short int)(clrx[i_start] - JULIAN_LANDSAT4_LAUNCH);
-    nrt_model[0].num_obs = (short int)(n_clr);
+
+    fit_cft = (float **) allocate_2d_array (TOTAL_IMAGE_BANDS_SCCD, SCCD_NUM_C, sizeof (float));
+    if (fit_cft == NULL)
+    {
+        RETURN_ERROR ("Allocating fit_cft memory", FUNC_NAME, FAILURE);
+    }
+
+
+    if ((*nrt_status == NRT_QUEUE_SNOW) | (*nrt_status == NRT_VOID))
+    {
+        /* if n_clr is not enough, save observations and return queue mode*/
+        if (n_clr < N_TIMES * SCCD_NUM_C)
+        {
+            *nrt_status = NRT_QUEUE_SNOW;
+            *num_obs_queue = n_clr;
+            for (k = 0; k < n_clr; k++)
+            {
+               obs_queue[k].clrx_since1982= clrx[k] - JULIAN_LANDSAT4_LAUNCH;
+               for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+                   obs_queue[k].clry[i_b] = clry[i_b][k];
+            }
+
+            status = free_2d_array ((void **) temp_v_dif);
+            if (status != SUCCESS)
+            {
+                RETURN_ERROR ("Freeing memory: rec_v_dif\n",
+                              FUNC_NAME, FAILURE);
+            }
+
+            free(rmse);
+            rmse = NULL;
+
+            status = free_2d_array ((void **)cov_p);
+            if (status != SUCCESS)
+            {
+                RETURN_ERROR ("Freeing memory: cov_p\n", FUNC_NAME, FAILURE);
+            }
+            status = free_2d_array ((void **)state_a);
+            if (status != SUCCESS)
+            {
+                RETURN_ERROR ("Freeing memory: state_a\n", FUNC_NAME, FAILURE);
+            }
+
+            for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+            {
+                gsl_vector_free(instance[i_b].Z);
+                //(&instance[i_b])->Z = NULL;
+                //gsl_matrix_free (instance[i_b].H);
+                gsl_matrix_free(instance[i_b].T);
+                //(&instance[i_b])->T = NULL;
+                gsl_matrix_free(instance[i_b].Q);
+                gsl_vector_free(state_a[i_b]);
+                gsl_matrix_free(cov_p[i_b]);
+            }
+
+            free(instance);
+            instance = NULL;
+
+            status = free_2d_array ((void **) fit_cft);
+            if (status != SUCCESS)
+            {
+                RETURN_ERROR ("Freeing memory: fit_cft\n", FUNC_NAME, FAILURE);
+            }
+
+            return SUCCESS;
+        }
+
+        /**********************************************************/
+        /*                                                        */
+        /* Treat saturated and unsaturated pixels differently.    */
+        /*                                                        */
+        /**********************************************************/
+
+        for (k = 0; k < TOTAL_IMAGE_BANDS_SCCD; k++)  //
+        {
+
+              status = auto_ts_fit_sccd(clrx, clry, k, k, 0, n_clr-1, MIN_NUM_C,
+                     fit_cft, &rmse[k], temp_v_dif);
+
+              if (status != SUCCESS)
+                  RETURN_ERROR ("Calling auto_ts_fit_sccd\n",
+                       FUNC_NAME, EXIT_FAILURE);
+
+        }
+
+        /**************************************************************/
+        /*                                                            */
+        /* step 1 - conti: initialize ssm models .                    */
+        /*                                                            */
+        /**************************************************************/
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+        {
+            initialize_ssmconstants(DEFAULT_N_STATE, rmse[i_b], &instance[i_b]);
+            /**************************************************************/
+            /*                                                            */
+            /*  initialize a and p                                        */
+            /*                                                            */
+            /**************************************************************/
+            step1_ssm_initialize(&instance[i_b], clrx, clry[i_b], i_start, n_clr - 1,
+                                 fit_cft, cov_p[i_b], i_b,  &sum_square_vt[i_b], n_clr);
+            nrt_model[0].H[i_b] = instance[i_b].H;
+        }
+
+
+        nrt_model[0].t_start_since1982 = (short int)(clrx[0] - JULIAN_LANDSAT4_LAUNCH);
+        nrt_model[0].num_obs = n_clr;
+
+        *nrt_status = NRT_MONITOR_SNOW;
+
+    }else   // monitor mode
+    {
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+        {
+            /*   1. covariance matrix   */
+            for(k1 = 0; k1 < DEFAULT_N_STATE; k1++)
+            {
+                for(k2 = 0; k2 < DEFAULT_N_STATE; k2++){
+                    // printf("k1 = %d, k2 = %d,  p = %f \n", k1, k2, gsl_matrix_get(cov_p[i_b], k1, k2));
+                    gsl_matrix_set(cov_p[i_b], k1, k2, nrt_model[0].covariance[i_b][k1 * DEFAULT_N_STATE + k2]);
+                }
+            }
+            /*   2. nrt harmonic coefficients   */
+            for(k2 = 0; k2 < SCCD_NUM_C; k2++)
+                fit_cft[i_b][k2] = nrt_model[0].nrt_coefs[i_b][k2];
+        }
+
+        /*     5. adjust rmse, sum       */
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+        {
+            sum_square_vt[i_b] = nrt_model[0].rmse_sum[i_b];
+            /*     6. initialize state-space model coefficients       */
+            initialize_ssmconstants(DEFAULT_N_STATE, nrt_model[0].H[i_b], &instance[i_b]);
+        }
+
+        nrt_model[0].num_obs = nrt_model[0].num_obs + n_clr - DEFAULT_CONSE;
+
+        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+        {
+            for(i = 0; i < n_clr - DEFAULT_CONSE; i++){
+                KF_ts_filter_regular(&instance[i_b], clrx, clry[i_b], cov_p[i_b],fit_cft, i, i_b, &vt, FALSE);
+                sum_square_vt[i_b] = sum_square_vt[i_b] + (unsigned int)(vt * vt);
+            }
+        }
+
+    }
+
 
     for(k = 0; k < DEFAULT_CONSE; k++)
     {
@@ -3108,8 +3170,7 @@ int sccd_snow
 
     for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
     {
-        // nrt_model[0].min_rmse[i_b] = (short int)(rmse[i_b]);
-        nrt_model[0].H[i_b] = instance[i_b].H;
+        nrt_model->rmse_sum[i_b] = sum_square_vt[i_b];
     }
 
     for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
@@ -3118,9 +3179,14 @@ int sccd_snow
              for(k2 = 0; k2 < DEFAULT_N_STATE; k2++){
                  nrt_model[0].covariance[i_b][k1 * DEFAULT_N_STATE + k2] = (float)(gsl_matrix_get(cov_p[i_b], k1, k2));
              }
-             nrt_model[0].nrt_coefs[i_b][k1] = (float)(gsl_vector_get(state_a[i_b], k1));
+             nrt_model[0].nrt_coefs[i_b][k1] = fit_cft[i_b][k1];
          }
+         // nrt_model[0].rmse_sum[i_b] =
     }
+
+    nrt_model[0].norm_cm = NA_VALUE;
+    nrt_model[0].cm_angle = NA_VALUE;
+    nrt_model[0].conse_last = 0;
 
     /* monitor mode */
     *nrt_status = NRT_MONITOR_SNOW;
