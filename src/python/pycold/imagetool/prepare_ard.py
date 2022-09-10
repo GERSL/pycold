@@ -513,7 +513,7 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
 
 
 def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger, config,
-                            is_partition=True, low_date_bound=None, upp_date_bound=None):
+                            is_partition=True, low_date_bound=None, upp_date_bound=None, b_c2=False):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy
     :param tmp_path: tmp folder to save unzip image
@@ -528,6 +528,7 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
     :param is_partition: True, partition each image into blocks; False, save original size of image
     :param low_date_bound: the lower bound of user interested year range
     :param upp_date_bound: the upper bound of user interested year range
+    :param b_c2:
     :return:
     """
     # unzip SR
@@ -566,15 +567,22 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
         return
 
     try:
-        QA_band = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                                   "{}_PIXELQA.tif".format(folder[0:len(folder) - 3])))
+        if b_c2 is False:
+            QA_band = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                       "{}_PIXELQA.tif".format(folder[0:len(folder) - 3])))
+        else:
+            QA_band = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                       "{}_QA_PIXEL.TIF".format(folder[0:len(folder) - 3])))
     except ValueError as e:
         # logger.error('Cannot open QA band for {}: {}'.format(folder, e))
         logger.error('Cannot open QA band for {}: {}'.format(folder, e))
         return
 
     # convertQA = np.vectorize(qabitval)
-    QA_band_unpacked = qabitval_array(QA_band).astype(np.short)
+    if b_c2 is False:
+        QA_band_unpacked = qabitval_array(QA_band).astype(np.short)
+    else:
+        QA_band_unpacked = qabitval_array_c2(QA_band).astype(np.short)
     if clear_threshold > 0:
         clear_ratio = np.sum(np.logical_or(QA_band_unpacked == QA_CLEAR,
                                            QA_band_unpacked == QA_WATER)) \
@@ -601,7 +609,10 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
         year = folder[15:19]
         doy = datetime(int(year), int(folder[19:21]), int(folder[21:23])).strftime('%j')
         collection = "C{}".format(folder[35:36])
-        version = folder[37:40]
+        if b_c2 is False:
+            version = folder[37:40]
+        else:
+            version = folder[34:35]
         file_name = sensor + col + row + year + doy + collection + version
         if low_date_bound is not None:
             if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) < parse(low_date_bound):
@@ -609,54 +620,106 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
         if upp_date_bound is not None:
             if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) > parse(upp_date_bound):
                 return
-
-        if sensor == 'LT5' or sensor == 'LE7' or sensor == 'LT4':
-            try:
-                B1 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                         "{}B1.tif".format(folder)))
-                B2 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                         "{}B2.tif".format(folder)))
-                B3 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                         "{}B3.tif".format(folder)))
-                B4 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                         "{}B4.tif".format(folder)))
-                B5 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                         "{}B5.tif".format(folder)))
-                B6 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                         "{}B7.tif".format(folder)))
-                B7 = gdal_array.LoadFile(
-                    join(join(tmp_path, "{}_BT".format(folder[0:len(folder) - 3])),
-                         "{}_BTB6.tif".format(folder[0:len(folder) - 3])))
-            except ValueError as e:
-                # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
-                return
-        elif sensor == 'LC8' or 'LC9':
-            try:
-                B1 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                              "{}B2.tif".format(folder)))
-                B2 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                              "{}B3.tif".format(folder)))
-                B3 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                              "{}B4.tif".format(folder)))
-                B4 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                              "{}B5.tif".format(folder)))
-                B5 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                              "{}B6.tif".format(folder)))
-                B6 = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                              "{}B7.tif".format(folder)))
-                B7 = gdal_array.LoadFile(
-                    join(join(tmp_path, "{}_BT".format(folder[0:len(folder) - 3])),
-                         "{}_BTB10.tif".format(folder[0:len(folder) - 3])))
-            except ValueError as e:
-                # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
-                return
+        if b_c2 is False:
+            if sensor == 'LT5' or sensor == 'LE7' or sensor == 'LT4':
+                try:
+                    B1 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}B1.tif".format(folder)))
+                    B2 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}B2.tif".format(folder)))
+                    B3 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}B3.tif".format(folder)))
+                    B4 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}B4.tif".format(folder)))
+                    B5 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}B5.tif".format(folder)))
+                    B6 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}B7.tif".format(folder)))
+                    B7 = gdal_array.LoadFile(
+                        join(join(tmp_path, "{}_BT".format(folder[0:len(folder) - 3])),
+                             "{}_BTB6.tif".format(folder[0:len(folder) - 3])))
+                except ValueError as e:
+                    # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
+                    logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                    return
+            elif sensor == 'LC8' or 'LC9':
+                try:
+                    B1 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}B2.tif".format(folder)))
+                    B2 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}B3.tif".format(folder)))
+                    B3 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}B4.tif".format(folder)))
+                    B4 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}B5.tif".format(folder)))
+                    B5 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}B6.tif".format(folder)))
+                    B6 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}B7.tif".format(folder)))
+                    B7 = gdal_array.LoadFile(
+                        join(join(tmp_path, "{}_BT".format(folder[0:len(folder) - 3])),
+                             "{}_BTB10.tif".format(folder[0:len(folder) - 3])))
+                except ValueError as e:
+                    # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
+                    logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                    return
+        else:
+            if sensor == 'LT5' or sensor == 'LE7' or sensor == 'LT4':
+                try:
+                    B1 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}_B1.TIF".format(folder)))
+                    B2 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}_B2.TIF".format(folder)))
+                    B3 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}_B3.TIF".format(folder)))
+                    B4 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}_B4.TIF".format(folder)))
+                    B5 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}_B5.TIF".format(folder)))
+                    B6 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                             "{}_B7.TIF".format(folder)))
+                    B7 = gdal_array.LoadFile(
+                        join(join(tmp_path, "{}_BT".format(folder[0:len(folder) - 3])),
+                             "{}_BT_B6.TIF".format(folder[0:len(folder) - 3])))
+                except ValueError as e:
+                    # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
+                    logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                    return
+            elif sensor == 'LC8' or 'LC9':
+                try:
+                    B1 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}_B2.TIF".format(folder)))
+                    B2 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}_B3.TIF".format(folder)))
+                    B3 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}_B4.TIF".format(folder)))
+                    B4 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}_B5.TIF".format(folder)))
+                    B5 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}_B6.TIF".format(folder)))
+                    B6 = gdal_array.LoadFile(join(join(tmp_path, folder),
+                                                  "{}_B7.TIF".format(folder)))
+                    B7 = gdal_array.LoadFile(
+                        join(tmp_path, "{}_BT".format(folder[0:len(folder) - 3]),
+                             "{}_BT_B10.TIF".format(folder[0:len(folder) - 3])))
+                except ValueError as e:
+                    # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
+                    logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                    return
 
         if (B1 is None) or (B2 is None) or (B3 is None) or (B4 is None) or (B5 is None) or (B6 is None) or \
                 (B7 is None):
             logger.error('Reading Landsat band fails for {}'.format(folder))
             return
+
+        if b_c2 is True:
+            B1 = (10000 * (B1 * 2.75e-05 - 0.2)).astype(np.int16)
+            B2 = (10000 * (B2 * 2.75e-05 - 0.2)).astype(np.int16)
+            B3 = (10000 * (B3 * 2.75e-05 - 0.2)).astype(np.int16)
+            B4 = (10000 * (B4 * 2.75e-05 - 0.2)).astype(np.int16)
+            B5 = (10000 * (B5 * 2.75e-05 - 0.2)).astype(np.int16)
+            B7 = (10000 * (B7 * 2.75e-05 - 0.2)).astype(np.int16)
+            B6 = (10 * (B6 * 0.00341802 + 149)).astype(np.int16)
 
         # if path_array is not None, we will eliminate those observation that has different path with its assigned path
         if path_array is not None:  # meaning that single-path processing
@@ -667,13 +730,20 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
 
             # get root element
             root = tree.getroot()
-            elements = root.findall(
-                './{https://landsat.usgs.gov/ard/v1}scene_metadata/{https://landsat.usgs.gov/'
-                'ard/v1}global_metadata/{https://landsat.usgs.gov/ard/v1}wrs')
+            if b_c2 is False:
+                elements = root.findall(
+                    './{https://landsat.usgs.gov/ard/v1}scene_metadata/{https://landsat.usgs.gov/'
+                    'ard/v1}global_metadata/{https://landsat.usgs.gov/ard/v1}wrs')
+            else:
+                elements = root.findall('SCENE_METADATA/IMAGE_ATTRIBUTES')
             if len(elements) == 0:
                 logger.error('Parsing xml fails for {}'.format(folder))
                 return
-            pathid = int(elements[0].attrib['path'])
+            if b_c2 is False:
+                pathid = int(elements[0].attrib['path'])
+            else:
+                pathid = int(elements[0][3].text)
+            print(pathid)
 
             # assign filled value to the pixels has different path id so won't be processed
             QA_band_unpacked[path_array != pathid] = QA_FILL
@@ -1112,7 +1182,7 @@ def bbox(f):
 @click.option('--hpc/--dhtc', default=True, help='if it is set for HPC or DHTC environment')
 @click.option('--low_date_bound', type=str, default=None, help='the lower bound of the date range of user interest')
 @click.option('--upp_date_bound', type=str, default=None, help='the upper bound of the date range of user interest')
-@click.option('--collection',  type=click.Choice(['ARD', 'C2', 'HLS', 'HLS14']), default='ARD',
+@click.option('--collection',  type=click.Choice(['ARD', 'C2', 'HLS', 'HLS14','ARD-C2']), default='ARD',
               help='image source')
 @click.option('--shapefile_path', type=str, default=None)
 @click.option('--id', type=int, default=0)
@@ -1122,7 +1192,7 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         print('Source directory not exists!')
 
     # select only _SR
-    if collection == 'ARD':
+    if collection == 'ARD' or collection == 'ARD-C2':
         folder_list = [f[0:len(f) - 4] for f in listdir(source_dir) if
                        (isfile(join(source_dir, f)) and f.endswith('.tar')
                         and f[len(f) - 6:len(f) - 4] == 'SR')]
@@ -1162,38 +1232,41 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         if not os.path.exists(tmp_path):
             os.mkdir(tmp_path)
 
-        if hpc is True and collection == 'ARD':
-            # warp a tile-based single path tif
+        if hpc is True:
+            if collection == 'ARD' or collection == 'ARD-C2':
+                # warp a tile-based single path tif
+                with importlib_resources.path('pycold.imagetool', 'singlepath_landsat_conus.tif') as conus_image_fpath:
+                    # conus_image_fpath = (Path(__file__).parent / 'singlepath_landsat_conus.tif').resolve()
+                    conus_image = gdal.Open(os.fspath(conus_image_fpath))
 
-            with importlib_resources.path('pycold.imagetool', 'singlepath_landsat_conus.tif') as conus_image_fpath:
-                # conus_image_fpath = (Path(__file__).parent / 'singlepath_landsat_conus.tif').resolve()
-                conus_image = gdal.Open(os.fspath(conus_image_fpath))
+                if os.path.exists(join(tmp_path, folder_list[0])):
+                    shutil.rmtree(join(tmp_path, folder_list[0]), ignore_errors=True)
+                with tarfile.open(join(source_dir, folder_list[0] + '.tar')) as tar_ref:
+                    try:
+                        tar_ref.extractall(join(tmp_path, folder_list[0]))
+                    except Exception:
+                        logger.error('Unzip fails for {}'.format(folder_list[0]))
+                if collection == 'ARD':
+                    ref_image = gdal.Open(join(tmp_path, folder_list[0], "{}B1.tif".format(folder_list[0])))
+                else:
+                    ref_image = gdal.Open(join(tmp_path, folder_list[0], "{}_B1.TIF".format(folder_list[0])))
+                trans = ref_image.GetGeoTransform()
+                proj = ref_image.GetProjection()
+                xmin = trans[0]
+                ymax = trans[3]
+                xmax = xmin + trans[1] * ref_image.RasterXSize
+                ymin = ymax + trans[5] * ref_image.RasterYSize
+                params = gdal.WarpOptions(dstSRS=proj, outputBounds=[xmin, ymin, xmax, ymax],
+                                          width=ref_image.RasterXSize, height=ref_image.RasterYSize)
 
-            if os.path.exists(join(tmp_path, folder_list[0])):
+                out_fpath = join(out_dir, 'singlepath_landsat_tile.tif')
+                dst = gdal.Warp(out_fpath, conus_image, options=params)
+                # must close the dst
+                dst = None  # NOQA
+                out_img = None  # NOQA
                 shutil.rmtree(join(tmp_path, folder_list[0]), ignore_errors=True)
-            with tarfile.open(join(source_dir, folder_list[0] + '.tar')) as tar_ref:
-                try:
-                    tar_ref.extractall(join(tmp_path, folder_list[0]))
-                except Exception:
-                    logger.error('Unzip fails for {}'.format(folder_list[0]))
-            ref_image = gdal.Open(join(join(tmp_path, folder_list[0]), "{}B1.tif".format(folder_list[0])))
-            trans = ref_image.GetGeoTransform()
-            proj = ref_image.GetProjection()
-            xmin = trans[0]
-            ymax = trans[3]
-            xmax = xmin + trans[1] * ref_image.RasterXSize
-            ymin = ymax + trans[5] * ref_image.RasterYSize
-            params = gdal.WarpOptions(dstSRS=proj, outputBounds=[xmin, ymin, xmax, ymax],
-                                      width=ref_image.RasterXSize, height=ref_image.RasterYSize)
 
-            out_fpath = join(out_dir, 'singlepath_landsat_tile.tif')
-            dst = gdal.Warp(out_fpath, conus_image, options=params)
-            # must close the dst
-            dst = None  # NOQA
-            out_img = None  # NOQA
-            shutil.rmtree(join(tmp_path, folder_list[0]), ignore_errors=True)
-
-        if collection == 'ARD':
+        if collection == 'ARD' or collection == 'ARD-C2':
             ordinal_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder[15:19]), int(folder[19:21]),
                                                                 int(folder[21:23])))
                              for folder in folder_list]
@@ -1210,10 +1283,16 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         ordinal_dates.sort()
         file = open(join(out_dir, "starting_last_dates.txt"), "w+")  # need to save out starting and
         # lasting date for this tile
-        file.writelines("{}\n".format(str(np.max([ordinal_dates[0],
-                                                 pd.Timestamp.toordinal(parse(low_date_bound))]))))
-        file.writelines("{}\n".format(str(np.min([ordinal_dates[-1],
-                                                 pd.Timestamp.toordinal(parse(upp_date_bound))]))))
+        if low_date_bound is not None:
+            tmp = pd.Timestamp.toordinal(parse(low_date_bound))
+        else:
+            tmp = 0
+        file.writelines("{}\n".format(str(np.max([ordinal_dates[0], tmp]))))
+        if upp_date_bound is not None:
+            tmp = pd.Timestamp.toordinal(parse(upp_date_bound))
+        else:
+            tmp = 999999
+        file.writelines("{}\n".format(str(np.min([ordinal_dates[-1], tmp]))))
         file.close()
     else:
         logging.basicConfig(filename=join(os.getcwd(), 'prepare_ard.log'),
@@ -1226,25 +1305,26 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
 
     # read a general path file which can indicate which pixel is assigned to which path
     path_array = None
-    if single_path is True and collection == 'ARD':
-        # parse tile h and v from folder name
-        folder_name = os.path.basename(source_dir)
-        tile_h = int(folder_name[folder_name.find('h') + 1: folder_name.find('h') + 4])
-        tile_v = int(folder_name[folder_name.find('v') + 1: folder_name.find('v') + 4])
-        if hpc is True:
-            path_array = gdal_array.LoadFile(join(out_dir, 'singlepath_landsat_tile.tif'))
-        else:
-            try:
-                path_array = gdal_array.LoadFile(join(Path(os.path.realpath(__file__)).parent,
-                                                      'singlepath_landsat_tile_crop_compress.tif'),
-                                                 xoff=tile_h * config['n_cols'],
-                                                 yoff=tile_v * config['n_rows'],
-                                                 xsize=config['n_cols'],
-                                                 ysize=config['n_rows'])  # read a partial array
-                # from a large file
-            except IOError as e:
-                logger.error(e)
-                exit()
+    if single_path is True:
+        if collection == 'ARD' or collection == 'ARD-C2':
+            # parse tile h and v from folder name
+            folder_name = os.path.basename(source_dir)
+            if hpc is True:
+                path_array = gdal_array.LoadFile(join(out_dir, 'singlepath_landsat_tile.tif'))
+            else:
+                try:
+                    tile_h = int(folder_name[folder_name.find('h') + 1: folder_name.find('h') + 4])
+                    tile_v = int(folder_name[folder_name.find('v') + 1: folder_name.find('v') + 4])
+                    path_array = gdal_array.LoadFile(join(Path(os.path.realpath(__file__)).parent,
+                                                          'singlepath_landsat_tile_crop_compress.tif'),
+                                                     xoff=tile_h * config['n_cols'],
+                                                     yoff=tile_v * config['n_rows'],
+                                                     xsize=config['n_cols'],
+                                                     ysize=config['n_rows'])  # read a partial array
+                    # from a large file
+                except IOError as e:
+                    logger.error(e)
+                    exit()
 
     if collection == 'C2':
         # gpd_tile = gpd.read_file(shapefile_path)
@@ -1268,6 +1348,16 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger,
                                   config, is_partition=is_partition, low_date_bound=low_date_bound,
                                   upp_date_bound=upp_date_bound)
+    elif collection == 'ARD-C2':
+        # assign files to each core
+        for i in range(int(np.ceil(len(folder_list) / n_cores))):
+            new_rank = rank - 1 + i * n_cores
+            if new_rank > (len(folder_list) - 1):  # means that all folder has been processed
+                break
+            folder = folder_list[new_rank]
+            single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger,
+                                  config, is_partition=is_partition, low_date_bound=low_date_bound,
+                                  upp_date_bound=upp_date_bound, b_c2=True)
     elif collection == 'HLS':
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
