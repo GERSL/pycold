@@ -91,7 +91,8 @@ int step2_KF_ChangeDetection
     int *num_fc_b_pinpoint,
     double gate_tcg,
     short int *norm_cm_scale100,
-    short int *mean_angle_scale100
+    short int *mean_angle_scale100,
+    float *CM_outputs
 );
 
 int KF_ts_predict_conse

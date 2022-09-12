@@ -136,7 +136,7 @@ int sccd
     {
         // if queue mode, will append old observation first
         for (i = 0; i < *num_obs_queue; i++){
-            clrx[i] = obs_queue[i].clrx_since1982+ JULIAN_LANDSAT4_LAUNCH;
+            clrx[i] = obs_queue[i].clrx_since1982+ ORDINAL_LANDSAT4_LAUNCH;
             for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                 clry[i_b][i] =  obs_queue[i].clry[i_b];
             n_clr++;
@@ -149,7 +149,7 @@ int sccd
             {
                 clry[i_b][k] = nrt_model->obs[i_b][k];
             }
-            clrx[k] = nrt_model->obs_date_since1982[k] + JULIAN_LANDSAT4_LAUNCH;
+            clrx[k] = nrt_model->obs_date_since1982[k] + ORDINAL_LANDSAT4_LAUNCH;
             n_clr++;
         }
      }
@@ -1705,7 +1705,8 @@ int step2_KF_ChangeDetection
     int *num_fc_pinpoint,
     double gate_tcg,
     short int *norm_cm_scale100,
-    short int *mean_angle_scale100
+    short int *mean_angle_scale100,
+    float *CM_outputs
 )
 {
     int i_b, b, m, k, j;
@@ -1734,6 +1735,8 @@ int step2_KF_ChangeDetection
     int conse_last;
     float **v_diff_tmp;
     float **v_dif_mag_tmp;
+    int current_CM_n;
+    int current_pinpoint;
 
 
     v_dif = (float **) allocate_2d_array (NUM_LASSO_BANDS, conse, sizeof (float));
@@ -1758,17 +1761,16 @@ int step2_KF_ChangeDetection
     {
         RETURN_ERROR ("Allocating v_dif_mag_norm memory", FUNC_NAME, FAILURE);
     }
+    for (k = 0; k < conse; k++)
+    {
+        v_dif_mag_norm[k] = 0;
+    }
+
 
     medium_v_dif = (float *)malloc(TOTAL_IMAGE_BANDS_SCCD * sizeof(float));
     if (medium_v_dif == NULL)
     {
         RETURN_ERROR ("Allocating medium_v_dif memory", FUNC_NAME, FAILURE);
-    }
-
-
-    for (k = 0; k < conse; k++)
-    {
-        v_dif_mag_norm[k] = 0;
     }
 
 
@@ -1842,7 +1844,15 @@ int step2_KF_ChangeDetection
 
     if (b_pinpoint == TRUE){
         if (i_conse >= PINPOINT_CONSE){
-            if ((*num_fc_pinpoint == 0) | (clrx[cur_i] - rec_cg_pinpoint[*num_fc_pinpoint - 1].t_break > AVE_DAYS_IN_A_YEAR))// must has a gap of 1 year with the last pinpoint break
+            current_CM_n = (clrx[cur_i] - ORDINAL_DATE_1982_1_1) / AVE_DAYS_IN_A_YEAR;
+            if (CM_outputs[current_CM_n] == 0){  // meaning that hasn't been assigned with pinpoint
+                current_pinpoint = *num_fc_pinpoint;
+            }else{
+                current_pinpoint = *num_fc_pinpoint - 1;
+            }
+
+            if (break_mag > CM_outputs[current_CM_n])
+            // if ((*num_fc_pinpoint == 0) | (clrx[cur_i] - rec_cg_pinpoint[*num_fc_pinpoint - 1].t_break > AVE_DAYS_IN_A_YEAR))// must has a gap of 1 year with the last pinpoint break
             {
                 for (conse_last = 1; conse_last <= conse; conse_last++)
                 {
@@ -1875,15 +1885,15 @@ int step2_KF_ChangeDetection
                         min_cm = MAX_SHORT;
                     if (mean_angle_pinpoint > MAX_SHORT)
                         mean_angle_pinpoint = MAX_SHORT;
-                    rec_cg_pinpoint[*num_fc_pinpoint].cm_angle[conse_last-1] = (short int)mean_angle_pinpoint;
-                    rec_cg_pinpoint[*num_fc_pinpoint].norm_cm[conse_last-1] = (short int)min_cm;
+                    rec_cg_pinpoint[current_pinpoint].cm_angle[conse_last-1] = (short int)mean_angle_pinpoint;
+                    rec_cg_pinpoint[current_pinpoint].norm_cm[conse_last-1] = (short int)min_cm;
                     for(k = 0; k < DEFAULT_CONSE; k ++)
                     {
                         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                         {
-                            rec_cg_pinpoint[*num_fc_pinpoint].obs[i_b][k] = (short int)clry[i_b][cur_i + k];
+                            rec_cg_pinpoint[current_pinpoint].obs[i_b][k] = (short int)clry[i_b][cur_i + k];
                         }
-                        rec_cg_pinpoint[*num_fc_pinpoint].obs_date_since1982[k] = (short int)(clrx[cur_i + k] - JULIAN_LANDSAT4_LAUNCH);
+                        rec_cg_pinpoint[current_pinpoint].obs_date_since1982[k] = (short int)(clrx[cur_i + k] - ORDINAL_LANDSAT4_LAUNCH);
                     }
                     for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                     {
@@ -1894,7 +1904,7 @@ int step2_KF_ChangeDetection
                             /* Record fitted coefficients.    */
                             /*                                */
                             /**********************************/
-                            rec_cg_pinpoint[*num_fc_pinpoint].coefs[i_b][k] = fit_cft[i_b][k];
+                            rec_cg_pinpoint[current_pinpoint].coefs[i_b][k] = fit_cft[i_b][k];
                         }
                     } //for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
 
@@ -1913,7 +1923,7 @@ int step2_KF_ChangeDetection
 //                        rec_cg_pinpoint[*num_fc_pinpoint].cm_bands[conse_last-1][i_b] = tmp;
 
 //                    }
-                    rec_cg_pinpoint[*num_fc_pinpoint].t_break = clrx[cur_i];
+                    rec_cg_pinpoint[current_pinpoint].t_break = clrx[cur_i];
 
                     status = free_2d_array ((void **) v_diff_tmp);
                     if (status != SUCCESS)
@@ -1928,7 +1938,11 @@ int step2_KF_ChangeDetection
                                       FUNC_NAME, FAILURE);
                     }
                 } // for (conse_last = 1; conse_last <= conse; conse_last++)
-                *num_fc_pinpoint = *num_fc_pinpoint + 1;
+
+                if (CM_outputs[current_CM_n] == 0){  // meaning that hasn't been assigned with pinpoint
+                   *num_fc_pinpoint = *num_fc_pinpoint + 1;
+                }
+                CM_outputs[current_CM_n] = break_mag;
             }
         }
     }
@@ -2238,7 +2252,7 @@ int step3_processing_end
         }
 
         /*     3. t_start  !!     */
-        nrt_model->t_start_since1982 = (short int)(t_start - JULIAN_LANDSAT4_LAUNCH);
+        nrt_model->t_start_since1982 = (short int)(t_start - ORDINAL_LANDSAT4_LAUNCH);
 
         /*     4. number of observations !!      */
         nrt_model->num_obs = (short int)(num_obs_processed);
@@ -2252,7 +2266,7 @@ int step3_processing_end
                 {
                     nrt_model->obs[i_b][k] = (short int)clry[i_b][cur_i + k];
                 }
-                nrt_model->obs_date_since1982[k] = (short int)(clrx[cur_i  + k] - JULIAN_LANDSAT4_LAUNCH);
+                nrt_model->obs_date_since1982[k] = (short int)(clrx[cur_i  + k] - ORDINAL_LANDSAT4_LAUNCH);
             }else{
                 for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                 {
@@ -2334,10 +2348,6 @@ int step3_processing_end
                     v_dif_mag_tmp[i_b][j] = v_dif_mag[i_b][j];
             }
 
-
-            // mean_angle = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, conse_last, lasso_blist_sccd);
-            mean_angle_scale100 = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last) * 100;
-
             // NOTE THAT USE THE DEFAULT CHANGE THRESHOLD (0.99) TO CALCULATE PROBABILITY
             if (v_dif_mag_norm[conse_last - 1] <= gate_tcg)
             //if (v_dif_mag_norm[conse_last - 1] <= DEFAULT_COLD_TCG)
@@ -2357,9 +2367,10 @@ int step3_processing_end
 
                     if (min_cm > MAX_SHORT)
                         min_cm = MAX_SHORT;
+                    // mean_angle = angl_scatter_measure(medium_v_dif, v_diff_tmp, NUM_LASSO_BANDS, conse_last, lasso_blist_sccd);
+                    mean_angle_scale100 = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last - 1) * 100;
                     if (mean_angle_scale100 > MAX_SHORT)
                         mean_angle_scale100 = MAX_SHORT;
-
 
                     nrt_model->norm_cm = (short int) (min_cm);
 //                        for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
@@ -2405,6 +2416,7 @@ int step3_processing_end
                             min_cm =  v_dif_mag_norm[j] * 100;
                     if (min_cm > MAX_SHORT)
                         min_cm = MAX_SHORT;
+                    mean_angle_scale100 = MeanAngl_float(v_diff_tmp, NUM_LASSO_BANDS, conse_last) * 100;
                     if (mean_angle_scale100 > MAX_SHORT)
                         mean_angle_scale100 = MAX_SHORT;
 
@@ -2451,7 +2463,7 @@ int step3_processing_end
         }
         for (k = 0; k < *num_obs_queue; k++)
         {
-           obs_queue[k].clrx_since1982= (short int)(clrx[istart_queue + k] - JULIAN_LANDSAT4_LAUNCH);
+           obs_queue[k].clrx_since1982= (short int)(clrx[istart_queue + k] - ORDINAL_LANDSAT4_LAUNCH);
            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                obs_queue[k].clry[i_b] = (short int)(clry[i_b][istart_queue + k]);
         }
@@ -2538,6 +2550,9 @@ int sccd_standard
     short int cm_angle_scale100 = 0;
     short int norm_cm_scale100 = NA_VALUE;      /* I/O: maximum change magnitudes at every norm_cm_INTERVAL days */
     short int norm_cm_date = NA_VALUE;      /* I/O: dates for maximum change magnitudes at every norm_cm_INTERVAL days */
+    int n_cm = (clrx[n_clr - 1] -  ORDINAL_DATE_1982_1_1) / AVE_DAYS_IN_A_YEAR + 1;;
+    float* CM_outputs;
+
 
     cov_p = (gsl_matrix **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, 1, sizeof(gsl_matrix));
     if (cov_p == NULL)
@@ -2550,6 +2565,17 @@ int sccd_standard
     if(instance == NULL)
     {
        RETURN_ERROR ("Allocating instance memory", FUNC_NAME, FAILURE);
+    }
+
+    CM_outputs = (float *)malloc(n_cm * sizeof(float));
+    if (CM_outputs == NULL)
+    {
+        RETURN_ERROR ("Allocating n_cm memory", FUNC_NAME, FAILURE);
+    }
+
+    for (k = 0; k < n_cm; k++)
+    {
+        CM_outputs[k] = 0;
     }
 
     /* alloc memory for ssm instance */
@@ -2618,7 +2644,7 @@ int sccd_standard
         }
 
         /*     3. t_start       */
-        t_start = JULIAN_LANDSAT4_LAUNCH + nrt_model->t_start_since1982;
+        t_start = ORDINAL_LANDSAT4_LAUNCH + nrt_model->t_start_since1982;
 
         /*     4. number of observations       */
         num_obs_processed = nrt_model->num_obs;
@@ -2756,14 +2782,14 @@ int sccd_standard
                 status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
                                                   cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed,
                                                   t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg,
-                                                  &norm_cm_scale100, &cm_angle_scale100);
+                                                  &norm_cm_scale100, &cm_angle_scale100, CM_outputs);
             }
             else
             {
                 status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
                                                   cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed,
                                                   t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg,
-                                                  &norm_cm_scale100, &cm_angle_scale100);
+                                                  &norm_cm_scale100, &cm_angle_scale100, CM_outputs);
             }
             if(status == CHANGEDETECTED)
             {
@@ -2803,7 +2829,7 @@ int sccd_standard
                 }
 
                 /*     3. t_start  !!     */
-                nrt_model->t_start_since1982 = (short int)(t_start - JULIAN_LANDSAT4_LAUNCH);
+                nrt_model->t_start_since1982 = (short int)(t_start - ORDINAL_LANDSAT4_LAUNCH);
 
                 /*     4. number of observations !!      */
                 nrt_model->num_obs = (short int)(num_obs_processed);
@@ -2817,7 +2843,7 @@ int sccd_standard
                         {
                             nrt_model->obs[i_b][k] = (short int)clry[i_b][i + k];
                         }
-                        nrt_model->obs_date_since1982[k] = (short int)(clrx[i  + k] - JULIAN_LANDSAT4_LAUNCH);
+                        nrt_model->obs_date_since1982[k] = (short int)(clrx[i  + k] - ORDINAL_LANDSAT4_LAUNCH);
                     }else{
                         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                         {
@@ -2925,6 +2951,7 @@ int sccd_standard
         RETURN_ERROR ("Freeing memory: rec_v_dif\n",
                       FUNC_NAME, FAILURE);
     }
+    free(CM_outputs);
 
     return SUCCESS;
 
@@ -3029,7 +3056,7 @@ int sccd_snow
             *num_obs_queue = n_clr;
             for (k = 0; k < n_clr; k++)
             {
-               obs_queue[k].clrx_since1982= clrx[k] - JULIAN_LANDSAT4_LAUNCH;
+               obs_queue[k].clrx_since1982= clrx[k] - ORDINAL_LANDSAT4_LAUNCH;
                for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                    obs_queue[k].clry[i_b] = clry[i_b][k];
             }
@@ -3116,7 +3143,7 @@ int sccd_snow
         }
 
 
-        nrt_model[0].t_start_since1982 = (short int)(clrx[0] - JULIAN_LANDSAT4_LAUNCH);
+        nrt_model[0].t_start_since1982 = (short int)(clrx[0] - ORDINAL_LANDSAT4_LAUNCH);
         nrt_model[0].num_obs = n_clr;
 
         *nrt_status = NRT_MONITOR_SNOW;
@@ -3165,7 +3192,7 @@ int sccd_snow
         {
             nrt_model[0].obs[i_b][k] = (short int)clry[i_b][n_clr - DEFAULT_CONSE + k];
         }
-        nrt_model[0].obs_date_since1982[k] = (short int)(clrx[n_clr - DEFAULT_CONSE + k] - JULIAN_LANDSAT4_LAUNCH);
+        nrt_model[0].obs_date_since1982[k] = (short int)(clrx[n_clr - DEFAULT_CONSE + k] - ORDINAL_LANDSAT4_LAUNCH);
     }
 
     for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)

@@ -329,7 +329,7 @@ int main(int argc, char *argv[])
     bool b_c2 = TRUE;
     bool b_header_csv = FALSE;
     int headline = -1;
-    bool b_pinpoint = FALSE;
+    bool b_pinpoint = TRUE;
     Output_sccd_pinpoint *rec_cg_pinpoint;
     int num_fc_pinpoint = 0;
     if (b_header_csv == TRUE)

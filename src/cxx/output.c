@@ -4,19 +4,19 @@
 #include "output.h"
 
 
-int convert_jday_to_year_doy_from_0000
+int convert_jday_to_year_doy_from_0001
 (
     int jday,      /* I: julian date since year 0000 */
     int *year,      /* O: year */
     int *doy       /* O: day of the year */
 )
 {
-    char FUNC_NAME[] = "convert_jday_to_year_doy_from_0000";
+    char FUNC_NAME[] = "convert_jday_to_year_doy_from_0001";
     int status;
-    int day_count = JULIAN_DATE_LAST_DAY_1972;
+    int day_count = ORDINAL_DATE_LAST_DAY_1972;
     int year_count = LANDSAT_START_YEAR - 1;
 
-    if (jday < JULIAN_DATE_LAST_DAY_1972)
+    if (jday < ORDINAL_DATE_LAST_DAY_1972)
     {
         RETURN_ERROR ("Landsat data starts from 1973", FUNC_NAME, ERROR);
     }
@@ -64,7 +64,7 @@ int firstDegradationYear(Output_t* t, int num_fc, int n_lassoband, bool updirect
             {
                 if(t[i].magnitude[n_lassoband] > 0)
                 {
-                    if(convert_jday_to_year_doy_from_0000(t[i].t_break, &degradation_year, &degradation_doy) == SUCCESS)
+                    if(convert_jday_to_year_doy_from_0001(t[i].t_break, &degradation_year, &degradation_doy) == SUCCESS)
                     {
                         *dyear = degradation_year;
                         return SUCCESS;
@@ -80,7 +80,7 @@ int firstDegradationYear(Output_t* t, int num_fc, int n_lassoband, bool updirect
             {
                 if(t[i].magnitude[n_lassoband] < 0)
                 {
-                    if(convert_jday_to_year_doy_from_0000(t[i].t_break, &degradation_year, &degradation_doy) == SUCCESS)
+                    if(convert_jday_to_year_doy_from_0001(t[i].t_break, &degradation_year, &degradation_doy) == SUCCESS)
                     {
                         *dyear = degradation_year;
                         return SUCCESS;

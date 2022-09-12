@@ -1204,7 +1204,7 @@ int stand_procedure_fixeddays
                                 if(tmp_CM > CM_outputs[current_CM_n])
                                 {
                                     CM_outputs[current_CM_n] = tmp_CM;
-                                    CM_outputs_date[current_CM_n] = (short int)(clrx[i_ini+1] - JULIAN_LANDSAT4_LAUNCH);
+                                    CM_outputs_date[current_CM_n] = (short int)(clrx[i_ini+1] - ORDINAL_LANDSAT4_LAUNCH);
                                     // printf("date = %d\n", clrx[i_ini+1]);
                                 }
                             }
@@ -1990,7 +1990,7 @@ int stand_procedure_fixeddays
                     if(tmp_CM > CM_outputs[current_CM_n])
                     {
                         CM_outputs[current_CM_n] = tmp_CM;
-                        CM_outputs_date[current_CM_n] = (short int)(clrx[i] - JULIAN_LANDSAT4_LAUNCH);
+                        CM_outputs_date[current_CM_n] = (short int)(clrx[i] - ORDINAL_LANDSAT4_LAUNCH);
                     }
                 }
 
@@ -3600,7 +3600,7 @@ int stand_procedure
 //                                    }
                                     CM_outputs[current_CM_n] = tmp_CM;
 //                                    CMdirection_outputs[current_CM_n] = tmp_direction;
-                                    CM_outputs_date[current_CM_n] = (short int)(clrx[i_ini+1] - JULIAN_LANDSAT4_LAUNCH);
+                                    CM_outputs_date[current_CM_n] = (short int)(clrx[i_ini+1] - ORDINAL_LANDSAT4_LAUNCH);
                                     // printf("date = %d\n", clrx[i_ini+1]);
                                 }
                             }
@@ -4307,7 +4307,7 @@ int stand_procedure
 //                        }
                         CM_outputs[current_CM_n] = tmp_CM;
 //                        CMdirection_outputs[current_CM_n] = tmp_direction;
-                        CM_outputs_date[current_CM_n] = (short int)(clrx[i] - JULIAN_LANDSAT4_LAUNCH);
+                        CM_outputs_date[current_CM_n] = (short int)(clrx[i] - ORDINAL_LANDSAT4_LAUNCH);
                     }
                 }
 
