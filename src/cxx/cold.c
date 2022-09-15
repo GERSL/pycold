@@ -4866,7 +4866,7 @@ int inefficientobs_procedure
     bool b_c2
 )
 {
-    int n_sn;
+    int n_sn = 0;
     int i, k;
     int end;
     int i_start;
@@ -4916,8 +4916,6 @@ int inefficientobs_procedure
 
     if (sn_pct > T_SN)
     {
-        n_sn = 0;
-
         /**********************************************************/
         /*                                                        */
         /* Snow observations are "good" now.                      */
@@ -5242,10 +5240,8 @@ int inefficientobs_procedure
         if (n_clr < N_TIMES * MIN_NUM_C)
         {
         // num_fc = 0, so won't output any curve
-             *num_fc = *num_fc - 1;
-            //RETURN_ERROR("Not enough good clear observations\n",
-                        //FUNC_NAME, FAILURE);
-
+            *num_fc = *num_fc - 1;
+            WARNING_MESSAGE("Not enough good clear observations (<12obs)\n", FUNC_NAME);
         }
         else
         {
