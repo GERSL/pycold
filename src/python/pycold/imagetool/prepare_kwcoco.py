@@ -90,18 +90,15 @@ def grab_demo_kwcoco_dataset():
         Path: the path to the kwcoco dataset
     """
     dpath = ub.Path.appdir('pycold/tests/demodata/kwcoco').ensuredir()
-    coco_fpath = dpath / 'Aligned-DemoKHQ/data.kwcoco.json'
+    coco_fpath = dpath / 'Aligned-DemoKHQ-2022-09-15-V6/data.kwcoco.json'
     if not coco_fpath.exists():
         # If the data does not already exist
-        # Use IPFS or Girder to download a demo kwcoco file with LandSat bands
-        mirrors = [
-            'https://ipfs.io/ipfs/bafybeihzcyzhacjplwmuygxapcwvrs6emfzkkztawex77y54dv2bbmufjq',  # Using IPFS is nice, but slow
-            'https://data.kitware.com/api/v1/file/6318d19a11dab8142820733f/download',
-        ]
+        # Use IPFS to download a demo kwcoco file with LandSat bands
+        url = 'https://ipfs.io/ipfs/bafybeifgh5xh7paplmdsep5xcfyz3k7kct3g7icwpxwma6vzoide3nw7xa'
         zip_fpath = ub.download(
-            url=mirrors[1],
-            fname='Aligned-DemoKHQ.zip',
-            hash_prefix='d42b7f1b81940004d88227ae3a5520cef082388838122625e673efe4bd0d6824d4ed',
+            url=url,
+            fname='Aligned-DemoKHQ-2022-09-15-V6.zip',
+            hash_prefix='1bab8aedd8848d217467eb7261f6ab69a609bfbee3d474560a9b',
             hasher='sha512')
         # Unzip the data
         import zipfile
