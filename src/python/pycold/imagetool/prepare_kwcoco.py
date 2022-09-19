@@ -161,8 +161,9 @@ def _demo_kwcoco_bands():
     # asset objects.
     for asset_index, asset in enumerate(coco_img.iter_asset_objs()):
         print('+ --- Asset {} --- '.format(asset_index))
-        print(f'  * file_name = file_name={asset["file_name"]}')
-        print(f'  * channels = file_name={asset["channels"]}')
+        print(f'  * file_name = {asset["file_name"]}')
+        print(f'  * channels = {asset["channels"]}')
+        print(f'  * parent_file_name= {asset["parent_file_name"]}')
 
     # A concicse list of all channels is available here using the kwcoco
     # channel spec.
