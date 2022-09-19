@@ -327,7 +327,7 @@ int main(int argc, char *argv[])
     short min_rmse[TOTAL_IMAGE_BANDS] = {0,0,0,0,0,0,0};
     int cm_output_interval;
     bool b_c2 = TRUE;
-    bool b_header_csv = FALSE;
+    bool b_header_csv = TRUE;
     int headline = -1;
     bool b_pinpoint = TRUE;
     Output_sccd_pinpoint *rec_cg_pinpoint;
@@ -406,9 +406,8 @@ int main(int argc, char *argv[])
 //    }
 
     // chi-square probability
-    //tcg = X2(NUM_LASSO_BANDS, probability_threshold);
+    tcg = X2(NUM_LASSO_BANDS, probability_threshold);
     // tcg = 15.086;
-    tcg = 20.515;
 
     /**************************************************************/
     /*                                                            */

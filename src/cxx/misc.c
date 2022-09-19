@@ -2358,7 +2358,7 @@ int auto_ts_fit_float
             }
 
             for (i = 0; i < LASSO_COEFFS; i++)
-                coefs[lasso_band_index][i] = 0.0;
+                coefs[lasso_band_index][i] = 0;
 
             for (i = 0; i < lmu; i++)
             {

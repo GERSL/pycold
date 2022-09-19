@@ -1331,15 +1331,17 @@ int stand_procedure_fixeddays
 
                     for (i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
                     {
-                        for (k = 0; k < MIN_NUM_C; k++)
+                        for (k = 0; k < LASSO_COEFFS; k++)
                         {
                             /**************************************/
                             /*                                    */
                             /* Record fitted coefficients.        */
                             /*                                    */
                             /**************************************/
-
-                            rec_cg[*num_fc].coefs[i_b][k] = fit_cft[i_b][k];
+                            if(k < MIN_NUM_C)
+                                rec_cg[*num_fc].coefs[i_b][k] = fit_cft[i_b][k];
+                            else
+                                rec_cg[*num_fc].coefs[i_b][k] = 0;
                         }
 
                         /******************************************/
@@ -3405,7 +3407,7 @@ int stand_procedure
 
                 if (*num_fc == rec_fc)
                 {
-                    i_break = 1; /* first curve */
+                    i_break = i_dense; /* first curve */
                 }
                 else
                 {
@@ -3709,7 +3711,7 @@ int stand_procedure
                     rec_cg[*num_fc].t_break = clrx[i_start -1];
                     rec_cg[*num_fc].category = 10 + MIN_NUM_C;
                     rec_cg[*num_fc].change_prob = 100;
-                    rec_cg[*num_fc].t_start = clrx[0];
+                    rec_cg[*num_fc].t_start = clrx[i_dense-1];
                     rec_cg[*num_fc].num_obs = i_start - i_dense + 1;  //SY 09182018
 
 //                    if ((i_start - 1 + adj_conse) < end)
@@ -3727,15 +3729,18 @@ int stand_procedure
 
                     for (i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
                     {
-                        for (k = 0; k < MIN_NUM_C; k++)
+                        for (k = 0; k < LASSO_COEFFS; k++)
                         {
                             /**************************************/
                             /*                                    */
                             /* Record fitted coefficients.        */
                             /*                                    */
                             /**************************************/
+                            if(k < MIN_NUM_C)
+                                rec_cg[*num_fc].coefs[i_b][k] = fit_cft[i_b][k];
+                            else
+                                rec_cg[*num_fc].coefs[i_b][k] = 0;
 
-                            rec_cg[*num_fc].coefs[i_b][k] = fit_cft[i_b][k];
                         }
 
                         /******************************************/

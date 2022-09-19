@@ -25,6 +25,12 @@
                           __FILE__, __LINE__, stdout); \
             return (status);}
 
+#define RETURN_WARNING(message, module, status) \
+           {write_message((message), (module), "WARNING", \
+                          __FILE__, __LINE__, stdout); \
+            return (status);}
+
+
 
 void write_message
 (
