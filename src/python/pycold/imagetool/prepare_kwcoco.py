@@ -89,22 +89,143 @@ def grab_demo_kwcoco_dataset():
     Returns:
         Path: the path to the kwcoco dataset
     """
+    # Register the name of the dataset, how to obtain it, and verify it.
+    dataset_info = {
+        'name': 'Aligned-DemoKHQ-2022-09-19-V7',
+        # The CID is the IPFS Content ID
+        'cid': 'bafybeigdkhphpa3n3rdv33w7g6tukmprdnch7g4bp4hc6ebmcr76y6yhwu',
+        # The sha512 is the hash of the zipfile we expect to grab.
+        'sha512': '6b98195f1d695c695d622ad9debeec93586e518de5934350a17001',
+    }
     dpath = ub.Path.appdir('pycold/tests/demodata/kwcoco').ensuredir()
-    coco_fpath = dpath / 'Aligned-DemoKHQ-2022-09-15-V6/data.kwcoco.json'
+
+    coco_fpath = dpath / dataset_info['name'] / 'data.kwcoco.json'
     if not coco_fpath.exists():
         # If the data does not already exist
         # Use IPFS to download a demo kwcoco file with LandSat bands
-        url = 'https://ipfs.io/ipfs/bafybeifgh5xh7paplmdsep5xcfyz3k7kct3g7icwpxwma6vzoide3nw7xa'
+        filename = dataset_info['name'] + '.zip'
+        url = f'https://ipfs.io/ipfs/{dataset_info["cid"]}?filename={filename}'
         zip_fpath = ub.download(
             url=url,
-            fname='Aligned-DemoKHQ-2022-09-15-V6.zip',
-            hash_prefix='1bab8aedd8848d217467eb7261f6ab69a609bfbee3d474560a9b',
+            fname=filename,
+            hash_prefix=dataset_info['sha512'],
             hasher='sha512')
         # Unzip the data
         import zipfile
         zfile = zipfile.ZipFile(zip_fpath)
         zfile.extractall(dpath)
+
+        if __debug__:
+            # The first item should be the name of the bundle folder
+            expected_bundle_name = coco_fpath.parent.name
+            got_bundle_name = zfile.filelist[0].filename.strip('/')
+            if got_bundle_name != expected_bundle_name:
+                print(f'expected_bundle_name={expected_bundle_name}')
+                print(f'got_bundle_name={got_bundle_name}')
+
+        if not coco_fpath.exists():
+            raise AssertionError(
+                'The zipfile did not contain the expected dataset')
+
     return coco_fpath
+
+
+def _demo_kwcoco_bands():
+    """
+    This is a quick example illustrating how to dig into a single kwcoco image.
+
+    This does not belong in the main logic and should be moved to an examples
+    or tutorial folder. But it can live here for now.
+    """
+    from pycold.imagetool.prepare_kwcoco import grab_demo_kwcoco_dataset
+    coco_fpath = grab_demo_kwcoco_dataset()
+
+    import kwcoco
+    # Load the dataset
+    coco_dset = kwcoco.CocoDataset(coco_fpath)
+
+    # Grab one arbitrary image id
+    image_id = coco_dset.images()[0]
+
+    coco_img = coco_dset.coco_image(image_id)
+
+    # Concept: all important metadata lives in the coco_img.img dictionary
+    # But that's messsy to work with, so lets demo the API instead
+
+    # One thing to note is that all file paths will either be absolute
+    # or relative to the bundle "dpath".
+
+    print(f'coco_dset.bundle_dpath={coco_dset.bundle_dpath}')
+
+    # We can get a sense of what lives in the coco image by looking at its
+    # asset objects.
+    for asset_index, asset in enumerate(coco_img.iter_asset_objs()):
+        print('+ --- Asset {} --- '.format(asset_index))
+        print(f'  * file_name = file_name={asset["file_name"]}')
+        print(f'  * channels = file_name={asset["channels"]}')
+
+    # A concicse list of all channels is available here using the kwcoco
+    # channel spec.
+    print(f'coco_img.channels={coco_img.channels}')
+
+    # We can use the "delay" method to construct a delayed load object and
+    # manipluate how we will load the image for a particular set of bands
+    # before we actually do it. Lets load two items of data: the RGB and QA
+    # bands.
+
+    rgb_delay = coco_img.delay('red|green|blue')
+    qa_delay = coco_img.delay('qa_pixel')
+
+    # The finalize method tells the delayed operations to execute.
+    rgb_data = rgb_delay.finalize()
+    qa_data = qa_delay.finalize()
+
+    # Because the QA band is categorical, we should be able to make a short
+    # histogram that describes what is inside.
+    qabits_to_count = ub.dict_hist(qa_data.ravel())
+    print('qabits_to_count = {}'.format(ub.repr2(qabits_to_count, nl=1)))
+
+    # I'm not sure exactly what these are, so lets try to visualize them next
+    # to the RGB data.  First we need to take the uint16 rgb data and make it
+    # in a visual range. We can do this robustly with kwimage.normalize_intensity
+
+    import kwimage
+    import kwplot
+    rgb_canvas = kwimage.normalize_intensity(rgb_data)
+
+    # For the QA band lets assign a color to each category
+    colors = kwimage.Color.distinct(len(qabits_to_count))
+    qabits_to_color = dict(zip(qabits_to_count, colors))
+
+    # Colorize the QA bands
+    colorized = np.empty(qa_data.shape[0:2] + (3,), dtype=np.float32)
+    for qabit, color in qabits_to_color.items():
+        mask = qa_data[:, :, 0] == qabit
+        colorized[mask] = color
+
+    qa_canvas = colorized
+    legend = kwplot.make_legend_img(qabits_to_color)  # Make a legend
+
+    # Stack things together into a nice single picture
+    qa_canvas = kwimage.stack_images([qa_canvas, legend], axis=1)
+    canvas = kwimage.stack_images([rgb_canvas, qa_canvas], axis=1)
+
+    ### Note, I'm not sure if the system the user is has an X server
+    ### or if this works in Jupyter notebooks. I will document the way I view
+    ### images on my machine in an IPython terminal, but I will also show how
+    ### to save these figures to disk so you can rsync them to a machine or do
+    ### whatever you normally do to look at an image.
+
+    ### HEADLESS METHOD
+    kwimage.imwrite('canvas.png', canvas)
+
+    ### IPYTHON METHOD
+    import kwplot
+    plt = kwplot.autoplt()
+
+    kwplot.imshow(canvas)
+
+    plt.show()
 
 
 def stack_kwcoco(coco_fpath, out_dir):
