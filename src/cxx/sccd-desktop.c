@@ -329,7 +329,7 @@ int main(int argc, char *argv[])
     bool b_c2 = TRUE;
     bool b_header_csv = TRUE;
     int headline = -1;
-    bool b_pinpoint = FALSE;
+    bool b_pinpoint = TRUE;
     Output_sccd_pinpoint *rec_cg_pinpoint;
     int num_fc_pinpoint = 0;
     if (b_header_csv == TRUE)
@@ -406,9 +406,8 @@ int main(int argc, char *argv[])
 //    }
 
     // chi-square probability
-    //tcg = X2(NUM_LASSO_BANDS, probability_threshold);
+    tcg = X2(NUM_LASSO_BANDS, probability_threshold);
     // tcg = 15.086;
-    tcg = 20.515;
 
     /**************************************************************/
     /*                                                            */
@@ -481,8 +480,12 @@ int main(int argc, char *argv[])
         row_count ++;
     }
     fclose(sampleFile);
+    if (sdate[valid_scene_count - 1] - sdate[0] == 0){
+        n_cm_maps = 1;
+    }else{
+            n_cm_maps = (sdate[valid_scene_count - 1] - sdate[0]) / cm_output_interval + 1;
+    }
 
-    n_cm_maps = (sdate[valid_scene_count - 1] - sdate[0]) / cm_output_interval + 1;
     if(method == SCCDONLINE)
         starting_date = 0;
     else

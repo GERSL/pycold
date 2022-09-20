@@ -1204,7 +1204,7 @@ int stand_procedure_fixeddays
                                 if(tmp_CM > CM_outputs[current_CM_n])
                                 {
                                     CM_outputs[current_CM_n] = tmp_CM;
-                                    CM_outputs_date[current_CM_n] = (short int)(clrx[i_ini+1] - JULIAN_LANDSAT4_LAUNCH);
+                                    CM_outputs_date[current_CM_n] = (short int)(clrx[i_ini+1] - ORDINAL_LANDSAT4_LAUNCH);
                                     // printf("date = %d\n", clrx[i_ini+1]);
                                 }
                             }
@@ -1331,15 +1331,17 @@ int stand_procedure_fixeddays
 
                     for (i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
                     {
-                        for (k = 0; k < MIN_NUM_C; k++)
+                        for (k = 0; k < LASSO_COEFFS; k++)
                         {
                             /**************************************/
                             /*                                    */
                             /* Record fitted coefficients.        */
                             /*                                    */
                             /**************************************/
-
-                            rec_cg[*num_fc].coefs[i_b][k] = fit_cft[i_b][k];
+                            if(k < MIN_NUM_C)
+                                rec_cg[*num_fc].coefs[i_b][k] = fit_cft[i_b][k];
+                            else
+                                rec_cg[*num_fc].coefs[i_b][k] = 0;
                         }
 
                         /******************************************/
@@ -1990,7 +1992,7 @@ int stand_procedure_fixeddays
                     if(tmp_CM > CM_outputs[current_CM_n])
                     {
                         CM_outputs[current_CM_n] = tmp_CM;
-                        CM_outputs_date[current_CM_n] = (short int)(clrx[i] - JULIAN_LANDSAT4_LAUNCH);
+                        CM_outputs_date[current_CM_n] = (short int)(clrx[i] - ORDINAL_LANDSAT4_LAUNCH);
                     }
                 }
 
@@ -3405,7 +3407,7 @@ int stand_procedure
 
                 if (*num_fc == rec_fc)
                 {
-                    i_break = 1; /* first curve */
+                    i_break = i_dense; /* first curve */
                 }
                 else
                 {
@@ -3600,7 +3602,7 @@ int stand_procedure
 //                                    }
                                     CM_outputs[current_CM_n] = tmp_CM;
 //                                    CMdirection_outputs[current_CM_n] = tmp_direction;
-                                    CM_outputs_date[current_CM_n] = (short int)(clrx[i_ini+1] - JULIAN_LANDSAT4_LAUNCH);
+                                    CM_outputs_date[current_CM_n] = (short int)(clrx[i_ini+1] - ORDINAL_LANDSAT4_LAUNCH);
                                     // printf("date = %d\n", clrx[i_ini+1]);
                                 }
                             }
@@ -3709,7 +3711,7 @@ int stand_procedure
                     rec_cg[*num_fc].t_break = clrx[i_start -1];
                     rec_cg[*num_fc].category = 10 + MIN_NUM_C;
                     rec_cg[*num_fc].change_prob = 100;
-                    rec_cg[*num_fc].t_start = clrx[0];
+                    rec_cg[*num_fc].t_start = clrx[i_dense-1];
                     rec_cg[*num_fc].num_obs = i_start - i_dense + 1;  //SY 09182018
 
 //                    if ((i_start - 1 + adj_conse) < end)
@@ -3727,15 +3729,18 @@ int stand_procedure
 
                     for (i_b = 0; i_b < TOTAL_IMAGE_BANDS; i_b++)
                     {
-                        for (k = 0; k < MIN_NUM_C; k++)
+                        for (k = 0; k < LASSO_COEFFS; k++)
                         {
                             /**************************************/
                             /*                                    */
                             /* Record fitted coefficients.        */
                             /*                                    */
                             /**************************************/
+                            if(k < MIN_NUM_C)
+                                rec_cg[*num_fc].coefs[i_b][k] = fit_cft[i_b][k];
+                            else
+                                rec_cg[*num_fc].coefs[i_b][k] = 0;
 
-                            rec_cg[*num_fc].coefs[i_b][k] = fit_cft[i_b][k];
                         }
 
                         /******************************************/
@@ -4307,7 +4312,7 @@ int stand_procedure
 //                        }
                         CM_outputs[current_CM_n] = tmp_CM;
 //                        CMdirection_outputs[current_CM_n] = tmp_direction;
-                        CM_outputs_date[current_CM_n] = (short int)(clrx[i] - JULIAN_LANDSAT4_LAUNCH);
+                        CM_outputs_date[current_CM_n] = (short int)(clrx[i] - ORDINAL_LANDSAT4_LAUNCH);
                     }
                 }
 
@@ -4866,7 +4871,7 @@ int inefficientobs_procedure
     bool b_c2
 )
 {
-    int n_sn;
+    int n_sn = 0;
     int i, k;
     int end;
     int i_start;
@@ -4916,8 +4921,6 @@ int inefficientobs_procedure
 
     if (sn_pct > T_SN)
     {
-        n_sn = 0;
-
         /**********************************************************/
         /*                                                        */
         /* Snow observations are "good" now.                      */
@@ -5242,10 +5245,8 @@ int inefficientobs_procedure
         if (n_clr < N_TIMES * MIN_NUM_C)
         {
         // num_fc = 0, so won't output any curve
-             *num_fc = *num_fc - 1;
-            //RETURN_ERROR("Not enough good clear observations\n",
-                        //FUNC_NAME, FAILURE);
-
+            *num_fc = *num_fc - 1;
+            WARNING_MESSAGE("Not enough good clear observations (<12obs)\n", FUNC_NAME);
         }
         else
         {

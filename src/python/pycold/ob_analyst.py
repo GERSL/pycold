@@ -253,7 +253,7 @@ def mode_median_by(input_array_mode, input_array_median, index_array):
 
 
 def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_l1_date=None,  floodfill_ratio=None,
-                           parameters=None, b_dist_prob_map=False, date_interval=60):
+                           parameters=None, b_dist_prob_map=False, date_interval=60, peak_threshold=None):
     """
     hierachical segmentation based on floodfill
     Parameters
@@ -267,6 +267,7 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
     b_dist_prob_map: boolean
         if true, cm_array is probability
     date_interval: the date interval for cm_date_array to connect adjacent pixels within the floodfill process
+    peak_threshold:
     Returns
     -------
     [object_map_s1, cm_date_array, object_map_s2, s1_info]:
@@ -293,13 +294,15 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
 
     # assign valid CM values in the stack into current cm array where NA values are
     if b_dist_prob_map:
-        peak_threshold = 0.5
+        if peak_threshold is None:
+            peak_threshold = 0.5
         if cm_array_l1 is None:
             cm_array_l1 = np.full((n_rows, n_cols), 0, dtype=np.float32)
         cm_array_l1[cm_array_l1 < peak_threshold] = 0
         cm_array[cm_array == 0] = cm_array_l1[cm_array == 0]
     else:
-        peak_threshold = chi2.ppf(0.90, 5)
+        if peak_threshold is None:
+            peak_threshold = chi2.ppf(0.90, 5)
         if cm_array_l1 is None:
             cm_array_l1 = np.full((n_rows, n_cols), parameters['COMMON']['NAN_VAL'], dtype=np.int16)
         cm_array_l1[cm_array_l1 < (chi2.ppf(0.90, 5)*parameters['OBCOLD']['cm_scale'])] = parameters['COMMON']['NAN_VAL']

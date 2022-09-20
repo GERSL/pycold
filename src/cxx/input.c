@@ -115,7 +115,7 @@ int convert_year_doy_to_ordinal
 
     if (year != LANDSAT_START_YEAR)
     {
-        *jday = JULIAN_DATE_LAST_DAY_1972;
+        *jday = ORDINAL_DATE_LAST_DAY_1972;
         for (i = LANDSAT_START_YEAR; i < year; i++)
         {
             status = is_leap_year(i);
