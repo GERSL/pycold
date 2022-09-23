@@ -104,7 +104,8 @@ int cold
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: (optional) maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
 //    unsigned char* CMdirection_outputs,      /* I/O: direction of change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    short int* CM_outputs_date        /* I/O: (optional) dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* CM_outputs_date,        /* I/O: (optional) dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    double gap_days                /* I: the day number of gap to define i_dense; it is useful for the cases that gap is in the middle of time series      */
 )
 {
     int clear_sum = 0;      /* Total number of clear cfmask pixels          */
@@ -194,7 +195,7 @@ int cold
 //        printf("num_fc=%d\n", *num_fc);
          result = stand_procedure(valid_num_scenes, valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t, fmask_buf, id_range,
                                  tcg, conse, b_outputCM, starting_date, rec_cg, num_fc, CM_OUTPUT_INTERVAL, CM_outputs,
-                                 CM_outputs_date, b_c2);
+                                 CM_outputs_date, b_c2, gap_days);
 //        result = stand_procedure_fixeddays(valid_num_scenes, valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t, fmask_buf, id_range,
 //                                 tcg, conse, b_outputCM, starting_date, rec_cg, num_fc, CM_OUTPUT_INTERVAL, CM_outputs,
 //                                 CM_outputs_date, (conse - 1) * 16);
@@ -2632,7 +2633,8 @@ int stand_procedure
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     short int* CM_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    bool b_c2
+    bool b_c2,
+    double gap_days
 )
 {
     int status;
@@ -3044,7 +3046,7 @@ int stand_procedure
                     //printf("%d \n", clrx[k]);
                 }
 
-                if (max_date_diff > NUM_YEARS)      //SY 09192018
+                if (max_date_diff > gap_days)      //SY 09192018
                 {
                     i++;
                     i_start++;

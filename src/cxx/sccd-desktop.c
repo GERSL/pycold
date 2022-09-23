@@ -335,6 +335,7 @@ int main(int argc, char *argv[])
     if (b_header_csv == TRUE)
         headline = 0;   // skip the head line of csv
     double gate_tcg = 9.236;
+    double gap_days = NUM_YEARS;
 
     /**************************************************************/
     /*                                                            */
@@ -698,7 +699,7 @@ int main(int argc, char *argv[])
         //                       valid_scene_count_scanline[i_col], i_col, original_row, probability_threshold);
                     result = cold(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, sdate, valid_scene_count,
                                   i_col + 1, tcg, conse, b_outputCM, starting_date, b_c2, rec_cg, &num_fc, CM_OUTPUT_INTERVAL, CM_outputs,
-                                  CM_outputs_date);
+                                  CM_outputs_date, gap_days);
 
                     // snprintf (msg_str, sizeof(msg_str), "pixel %d COLD calculation finished\n", i_col+1);
                     // LOG_MESSAGE (msg_str, FUNC_NAME)

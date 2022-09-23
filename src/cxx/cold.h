@@ -26,7 +26,8 @@ int cold
     int *num_fc,                /* O: number of fitting curves                   */
     int CM_OUTPUT_INTERVAL,     /* I: the interval of days of outputting change maganitude                   */
     short int* CM_outputs,      /* I/O: (optional) maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    short int* CM_outputs_date       /* I/O: (optional) dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    short int* CM_outputs_date,       /* I/O: (optional) dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
+    double gap_days                /* I: the day number of gap to define i_dense; it is useful for the cases that gap is in the middle of time series      */
 );
 
 
@@ -52,7 +53,8 @@ int stand_procedure
     int CM_OUTPUT_INTERVAL,
     short int* CM_outputs,      /* I/O: maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
     short int* CM_outputs_date,      /* I/O: dates for maximum change magnitudes at every CM_OUTPUT_INTERVAL days, only for b_outputCM is True*/
-    bool b_c2
+    bool b_c2,
+    double gap_days
 );
 
 int inefficientobs_procedure

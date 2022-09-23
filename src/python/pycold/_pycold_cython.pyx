@@ -113,7 +113,7 @@ cdef extern from "../../cxx/cold.h":
                   long *buf_t, long *fmask_buf, long *valid_date_array, int valid_num_scenes, int pos, 
                   double tcg, int conse, bool b_output_cm, int starting_date, bool b_c2, Output_t *rec_cg,
                   int *num_fc, int cm_output_interval, short int *cm_outputs,
-                  short int *cm_outputs_date);
+                  short int *cm_outputs_date, double gap_days);
 
 
 cdef extern from "../../cxx/cold.h":
@@ -157,7 +157,7 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
                 np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
                 double t_cg = 15.0863, int pos=1, int conse=6, bint b_output_cm=False,
-                int starting_date=0, int n_cm=0, int cm_output_interval=0, bint b_c2=False):
+                int starting_date=0, int n_cm=0, int cm_output_interval=0, bint b_c2=False, double gap_days=365.25):
     """
     Helper function to do COLD algorithm.
 
@@ -180,6 +180,7 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
                    	all pixels for a tile should have the same date, only for b_output_cm is True
         b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to the current low quality
     	cm_output_interval: the temporal interval of outputting change magnitudes
+    	gap_days: define the day number of the gap year for i_dense
     	Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
 
     	Returns
@@ -252,7 +253,8 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
 
     result = cold(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0], &ts_t_view[0],
                  &qas_view[0], &dates_view[0], valid_num_scenes, pos, t_cg, conse, b_output_cm,
-                 starting_date, b_c2, rec_cg, &num_fc, cm_output_interval, &cm_outputs_view[0], &cm_outputs_date_view[0])
+                 starting_date, b_c2, rec_cg, &num_fc, cm_output_interval, &cm_outputs_view[0], &cm_outputs_date_view[0],
+                 gap_days)
     if result != 0:
         raise RuntimeError("cold function fails for pos = {} ".format(pos))
     else:
