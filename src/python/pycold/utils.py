@@ -487,7 +487,7 @@ def generate_rowcolimage(ref_image_path, out_path):
     index = (i + 1) * 10000 + j + 1
 
     outdriver1 = gdal.GetDriverByName("GTiff")
-    outdata = outdriver1.Create(out_path, rows, cols, 1, gdal.GDT_Int32)
+    outdata = outdriver1.Create(out_path, cols, rows, 1, gdal.GDT_Int32)
     outdata.GetRasterBand(1).WriteArray(index)
     outdata.FlushCache()
     outdata.SetGeoTransform(trans)
