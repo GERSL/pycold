@@ -89,25 +89,123 @@ def grab_demo_kwcoco_dataset():
     Returns:
         Path: the path to the kwcoco dataset
     """
+    # Register the name of the dataset, how to obtain it, and verify it.
+    dataset_info = {
+        'name': 'Aligned-DemoKHQ-2022-09-19-V7',
+        # The CID is the IPFS Content ID
+        'cid': 'bafybeigdkhphpa3n3rdv33w7g6tukmprdnch7g4bp4hc6ebmcr76y6yhwu',
+        # The sha512 is the hash of the zipfile we expect to grab.
+        'sha512': '6b98195f1d695c695d622ad9debeec93586e518de5934350a17001',
+    }
     dpath = ub.Path.appdir('pycold/tests/demodata/kwcoco').ensuredir()
-    coco_fpath = dpath / 'Aligned-DemoKHQ/data.kwcoco.json'
+
+    coco_fpath = dpath / dataset_info['name'] / 'data.kwcoco.json'
     if not coco_fpath.exists():
         # If the data does not already exist
-        # Use IPFS or Girder to download a demo kwcoco file with LandSat bands
-        mirrors = [
-            'https://ipfs.io/ipfs/bafybeihzcyzhacjplwmuygxapcwvrs6emfzkkztawex77y54dv2bbmufjq',  # Using IPFS is nice, but slow
-            'https://data.kitware.com/api/v1/file/6318d19a11dab8142820733f/download',
-        ]
+        # Use IPFS to download a demo kwcoco file with LandSat bands
+        filename = dataset_info['name'] + '.zip'
+        url = f'https://ipfs.io/ipfs/{dataset_info["cid"]}?filename={filename}'
         zip_fpath = ub.download(
-            url=mirrors[1],
-            fname='Aligned-DemoKHQ.zip',
-            hash_prefix='d42b7f1b81940004d88227ae3a5520cef082388838122625e673efe4bd0d6824d4ed',
+            url=url,
+            fname=filename,
+            hash_prefix=dataset_info['sha512'],
             hasher='sha512')
         # Unzip the data
         import zipfile
         zfile = zipfile.ZipFile(zip_fpath)
         zfile.extractall(dpath)
+
+        if __debug__:
+            # The first item should be the name of the bundle folder
+            expected_bundle_name = coco_fpath.parent.name
+            got_bundle_name = zfile.filelist[0].filename.strip('/')
+            if got_bundle_name != expected_bundle_name:
+                print(f'expected_bundle_name={expected_bundle_name}')
+                print(f'got_bundle_name={got_bundle_name}')
+
+        if not coco_fpath.exists():
+            raise AssertionError(
+                'The zipfile did not contain the expected dataset')
+
     return coco_fpath
+
+
+def _demo_kwcoco_bands():
+    """
+    This is a quick example illustrating how to dig into a single kwcoco image.
+
+    This does not belong in the main logic and should be moved to an examples
+    or tutorial folder. But it can live here for now.
+    """
+    from pycold.imagetool.prepare_kwcoco import grab_demo_kwcoco_dataset
+    coco_fpath = grab_demo_kwcoco_dataset()
+
+    import kwcoco
+    # Load the dataset
+    coco_dset = kwcoco.CocoDataset(coco_fpath)
+
+    # Grab one arbitrary image id
+    image_id = coco_dset.images()[0]
+
+    coco_img = coco_dset.coco_image(image_id)
+
+    # Concept: all important metadata lives in the coco_img.img dictionary
+    # But that's messsy to work with, so lets demo the API instead
+
+    # One thing to note is that all file paths will either be absolute
+    # or relative to the bundle "dpath".
+
+    print(f'coco_dset.bundle_dpath={coco_dset.bundle_dpath}')
+
+    # We can get a sense of what lives in the coco image by looking at its
+    # asset objects.
+    for asset_index, asset in enumerate(coco_img.iter_asset_objs()):
+        print('+ --- Asset {} --- '.format(asset_index))
+        print(f'  * file_name = {asset["file_name"]}')
+        print(f'  * channels = {asset["channels"]}')
+        print(f'  * parent_file_name= {asset["parent_file_name"]}')
+
+    # A concicse list of all channels is available here using the kwcoco
+    # channel spec.
+    print(f'coco_img.channels={coco_img.channels}')
+
+    # We can use the "delay" method to construct a delayed load object and
+    # manipluate how we will load the image for a particular set of bands
+    # before we actually do it. Lets load two items of data: the RGB and QA
+    # bands.
+
+    rgb_delay = coco_img.delay('red|green|blue')
+    qa_delay = coco_img.delay('qa_pixel')
+
+    # The finalize method tells the delayed operations to execute.
+    rgb_data = rgb_delay.finalize()
+    qa_data = qa_delay.finalize()
+
+    # Because the QA band is categorical, we should be able to make a short
+
+    qa_canvas = colorized
+    legend = kwplot.make_legend_img(qabits_to_color)  # Make a legend
+
+    # Stack things together into a nice single picture
+    qa_canvas = kwimage.stack_images([qa_canvas, legend], axis=1)
+    canvas = kwimage.stack_images([rgb_canvas, qa_canvas], axis=1)
+
+    ### Note, I'm not sure if the system the user is has an X server
+    ### or if this works in Jupyter notebooks. I will document the way I view
+    ### images on my machine in an IPython terminal, but I will also show how
+    ### to save these figures to disk so you can rsync them to a machine or do
+    ### whatever you normally do to look at an image.
+
+    ### HEADLESS METHOD
+    kwimage.imwrite('canvas.png', canvas)
+
+    ### IPYTHON METHOD
+    import kwplot
+    plt = kwplot.autoplt()
+
+    kwplot.imshow(canvas)
+
+    plt.show()
 
 
 def stack_kwcoco(coco_fpath, out_dir):
@@ -250,6 +348,28 @@ def process_one_coco_image(coco_image, config, out_dir):
         # Developer note:
         # Try running this to get a feel for what the delayed image
         # representation. Also try removing the optimize call to see what
+        # changes!
+        delayed_im.optimize().write_network_text()
+        delayed_qa.optimize().write_network_text()
+
+    # It is important that the categorical QA band is not interpolated or
+    # antialiased, whereas the intensity bands should be.
+    qa_data = delayed_qa.finalize(interpolation='nearest', antialias=False)
+
+    # First check the quality bands before loading all of the image data.
+    # FIXME: the quality bits in this example are wrong.
+    # Setting the threshold to zero to bypass for now.
+    clear_threshold = 0
+    if clear_threshold > 0:
+        clear_bits = functools.reduce(
+            operator.or_, ub.take(quality_bits, ['clear_land', 'clear_water']))
+        noobs_bits = functools.reduce(
+            operator.or_, ub.take(quality_bits, ['no_observation']))
+        is_clear = (qa_data & clear_bits) > 0
+        is_noobs = (qa_data & noobs_bits) > 0
+        is_obs = ~is_noobs
+        is_obs_clear = is_clear & is_obs
+        clear_ratio = is_obs_clear.sum() / is_obs.sum()
         # changes!
         delayed_im.optimize().write_network_text()
         delayed_qa.optimize().write_network_text()

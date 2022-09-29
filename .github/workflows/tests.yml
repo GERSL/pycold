@@ -8,7 +8,7 @@ name: BinPy Build and Test
 on:
   push:
   pull_request:
-    branches: [ main, devel ]
+    branches: [ devel, main ]
 
 jobs:
   lint_job:
@@ -101,21 +101,32 @@ jobs:
       matrix:
         os:
         - ubuntu-latest
+        #- macOS-latest
+        #- windows-latest
         cibw_skip:
-        - '*-win32'
+        - '*-win32 *-musllinux_* *i686 pp*'
         arch:
-        - x86_64
-        #- auto
+        - auto
+        #include:
+        #- os: windows-latest
+        #  arch: auto
+        #  cibw_skip: '*-win_amd64'
     steps:
-
     - name: Checkout source
       uses: actions/checkout@v3
-
-    #- name: Set up QEMU
-    #  uses: docker/setup-qemu-action@v2
-    #  if: runner.os == 'Linux' && matrix.arch != 'auto'
-    #  with:
-    #    platforms: all
+    - name: Enable MSVC 64bit
+      uses: ilammy/msvc-dev-cmd@v1
+      if: matrix.os == 'windows-latest' && matrix.cibw_skip == '*-win32'
+    - name: Enable MSVC 32bit
+      uses: ilammy/msvc-dev-cmd@v1
+      if: matrix.os == 'windows-latest' && matrix.cibw_skip == '*-win_amd64'
+      with:
+        arch: x86
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      if: runner.os == 'Linux' && matrix.arch != 'auto'
+      with:
+        platforms: all
     - name: Build binary wheels
       uses: pypa/cibuildwheel@v2.9.0
       with:
@@ -156,23 +167,53 @@ jobs:
       with:
         name: wheels
         path: ./wheelhouse/pycold*.whl
-
-
-###
-# Unfortunately we cant (yet) use the yaml docstring trick here
-# https://github.community/t/allow-unused-keys-in-workflow-yaml-files/172120
-#__doc__: |
-#    # How to run locally
-#    # https://packaging.python.org/guides/using-testpypi/
-#    git clone https://github.com/nektos/act.git $HOME/code/act
-#    chmod +x $HOME/code/act/install.sh
-#    (cd $HOME/code/act && ./install.sh -b $HOME/.local/opt/act)
-#
-#    load_secrets
-#    unset GITHUB_TOKEN
-#    $HOME/.local/opt/act/act \
-#        --secret=EROTEMIC_TWINE_PASSWORD=$EROTEMIC_TWINE_PASSWORD \
-#        --secret=EROTEMIC_TWINE_USERNAME=$EROTEMIC_TWINE_USERNAME \
-#        --secret=EROTEMIC_CI_SECRET=$EROTEMIC_CI_SECRET \
-#        --secret=EROTEMIC_TEST_TWINE_USERNAME=$EROTEMIC_TEST_TWINE_USERNAME \
-#        --secret=EROTEMIC_TEST_TWINE_PASSWORD=$EROTEMIC_TEST_TWINE_PASSWORD
+  test_deploy:
+    name: Uploading Test to PyPi
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && ! startsWith(github.event.ref, 'refs/tags') && ! startsWith(github.event.ref, 'refs/heads/release')
+    needs:
+    - build_and_test_sdist
+    - build_and_test_binpy_wheels
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+    - uses: actions/download-artifact@v3
+      name: Download wheels and sdist
+      with:
+        name: wheels
+        path: wheelhouse
+    - name: Show files to upload
+      shell: bash
+      run: ls -la wheelhouse
+    - name: Publish
+      env:
+        TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
+        TWINE_PASSWORD: ${{ secrets.PYPY_TEST }}
+      run: |-
+        pip install urllib3 pyopenssl requests[security] twine -U
+        twine upload --username=__token__ --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
+  live_deploy:
+    name: Uploading Live to PyPi
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (startsWith(github.event.ref, 'refs/tags') || startsWith(github.event.ref, 'refs/heads/release'))
+    needs:
+    - build_and_test_sdist
+    - build_and_test_binpy_wheels
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+    - uses: actions/download-artifact@v3
+      name: Download wheels and sdist
+      with:
+        name: wheels
+        path: wheelhouse
+    - name: Show files to upload
+      shell: bash
+      run: ls -la wheelhouse
+    - name: Publish
+      env:
+        TWINE_REPOSITORY_URL: https://upload.pypi.org/legacy/
+        TWINE_PASSWORD: ${{ secrets.PYPI }}
+      run: |-
+        pip install urllib3 pyopenssl requests[security] twine -U
+        twine upload --username=__token__ --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
