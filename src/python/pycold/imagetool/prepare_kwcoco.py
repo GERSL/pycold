@@ -28,7 +28,8 @@ import operator
 import ubelt as ub
 import itertools as it
 import logging
-
+from datetime import datetime
+import numpy as geek
 logger = logging.getLogger(__name__)
 
 
@@ -49,6 +50,8 @@ SENSOR_TO_INFO['L8'] = {
     'quality_interpretation': 'FMASK'  # I dont think this is right.
 }
 
+    ## You may want to check this document for understading how QA band is encoded.
+    ## https://d9-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/s3fs-public/media/files/LSDS-1435%20Landsat%20C2%20US%20ARD%20Data%20Format%20Control%20Book-v3.pdf
 
 # Register different quality bit standards. (This could/should be moved to a
 # different module for for conciceness)
@@ -67,13 +70,15 @@ QUALITY_BIT_INTERPRETATIONS['TA1'] = {
     'water'         : 1 << 7,
 }
 
+# This will be used for value of decoding.
+# After decoding QA band, it will include only value of 0, 1, 2, 3, 4, and 255.
 QUALITY_BIT_INTERPRETATIONS['FMASK'] = {
-    'clear_land'     : 1 << 0,
-    'clear_water'    : 1 << 1,
-    'cloud_shadow'   : 1 << 2,
-    'snow'           : 1 << 3,
-    'cloud'          : 1 << 4,
-    'no_observation' : 1 << 5,
+    'clear_land'     : 0,
+    'clear_water'    : 1,
+    'cloud_shadow'   : 2,
+    'snow'           : 3,
+    'cloud'          : 4,
+    'no_observation' : 255,
 }
 
 
@@ -207,6 +212,23 @@ def _demo_kwcoco_bands():
 
     plt.show()
 
+# This function is a temporary way (quick solution) to run COLD algorithm for Landsat 8 Collection 2 by now.
+# One of reasons why file name is important is that it decides how to treat QA band decoding and scaling.
+# We need a Key information: 'sensor (LT5, LE7, LC8, LC9, L30, S30, etc), 'year', 'doy', 'collection (C_1, C_2)'
+# In specific, sensor name includes information about 'ARD' data or 'HLS' data or just 'Landsat' data etc.
+# We need to think about better way to handle this issue in the future...
+def get_file_name(parent_name):
+    sensor = parent_name.split('_')[0]
+    path_hv = parent_name.split('_')[2]
+    year = parent_name.split('_')[3][:4]
+    doy = datetime(int(year), int(parent_name[19:21]), int(parent_name[21:23])).strftime('%j')
+    collection = parent_name.split('_')[5]
+    if sensor == 'LC08':
+        sensor = 'LC8'
+    if collection == '02':
+        collection = 'C_2'
+    file_name = sensor + path_hv + year + doy + collection
+    return file_name
 
 def stack_kwcoco(coco_fpath, out_dir):
     """
@@ -261,6 +283,34 @@ def stack_kwcoco(coco_fpath, out_dir):
             # Transform the image data into the desired block structure.
             process_one_coco_image(coco_image, config, out_dir)
 
+# This funtion is for decoding QA band value (written by Su Ye)
+# Reference: see page 19-20 (https://d9-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/s3fs-public/media/files/LSDS-1435%20Landsat%20C2%20US%20ARD%20Data%20Format%20Control%20Book-v3.pdf)
+def qabitval_array_c2(qa_data):
+    """
+    Institute a hierarchy of qa values that may be flagged in the bitpacked
+    value for collection 2 data
+    fill > cloud > shadow > snow > water > clear
+    Args:
+        packedint: int value to bit check
+    Returns:
+        offset value to use
+    """
+    # NEED HELP: I think replacing value (255, 0, 1, 2, 3, 4) to quality_bits['no_observation']... would be better.
+    unpacked = np.full(qa_data.shape, 255) # quality_bits['no_observation'])
+    QA_CLEAR_unpacked = geek.bitwise_and(qa_data, 1 << 6) # I believe number on the right indicate bits number. For example, 'Clear' flags in bits 6.
+    QA_SHADOW_unpacked = geek.bitwise_and(qa_data, 1 << 4) # 'Cloud shadow' flags in bits 4.
+    QA_CLOUD_unpacked = geek.bitwise_and(qa_data, 1 << 3) # 'Cloud' flags in bits 3.
+    QA_DILATED_unpacked = geek.bitwise_and(qa_data, 1 << 1) # 'Dilated Cloud' flags in bits 1.
+    QA_SNOW_unpacked = geek.bitwise_and(qa_data, 1 << 5) # 'Snow' flags in bits 5.
+    QA_WATER_unpacked = geek.bitwise_and(qa_data, 1 << 7) # 'Water' flags in bits 7.
+
+    unpacked[QA_SNOW_unpacked > 0] = 3 # quality_bits['snow']
+    unpacked[QA_SHADOW_unpacked > 0] = 2 # quality_bits['cloud_shadow']
+    unpacked[QA_CLOUD_unpacked > 0] = 4 # quality_bits['cloud']
+    unpacked[QA_DILATED_unpacked > 0] = 4 # quality_bits['cloud']
+    unpacked[QA_CLEAR_unpacked > 0] = 0 # quality_bits['clear_land']
+    unpacked[QA_WATER_unpacked > 0] = 1 # quality_bits['clear_water']
+    return unpacked
 
 def process_one_coco_image(coco_image, config, out_dir):
     """
@@ -378,6 +428,9 @@ def process_one_coco_image(coco_image, config, out_dir):
     # antialiased, whereas the intensity bands should be.
     qa_data = delayed_qa.finalize(interpolation='nearest', antialias=False)
 
+    # Decoding QA band
+    qa_unpacked = qabitval_array_c2(qa_data) # I think it works well...
+
     # First check the quality bands before loading all of the image data.
     # FIXME: the quality bits in this example are wrong.
     # Setting the threshold to zero to bypass for now.
@@ -402,12 +455,24 @@ def process_one_coco_image(coco_image, config, out_dir):
 
     im_data = delayed_im.finalize(interpolation='cubic', antialias=True)
 
+    # Scaling surface reflectance/temperature is required.
+    # source: https://www.usgs.gov/faqs/how-do-i-use-scale-factor-landsat-level-2-science-products?qtnews_science_products=0#qt-news_science_products
+    # There must have been a fancy way...I think idea here is clear to you...Feel free to edit it!
+    no_thermal = im_data[:, :, 0:6]
+    thermal = im_data[:, :, 6]
+    scale_no_thermal = (10000 * (no_thermal * 2.75e-05 - 0.2)).astype(np.int16)
+    scale_no_thermal = scale_no_thermal.clip(min=0)  # change negative value to 0, just in case this value would affect COLD model
+    scale_thermal = (10 * (thermal * 0.00341802 + 149)).astype(np.int16)
+    scale_thermal[scale_thermal == 1490] = 0  # change 1490 (value of 0 before scaling) to 0, just in case this value would affect COLD model
+    scale_thermal = np.expand_dims(scale_thermal, axis=2)
+
     # NOTE: if we enable a nodata method, we will need to handle it here.
     # NOTE: if any intensity modification needs to be done handle it here.
 
-    data = np.concatenate([im_data, qa_data], axis=2)
+    data = np.concatenate([scale_no_thermal, scale_thermal, qa_unpacked], axis=2)
+    image_name = get_file_name(coco_image.img['parent_name'])
 
-    if is_partition:
+if is_partition:
         bw = int(padded_w / n_block_x)  # width of a block
         bh = int(padded_h / n_block_y)  # height of a block
 
@@ -431,7 +496,7 @@ def process_one_coco_image(coco_image, config, out_dir):
                 if ... and False:
                     continue
 
-            block_dname = 'block_x{}_y{}'.format(j + 1, i + 1)
+            block_dname = 'block_x{}_y{}'.format(i + 1, j + 1)
             block_dpath = (video_dpath / block_dname).ensuredir()
             block_fpath = block_dpath / (image_name + '.npy')
             np.save(block_fpath, block)
