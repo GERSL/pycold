@@ -57,7 +57,8 @@ int sccd
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
     int *num_fc_pinpoint,
-    double gate_tcg
+    double gate_tcg,
+    int delay_queue_recent
 )
 {
     int clear_sum = 0;      /* Total number of clear cfmask pixels          */
@@ -217,7 +218,8 @@ int sccd
              }
 
             result = sccd_standard(clrx, clry, n_clr, tcg, rec_cg, num_fc, nrt_mode, nrt_model, num_obs_queue,
-                                   obs_queue, min_rmse, conse, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg);
+                                   obs_queue, min_rmse, conse, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint,
+                                   gate_tcg, delay_queue_recent);
 
          }else{
              // no new observation, output NONE for ending parameters   // remove it! 08302022SY
@@ -2156,7 +2158,6 @@ int step3_processing_end
     float *v_dif_mag_norm;
     float** v_dif;
     float mean_angle_scale100 = 0;
-    float tmp;
     float *medium_v_dif;
     clock_t t_time = clock();
     float **v_dif_mag;
@@ -2469,8 +2470,6 @@ int step3_processing_end
         }
     }
 
-    /* at the end, we will add 1 for anyway since num_curve = break + 1*/
-   //  *num_curve = *num_curve + 1;
 
     status = free_2d_array ((void **) temp_v_dif);
     if (status != SUCCESS)
@@ -2518,7 +2517,8 @@ int sccd_standard
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
     int *num_fc_pinpoint,
-    double gate_tcg
+    double gate_tcg,
+    int delay_queue_recent
 )
 {
     int i_b;
@@ -2776,21 +2776,11 @@ int sccd_standard
         /**************************************************************/
         else
         {
+            status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
+                                              cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed,
+                                              t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg,
+                                              &norm_cm_scale100, &cm_angle_scale100, CM_outputs);
 
-            if(*nrt_mode == NRT_VOID)
-            {
-                status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
-                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed,
-                                                  t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg,
-                                                  &norm_cm_scale100, &cm_angle_scale100, CM_outputs);
-            }
-            else
-            {
-                status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
-                                                  cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed,
-                                                  t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg,
-                                                  &norm_cm_scale100, &cm_angle_scale100, CM_outputs);
-            }
             if(status == CHANGEDETECTED)
             {
                 /**********************************************/
@@ -2889,8 +2879,16 @@ int sccd_standard
 //    }
 
 
-    /* step 3: processing the n_clr of time series */
-    if ((change_detected==TRUE) & (*nrt_mode != NRT_VOID)){
+    /* step 3: processing the n_clr of time series. NRT_VOID is offline processing and is never be QUEUE_RECENT */
+    if((*nrt_mode == NRT_QUEUE_RECENT) & (n_clr - conse >= 0)){   // previous is NRT_QUEUE_RECENT
+        if (clrx[n_clr - conse] - nrt_model->obs_date_since1982[0] - ORDINAL_LANDSAT4_LAUNCH < delay_queue_recent){
+            prev_i_break = 0;
+            *nrt_mode = NRT_QUEUE_RECENT;
+        }else{
+            *nrt_mode = NRT_QUEUE_STANDARD;
+        }
+    }else if ((change_detected==TRUE) & (*nrt_mode != NRT_VOID))
+    {
         *nrt_mode = NRT_QUEUE_RECENT;
     }else{
         if (bl_train == 1)
@@ -3182,7 +3180,6 @@ int sccd_snow
                 sum_square_vt[i_b] = sum_square_vt[i_b] + (unsigned int)(vt * vt);
             }
         }
-
     }
 
 

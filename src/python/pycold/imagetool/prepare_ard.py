@@ -743,7 +743,7 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                 pathid = int(elements[0].attrib['path'])
             else:
                 pathid = int(elements[0][3].text)
-            print(pathid)
+            # print(pathid)
 
             # assign filled value to the pixels has different path id so won't be processed
             QA_band_unpacked[path_array != pathid] = QA_FILL
@@ -1183,9 +1183,9 @@ def bbox(f):
 @click.option('--low_date_bound', type=str, default=None, help='the lower bound of the date range of user interest')
 @click.option('--upp_date_bound', type=str, default=None, help='the upper bound of the date range of user interest')
 @click.option('--collection',  type=click.Choice(['ARD', 'C2', 'HLS', 'HLS14','ARD-C2']), default='ARD',
-              help='image source')
+              help='image source category')
 @click.option('--shapefile_path', type=str, default=None)
-@click.option('--id', type=int, default=0)
+@click.option('--id', type=int, default=0, help=' the id of shapefile to crop image, only for C2 image category')
 def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_partition, yaml_path, hpc, low_date_bound,
          upp_date_bound, collection, shapefile_path, id):
     if not os.path.exists(source_dir):

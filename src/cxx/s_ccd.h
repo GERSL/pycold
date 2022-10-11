@@ -32,7 +32,8 @@ int sccd
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
     int *num_fc_b_pinpoint,
-    double gate_tcg
+    double gate_tcg,
+    int delay_queue_recent
 );
 
 int step1_cold_initialize
@@ -196,7 +197,8 @@ int sccd_standard
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
     int *num_fc_b_pinpoint,
-    double gate_tcg
+    double gate_tcg,
+    int delay_queue_recent
 );
 
 

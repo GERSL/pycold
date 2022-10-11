@@ -365,7 +365,7 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                                                                          original_col,
                                                                      conse=config['conse'],
                                                                      starting_date=starting_date,
-                                                                     n_cm=n_cm_maps,
+                                                                     n_cm=n_cm_maps, b_c2=b_c2,
                                                                      cm_output_interval=config['CM_OUTPUT_INTERVAL'],
                                                                      b_output_cm=True)
                         else:
@@ -427,8 +427,9 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
             ob_analyst = ObjectAnalystHPC(config, starting_date=starting_date, stack_path=stack_path,
                                           result_path=result_path)
         else:
-            pyclassifier = PyClassifierHPC(config, record_path=result_path, year_lowbound=year_lowbound,
-                                           year_uppbound=year_uppbound, seedmap_path=seedmap_path)
+            pyclassifier = PyClassifierHPC(config, record_path=result_path,
+                                           year_list_to_predict=list(range(year_lowbound, year_uppbound)),
+                                           seedmap_path=seedmap_path)
             ob_analyst = ObjectAnalystHPC(config, starting_date=starting_date, stack_path=stack_path,
                                           result_path=result_path, thematic_path=join(result_path, 'feature_maps'))
         if rank == 1:

@@ -224,7 +224,7 @@ class PyClassifier:
         index_list = np.vstack(index_list)
         label_list = np.hstack(label_list)
         feature_extraction = np.array([full_feature_array[tuple(x)] for x in index_list]).astype(np.float32)
-        rf_model = RandomForestClassifier(random_state=42)
+        rf_model = RandomForestClassifier(random_state=42, max_depth=20)
         rf_model.fit(feature_extraction, label_list)
         return rf_model
 
@@ -473,6 +473,7 @@ class PyClassifierHPC(PyClassifier):
     def step3_classification(self, block_id):
         while not self._is_finished_step2_train_rfmodel():
             time.sleep(5)
+        time.sleep(5)  # wait for 5 more seconds to guarantee all data of rf.model was down to the disk
         try:
             rf_model = self._get_rf_model()
         except IOError as e:
