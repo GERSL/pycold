@@ -5,12 +5,13 @@ import numpy as np
 import pandas as pd
 from osgeo import gdal
 import click
-import datetime as datetime
 from mpi4py import MPI
 from osgeo import gdal_array
 import pickle
 import yaml
 from collections import namedtuple
+import datetime as datetime
+
 
 PACK_ITEM = 6
 SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
@@ -22,6 +23,10 @@ output_nrtmodel = np.dtype([('t_start_since1982', np.short), ('num_obs', np.shor
                             ('obs_date_since1982', np.short, 5), ('covariance', np.float32, (6, 36)),
                             ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
                             ('cm_outputs', np.short), ('cm_outputs_date', np.short)], align=True)
+
+coef_names = ['a0', 'c1', 'a1', 'b1', 'a2', 'b2', 'a3', 'b3', 'cv', 'rmse']
+band_names = [0, 1, 2, 3, 4, 5, 6]
+SLOPE_SCALE = 10000
 
 
 # copy from /pycold/src/python/pycold/pyclassifier.py because MPI has conflicts with the pycold package in UCONN HPC.
@@ -40,7 +45,7 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, feature_outputs
     nan_val: integer
         NA value assigned to the output
     feature_outputs: a list of outputted feature name
-        it must be within [a0, c1, a1, b1,a2, b2, a3, b3, rmse]
+        it must be within [a0, c1, a1, b1,a2, b2, a3, b3, cv, rmse]
     Returns
     -------
         feature: a list (length = n_feature) of 1-array [len(ordinal_day_list)]
@@ -53,16 +58,21 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, feature_outputs
                 max_days = cold_plot[idx]['t_end']
             else:
                 max_days = cold_plot[idx + 1]['t_start']
+            if cold_curve['t_break'] > 0:
+                break_year = pd.Timestamp.fromordinal(cold_curve['t_break']).year
+                ordinal_day_break_july1st = pd.Timestamp.toordinal(datetime.date(break_year, 7, 1))
+            else:
+                ordinal_day_break_july1st = 0
 
             if cold_curve['t_start'] <= ordinal_day < max_days:
                 for n, feature in enumerate(feature_outputs):
                     if feature == 'a0':
                         features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
-                                             ordinal_day / 100
+                                             ordinal_day / SLOPE_SCALE
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
                     elif feature == 'c1':
-                        features[n][index] = cold_curve['coefs'][band][1] / 100
+                        features[n][index] = cold_curve['coefs'][band][1] / SLOPE_SCALE
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
                     elif feature == 'a1':
@@ -89,12 +99,19 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, feature_outputs
                         features[n][index] = cold_curve['coefs'][band][7]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
+                    elif feature == 'cv':
+                        if ordinal_day == ordinal_day_break_july1st:
+                            features[n][index] = cold_curve['magnitude'][band]
+                        else:
+                            features[n][index] = 0
+                        if np.isnan(features[n][index]):
+                            features[n][index] = 0
                     elif feature == 'rmse':
                         features[n][index] = cold_curve['rmse'][band]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
                     else:
-                        raise Exception('the outputted feature must be in [a0, c1, a1, b1,a2, b2, a3, b3, rmse]')
+                        raise Exception('the outputted feature must be in [a0, c1, a1, b1,a2, b2, a3, b3, cv, rmse]')
                 break
     return features
 
@@ -184,12 +201,12 @@ def getcategory_sccd(cold_plot, i_curve):
 @click.option('--yaml_path', type=str, help='path for yaml file')
 @click.option('--year_lowbound', type=int, default=1982, help='the starting year for exporting')
 @click.option('--year_uppbound', type=int, default=2020, help='the ending year for exporting')
-@click.option('--coefs', default=False, help='if output coefs layers')
-@click.option('--coefs_bands', default=[0, 1, 2, 3, 4, 5], help='indicate the bands for output coefs_bands,'
-                                                                ' only works when coefs is True; note that the band order is'
-                                                                'b,g,r,n, s1,s2, t')
+@click.option('--coefs', type=str, default=None, help='if output coefs layers')
+@click.option('--coefs_bands', type=str, default='0, 1, 2, 3, 4, 5, 6', help='indicate the ba_nds for output coefs_bands,'
+                                                                    'only works when coefs is True; note that the band '
+                                                                    'order is b,g,r,n,s1,s2,t')
 def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbound, yaml_path, coefs, coefs_bands):
-    # reference_path = '/Users/coloury/Dropbox/UCONN/spatial/test_results/h016v010/recentdist_map_COLD.tif'
+    # reference_path = '/Users/coloury/Dropbox/UCONN/spatial/test_results/h016v010/recentdist_mapCOLD.tif'
     # method = 'SCCDOFFLINE'
     # yaml_path = '/home/coloury/Dropbox/Documents/PyCharmProjects/HLS_NRT/config_hls.yaml'
     # reccg_path ='/home/coloury'
@@ -208,6 +225,20 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
         out_path = os.path.join(out_path, 'cold_maps')
     elif method == 'SCCDOFFLINE':
         out_path = os.path.join(out_path, 'sccd_maps')
+
+    if coefs is not None:
+        try:
+            coefs = list(coefs.split(","))
+            coefs = [str(coef) for coef in coefs]
+        except:
+            print("Illegal coefs inputs: example, --coefs='a0, c1, a1, b1, a2, b2, a3, b3, cv, rmse'")
+
+        try:
+            coefs_bands = list(coefs_bands.split(","))
+            coefs_bands = [int(coefs_band) for coefs_band in coefs_bands]
+        except:
+            print("Illegal coefs_bands inputs: example, --coefs_bands='0, 1, 2, 3, 4, 5, 6'")
+
 
     # outname'obcold':
     # outname = 'breakyear_cold_h11v9_{}_{}_{}'.format(lower_year, upper_year, method)
@@ -229,6 +260,10 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
                        ('coefs', np.float32, (7, 8)),   # note that the slope coefficient was scaled up by 10000
                        ('rmse', np.float32, 7),
                        ('magnitude', np.float32, 7)])
+
+    if coefs is not None:
+        assert all(elem in coef_names for elem in coefs)
+        assert all(elem in band_names for elem in coefs_bands)
 
     if rank == 0:
         if not os.path.exists(out_path):
@@ -273,12 +308,14 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
         elif method == 'SCCDOFFLINE':
             filename = 'record_change_x{}_y{}_sccd.npy'.format(current_block_x, current_block_y)
 
-        results_block = [np.full((config['block_height'], config['block_width']), -9999, dtype=np.int32)
+        results_block = [np.full((config['block_height'], config['block_width']), -9999, dtype=np.int16)
                          for t in range(year_uppbound - year_lowbound + 1)]
+        if coefs is not None:
+            results_block_coefs = np.full((config['block_height'], config['block_width'], len(coefs) * len(coefs_bands),
+                                           year_uppbound - year_lowbound + 1), -9999, dtype=np.float32)
 
         print('processing the rec_cg file {}'.format(os.path.join(reccg_path, filename)))
         if not os.path.exists(os.path.join(reccg_path, filename)):
-            # reccg_path = '/home/coloury'
             print('the rec_cg file {} is missing'.format(os.path.join(reccg_path, filename)))
             for year in range(year_lowbound, year_uppbound + 1):
                 outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
@@ -308,10 +345,10 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
                     if curve['t_break'] == 0 or count == (len(cold_block) - 1):  # last segment
                         continue
 
-                    i_col = int((plot.position  - 1) % config['n_cols']) - \
-                            (current_block_x - 1) * config['block_width']
-                    i_row = int((plot.position  - 1) / config['n_cols']) - \
-                            (current_block_y - 1) * config['block_height']
+                    i_col = int((plot.position - 1) % config['n_cols']) - \
+                             (current_block_x - 1) * config['block_width']
+                    i_row = int((plot.position - 1) / config['n_cols']) - \
+                             (current_block_y - 1) * config['block_height']
                     if i_col < 0:
                         print('Processing {} failed: i_row={}; i_col={} for {}'.format(filename,
                                                                                        i_row, i_col, filename))
@@ -327,6 +364,9 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
             cold_block.sort(order='pos')
             current_processing_pos = cold_block[0]['pos']
             current_dist_type = 0
+            year_list_to_predict = list(range(year_lowbound, year_uppbound + 1))
+            ordinal_day_list = [pd.Timestamp.toordinal(datetime.date(year, 7, 1)) for year
+                                in year_list_to_predict]
             for count, curve in enumerate(cold_block):
                 if curve['pos'] != current_processing_pos:
                     current_processing_pos = curve['pos']
@@ -353,12 +393,31 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
                     continue
                 results_block[break_year - year_lowbound][i_row][i_col] = current_dist_type * 1000 + curve['t_break'] - \
                     (pd.Timestamp.toordinal(datetime.date(break_year, 1, 1))) + 1
-            # e.g., 1315 means that disturbance happens at doy of 315
+                # e.g., 1315 means that disturbance happens at doy of 315
 
-        # save the temp dataset out
-        for year in range(year_lowbound, year_uppbound + 1):
-            outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
-            np.save(outfile, results_block[year - year_lowbound])
+            if coefs is not None:
+                cold_block_split = np.split(cold_block, np.argwhere(np.diff(cold_block['pos']) != 0)[:, 0] + 1)
+                for element in cold_block_split:
+                    # the relative column number in the block
+                    i_col = int((element[0]["pos"] - 1) % config['n_cols']) - \
+                                (current_block_x - 1) * config['block_width']
+                    i_row = int((element[0]["pos"] - 1) / config['n_cols']) - \
+                                 (current_block_y - 1) * config['block_height']
+
+                    for band_idx, band in enumerate(coefs_bands):
+                        feature_row = extract_features(element, band, ordinal_day_list, -9999,
+                                                       feature_outputs=coefs)
+                        for index, coef in enumerate(coefs):
+                            results_block_coefs[i_row][i_col][index + band_idx * len(coefs)][:] = \
+                                feature_row[index]
+
+                # save the temp dataset out
+                for year in range(year_lowbound, year_uppbound + 1):
+                    outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
+                    np.save(outfile, results_block[year - year_lowbound])
+                    if coefs is not None:
+                        outfile = os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(iblock + 1, year))
+                        np.save(outfile, results_block_coefs[:, :, :, year - year_lowbound])
 
     # wait for all processes
     comm.Barrier()
@@ -385,6 +444,32 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
             outdata.FlushCache()
             outdata.SetProjection(proj)
             outdata.FlushCache()
+
+        if coefs is not None:
+            for year in range(year_lowbound, year_uppbound + 1):
+                tmp_map_blocks = [np.load(os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(x + 1, year)))
+                                  for x in range(config['n_blocks'])]
+
+                results = np.hstack(tmp_map_blocks)
+                results = np.vstack(np.hsplit(results, config['n_block_x']))
+                ninput = 0
+                for band_idx, band_name in enumerate(coefs_bands):
+                    for coef_index, coef in enumerate(coefs):
+                        mode_string = str(year) + '_coefs'
+                        outname = '{}_{}_{}_{}.tif'.format(mode_string, method, band_name, coef)
+                        outfile = os.path.join(out_path, outname)
+                        outdriver1 = gdal.GetDriverByName("GTiff")
+                        outdata = outdriver1.Create(outfile, rows, cols, 1, gdal.GDT_Float32)
+                        outdata.GetRasterBand(1).WriteArray(results[:, :, ninput])
+                        outdata.FlushCache()
+                        outdata.SetGeoTransform(trans)
+                        outdata.FlushCache()
+                        outdata.SetProjection(proj)
+                        outdata.FlushCache()
+                        ninput = ninput + 1
+
+                for x in range(config['n_blocks']):
+                    os.remove(os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(x + 1, year)))
 
         # output recent disturbance year
         recent_dist = np.full((config['n_rows'], config['n_cols']), 0, dtype=np.int16)
