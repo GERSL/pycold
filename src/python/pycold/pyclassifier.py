@@ -441,10 +441,18 @@ class PyClassifierHPC(PyClassifier):
                 raise e
 
     def step1_feature_generation(self, block_id):
-        cold_block = np.load(join(self.record_path, 'record_change_x{}_y{}_cold.npy').format(
-                             get_block_x(block_id, self.config['n_block_x']),
-                             get_block_y(block_id, self.config['n_block_x'])))
-        block_features = self.predict_features(block_id, cold_block, self.year_list_to_predict)
+        if os.path.exists(join(self.record_path, 'record_change_x{}_y{}_cold.npy').format(
+                                 get_block_x(block_id, self.config['n_block_x']),
+                                 get_block_y(block_id, self.config['n_block_x']))):
+            cold_block = np.load(join(self.record_path, 'record_change_x{}_y{}_cold.npy').format(
+                                 get_block_x(block_id, self.config['n_block_x']),
+                                 get_block_y(block_id, self.config['n_block_x'])))
+            block_features = self.predict_features(block_id, cold_block, self.year_list_to_predict)
+        else:
+            block_features = np.full((len(self.year_list_to_predict),
+                                      self.config['block_width'] * self.config['block_height'],
+                                      self.n_features),
+                                     defaults['COMMON']['NAN_VAL'], dtype=np.float32)
         self._save_features(block_id, block_features)
         with open(join(self.tmp_path, 'tmp_step1_predict_{}_finished.txt'.format(block_id)), 'w'):
             pass

@@ -303,6 +303,8 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
                 for pos in range(block_width * block_height):
                     CM_collect.append(np.full(n_cm_maps, -9999, dtype=np.short))
                     date_collect.append(np.full(n_cm_maps, -9999, dtype=np.short))
+                np.save(join(result_path, 'CM_date_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(date_collect))
+                np.save(join(result_path, 'CM_x{}_y{}.npy'.format(block_x, block_y)), np.hstack(CM_collect))
         else:
             # for sccd, as the output is heterogeneous, we continuously save the sccd pack for each pixel
             if method == "SCCDOFFLINE":

@@ -314,7 +314,7 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
             results_block_coefs = np.full((config['block_height'], config['block_width'], len(coefs) * len(coefs_bands),
                                            year_uppbound - year_lowbound + 1), -9999, dtype=np.float32)
 
-        print('processing the rec_cg file {}'.format(os.path.join(reccg_path, filename)))
+        print('Processing the rec_cg file {}'.format(os.path.join(reccg_path, filename)))
         if not os.path.exists(os.path.join(reccg_path, filename)):
             print('the rec_cg file {} is missing'.format(os.path.join(reccg_path, filename)))
             for year in range(year_lowbound, year_uppbound + 1):
@@ -411,13 +411,13 @@ def main(reccg_path, reference_path, out_path, method, year_lowbound, year_uppbo
                             results_block_coefs[i_row][i_col][index + band_idx * len(coefs)][:] = \
                                 feature_row[index]
 
-                # save the temp dataset out
-                for year in range(year_lowbound, year_uppbound + 1):
-                    outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
-                    np.save(outfile, results_block[year - year_lowbound])
-                    if coefs is not None:
-                        outfile = os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(iblock + 1, year))
-                        np.save(outfile, results_block_coefs[:, :, :, year - year_lowbound])
+            # save the temp dataset out
+            for year in range(year_lowbound, year_uppbound + 1):
+                outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
+                np.save(outfile, results_block[year - year_lowbound])
+                if coefs is not None:
+                    outfile = os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(iblock + 1, year))
+                    np.save(outfile, results_block_coefs[:, :, :, year - year_lowbound])
 
     # wait for all processes
     comm.Barrier()
