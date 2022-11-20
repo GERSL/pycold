@@ -2539,7 +2539,6 @@ int sccd_standard
     int i_start = 0;
     int i_dense = 0;
     int t_start;
-    bool change_detected = FALSE;
     short int cm_angle_scale100 = 0;
     short int norm_cm_scale100 = NA_VALUE;      /* I/O: maximum change magnitudes at every norm_cm_INTERVAL days */
     short int norm_cm_date = NA_VALUE;      /* I/O: dates for maximum change magnitudes at every norm_cm_INTERVAL days */
@@ -2786,7 +2785,6 @@ int sccd_standard
                 /*                                            */
                 /**********************************************/
                 bl_train = 0;
-                change_detected = TRUE;
 
 
                 /****************************************************/
@@ -2845,6 +2843,7 @@ int sccd_standard
                 nrt_model->norm_cm = (short int)norm_cm_scale100;
                 nrt_model->cm_angle = (short int)cm_angle_scale100;
                 nrt_model->conse_last = (unsigned char)conse;   // for new change, at last conse
+                *nrt_mode = NRT_BISTATUS;
             }
             else if(status == FALSECHANGE)
             {
@@ -2859,9 +2858,9 @@ int sccd_standard
         // only for sccd_update and bi status
         if ((bl_train == 0) && (*nrt_mode == NRT_BISTATUS))
         {
-            i_tmp = i - 1;
+            i_tmp = i - 1; // cuz i has been added by 1 in the initialization stage
             if (i_tmp + conse >= n_clr_record){
-                num_obs_processed = num_obs_processed - 1;
+                // num_obs_processed = num_obs_processed - 1;
                 status = step2_KF_ChangeDetection(instance, clrx, clry, i_tmp, num_fc, conse, min_rmse, 9999999.0,
                                                   &n_clr, cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed,
                                                   t_start, FALSE, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg,
@@ -2894,9 +2893,6 @@ int sccd_standard
                 *nrt_mode = NRT_QUEUE_STANDARD;
             }
         }
-    }else if ((change_detected==TRUE) & (*nrt_mode != NRT_VOID))
-    {
-        *nrt_mode = NRT_BISTATUS;
     }else{
         if (bl_train == 1)
             *nrt_mode = NRT_MONITOR_STANDARD;
