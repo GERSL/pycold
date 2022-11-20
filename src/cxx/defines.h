@@ -108,7 +108,7 @@
 #define DEFAULT_COLD_TCG 15.0863
 
 
-#define INI_Q00 0.1   /* MATLAB default */
+#define INI_Q00 1   /* MATLAB default */
 #define INI_P 10000
 
 /* from ccd.c detection method*/
@@ -141,7 +141,7 @@
 #define NRT_QUEUE_STANDARD 2
 #define NRT_MONITOR_SNOW 3
 #define NRT_QUEUE_SNOW 4
-#define NRT_QUEUE_RECENT 5
+#define NRT_BISTATUS 5
 #define MAX_OBS_QUEUE 240 /* the maximum number of observations in queue (for NRT) */
 
 #define LANDSAT45_TM 4

@@ -82,7 +82,7 @@ int sccd
     int len_clrx;         /* length of clrx  */
     int n_clr_record;
 
-    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD)|(*nrt_mode  == NRT_QUEUE_RECENT))
+    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD)|(*nrt_mode  == NRT_BISTATUS))
         len_clrx = valid_num_scenes + *num_obs_queue;
     else if ((*nrt_mode  == NRT_MONITOR_SNOW)|(*nrt_mode  == NRT_MONITOR_STANDARD))
         len_clrx = valid_num_scenes + DEFAULT_CONSE;
@@ -133,7 +133,7 @@ int sccd
     /*     initializing clrx and clry using existing obs in queue        */
     /*                                                                   */
     /*********************************************************************/
-    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD)|(*nrt_mode  == NRT_QUEUE_RECENT))
+    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD)|(*nrt_mode  == NRT_BISTATUS))
     {
         // if queue mode, will append old observation first
         for (i = 0; i < *num_obs_queue; i++){
@@ -217,24 +217,10 @@ int sccd
                  }
              }
 
-            result = sccd_standard(clrx, clry, n_clr, tcg, rec_cg, num_fc, nrt_mode, nrt_model, num_obs_queue,
+            result = sccd_standard(clrx, clry, n_clr, tcg, n_clr_record, rec_cg, num_fc, nrt_mode, nrt_model, num_obs_queue,
                                    obs_queue, min_rmse, conse, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint,
                                    gate_tcg, delay_queue_recent);
 
-         }else{
-             // no new observation, output NONE for ending parameters   // remove it! 08302022SY
-             if((*nrt_mode == NRT_MONITOR_STANDARD) | (*nrt_mode == NRT_QUEUE_RECENT)){
-//                 nrt_model->norm_cm = NA_VALUE;
-//                 nrt_model->conse_last = 0;
-//                 for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-//                 {
-//                     nrt_model->cm_bands[i_b] = NA_VALUE;
-//                 }
-//                nrt_model->cm_angle = NA_VALUE;
-//                 if(*nrt_mode == NRT_QUEUE_RECENT){
-//                     *nrt_mode = NRT_QUEUE_STANDARD;
-//                 }
-             }
          }
     }
     else
@@ -556,6 +542,10 @@ int step1_cold_initialize
     int max_date_diff = 0;
     int tmp_end;
     // i_dense = *i_start;
+
+    if (*cur_i < N_TIMES * MID_NUM_C  - 1){
+        return INCOMPLETE;
+    }
 
     /****************************************************/
     /*                                                  */
@@ -1708,7 +1698,8 @@ int step2_KF_ChangeDetection
     double gate_tcg,
     short int *norm_cm_scale100,
     short int *mean_angle_scale100,
-    float *CM_outputs
+    float *CM_outputs,
+    float t_max_cg_sccd
 )
 {
     int i_b, b, m, k, j;
@@ -1845,7 +1836,7 @@ int step2_KF_ChangeDetection
     }
 
     if (b_pinpoint == TRUE){
-        if (i_conse >= PINPOINT_CONSE){
+        if (i_conse >= PINPOINT_CONSE){  // meaning that over 3 anomaly pixel
             current_CM_n = (clrx[cur_i] - ORDINAL_DATE_1982_1_1) / AVE_DAYS_IN_A_YEAR;
             if (CM_outputs[current_CM_n] == 0){  // meaning that hasn't been assigned with pinpoint
                 current_pinpoint = *num_fc_pinpoint;
@@ -2024,7 +2015,7 @@ int step2_KF_ChangeDetection
 
         RETURN_VALUE = CHANGEDETECTED;
     } // if (TRUE == change_flag)
-    else if(v_dif_mag_norm[0]  >  T_MAX_CG_SCCD)  // the current one
+    else if(v_dif_mag_norm[0]  >  t_max_cg_sccd)  // the current one
     {
         /**********************************************/
         /*                                            */
@@ -2232,7 +2223,7 @@ int step3_processing_end
 //    printf("step3 timepoint 1 took %f seconds to execute\n", time_taken);
 //    t_time = clock();
 
-    if (nrt_mode == NRT_MONITOR_STANDARD)
+    if ((nrt_mode == NRT_MONITOR_STANDARD) | (nrt_mode == NRT_BISTATUS))
     {
         /****************************************************/
         /*   need to save nrt records for monitor mode      */
@@ -2453,7 +2444,7 @@ int step3_processing_end
 //        t_time = clock();
     } // if (nrt_mode == NRT_MONITOR_STANDARD)
 
-    if((nrt_mode == NRT_QUEUE_STANDARD) | (nrt_mode == NRT_QUEUE_RECENT))
+    if((nrt_mode == NRT_QUEUE_STANDARD) | (nrt_mode == NRT_BISTATUS))
     {
         *num_obs_queue = *n_clr - prev_i_break;
         if (*num_obs_queue > MAX_OBS_QUEUE){
@@ -2506,6 +2497,7 @@ int sccd_standard
     float **clry,               /* I: clear pixel curve in Y direction (spectralbands)    */
     int n_clr,
     double tcg,              /* I:  threshold of change magnitude   */
+    int n_clr_record,        /* I:  the number of observation from the last run   */
     Output_sccd *rec_cg,    /* O: offline change records */
     int *num_fc,            /* O: intialize NUM of Functional Curves    */
     int *nrt_mode,             /* O: 1 - monitor mode; 2 - queue mode    */
@@ -2523,7 +2515,8 @@ int sccd_standard
 {
     int i_b;
     int status;
-    int i, k, k1, k2;
+    int k, k1, k2;
+    int i = 0;
     char FUNC_NAME[] = "sccd_standard";
     //char msg_str[MAX_STR_LEN];       /* Input data scene name                 */
     float **fit_cft;                 /* Fitted coefficients 2-D array.        */
@@ -2537,7 +2530,7 @@ int sccd_standard
 
     // gsl_vector** state_a;          /* a vector of a for current i,  multiple band */
     gsl_matrix** cov_p;          /* a vector p matrix for current i,  for multiple band */
-    int prev_i_break;
+    int prev_i_break = 0;
     float** rec_v_dif;
     int bl_train = 0;  // indicate both ccd and kalman filter initialization
     float unadjusted_rmse;
@@ -2552,6 +2545,7 @@ int sccd_standard
     short int norm_cm_date = NA_VALUE;      /* I/O: dates for maximum change magnitudes at every norm_cm_INTERVAL days */
     int n_cm = (clrx[n_clr - 1] -  ORDINAL_DATE_1982_1_1) / AVE_DAYS_IN_A_YEAR + 1;;
     float* CM_outputs;
+    int i_tmp;
 
 
     cov_p = (gsl_matrix **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, 1, sizeof(gsl_matrix));
@@ -2624,10 +2618,8 @@ int sccd_standard
     }
 
     /* if monitor mode, need to copy current nrtmodel info from nrt_model*/
-    if (*nrt_mode  == NRT_MONITOR_STANDARD)
+    if((*nrt_mode == NRT_MONITOR_STANDARD)|(*nrt_mode == NRT_BISTATUS))
     {
-        bl_train = 1;
-        i = 0;
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             /*   1. covariance matrix   */
@@ -2657,14 +2649,12 @@ int sccd_standard
             initialize_ssmconstants(DEFAULT_N_STATE, nrt_model->H[i_b], &instance[i_b]);
         }
     }
-    else
-    {
-        bl_train = 0;
 
-        /* Start with mininum requirement of clear obs.               */
-        i = N_TIMES * MID_NUM_C  - 1;
-        prev_i_break = 0;
-    }
+
+    if (*nrt_mode  == NRT_MONITOR_STANDARD)
+        bl_train = 1;
+    else
+        bl_train = 0;
 
 
     /**************************************************************/
@@ -2714,7 +2704,6 @@ int sccd_standard
             if(INCOMPLETE == status)
             {
                 i++;
-                continue;
             }
             else if(SUCCESS == status)
             {
@@ -2763,7 +2752,7 @@ int sccd_standard
                 /* initialization stage stops, and continious change detection starts */
                 i++;
                 bl_train = 1;
-            } /* else if(SUCCESS == status) */
+             } /* else if(SUCCESS == status) */
 //            time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
 //            printf("Initialization took %f seconds to execute\n", time_taken);
 //            t_time = clock();
@@ -2779,7 +2768,7 @@ int sccd_standard
             status = step2_KF_ChangeDetection(instance, clrx, clry, i, num_fc, conse, min_rmse, tcg, &n_clr,
                                               cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed,
                                               t_start, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg,
-                                              &norm_cm_scale100, &cm_angle_scale100, CM_outputs);
+                                              &norm_cm_scale100, &cm_angle_scale100, CM_outputs, T_MAX_CG_SCCD);
 
             if(status == CHANGEDETECTED)
             {
@@ -2861,9 +2850,23 @@ int sccd_standard
             {
                 //printf("%d\n", clrx[i]);
                 n_clr--;
+                n_clr_record--;
                 i--;
             }
             i++;
+        }
+
+        // only for sccd_update and bi status
+        if ((bl_train == 0) && (*nrt_mode == NRT_BISTATUS))
+        {
+            i_tmp = i - 1;
+            if (i_tmp + conse >= n_clr_record){
+                num_obs_processed = num_obs_processed - 1;
+                status = step2_KF_ChangeDetection(instance, clrx, clry, i_tmp, num_fc, conse, min_rmse, 9999999.0,
+                                                  &n_clr, cov_p, fit_cft, rec_cg, sum_square_vt, &num_obs_processed,
+                                                  t_start, FALSE, rec_cg_pinpoint, num_fc_pinpoint, gate_tcg,
+                                                  &norm_cm_scale100, &cm_angle_scale100, CM_outputs, 9999999.0);
+            }
         }
     } /* n_clr for while (i < n_clr - conse) */
 
@@ -2880,16 +2883,20 @@ int sccd_standard
 
 
     /* step 3: processing the n_clr of time series. NRT_VOID is offline processing and is never be QUEUE_RECENT */
-    if((*nrt_mode == NRT_QUEUE_RECENT) & (n_clr - conse >= 0)){   // previous is NRT_QUEUE_RECENT
-        if (clrx[n_clr - conse] - nrt_model->obs_date_since1982[0] - ORDINAL_LANDSAT4_LAUNCH < delay_queue_recent){
-            prev_i_break = 0;
-            *nrt_mode = NRT_QUEUE_RECENT;
+    if((*nrt_mode == NRT_BISTATUS) & (n_clr - conse >= 0)){   // previous is NRT_BISTATUS
+        if (bl_train == 1){
+             *nrt_mode = NRT_MONITOR_STANDARD;
         }else{
-            *nrt_mode = NRT_QUEUE_STANDARD;
+            if (clrx[n_clr - conse] - nrt_model->obs_date_since1982[0] - ORDINAL_LANDSAT4_LAUNCH < delay_queue_recent){
+                prev_i_break = 0;
+                *nrt_mode = NRT_BISTATUS;
+            }else{
+                *nrt_mode = NRT_QUEUE_STANDARD;
+            }
         }
     }else if ((change_detected==TRUE) & (*nrt_mode != NRT_VOID))
     {
-        *nrt_mode = NRT_QUEUE_RECENT;
+        *nrt_mode = NRT_BISTATUS;
     }else{
         if (bl_train == 1)
             *nrt_mode = NRT_MONITOR_STANDARD;

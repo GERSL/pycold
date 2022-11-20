@@ -93,7 +93,8 @@ int step2_KF_ChangeDetection
     double gate_tcg,
     short int *norm_cm_scale100,
     short int *mean_angle_scale100,
-    float *CM_outputs
+    float *CM_outputs,
+    float t_max_cg_sccd
 );
 
 int KF_ts_predict_conse
@@ -186,6 +187,7 @@ int sccd_standard
     float **clry,               /* I: clear pixel curve in Y direction (spectralbands)    */
     int n_clr,
     double tcg,              /* I:  threshold of change magnitude   */
+    int n_clr_record,        /* I:  the number of observation from the last run   */
     Output_sccd *rec_cg,    /* O: offline change records */
     int *num_fc,            /* O: intialize NUM of Functional Curves    */
     int *nrt_mode,             /* O: 1 - monitor mode; 2 - queue mode    */

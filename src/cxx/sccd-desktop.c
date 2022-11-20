@@ -189,7 +189,7 @@ int getnrtstructurefromtxt(char* nrtoutput_affix,  Output_sccd *s_rec_cg, output
         ptr = fopen(model_with_extension,"rb");  // r for read, b for binary
         fread(nrt_model, sizeof(output_nrtmodel), 1, ptr);
         fclose(ptr);
-    }else if((*nrt_mode == NRT_QUEUE_SNOW)|(*nrt_mode == NRT_QUEUE_STANDARD)){
+    }else if((*nrt_mode == NRT_QUEUE_SNOW)|(*nrt_mode == NRT_QUEUE_STANDARD)|(*nrt_mode == NRT_BISTATUS)){
         strcpy(nrt_queue_with_extension, nrtoutput_affix); /* copy name into the new var */
         strcat(nrt_queue_with_extension, queue_ext);
         /* add the extension */
@@ -407,8 +407,8 @@ int main(int argc, char *argv[])
 //    }
 
     // chi-square probability
-    tcg = X2(NUM_LASSO_BANDS, probability_threshold);
-    // tcg = 15.086;
+    //tcg = X2(NUM_LASSO_BANDS, probability_threshold);
+     tcg = 15.086;
 
     /**************************************************************/
     /*                                                            */

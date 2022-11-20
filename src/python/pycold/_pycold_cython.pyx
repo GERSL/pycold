@@ -19,7 +19,7 @@ except ImportError:
     pass  # The modules don't actually have to exists for Cython to use them as annotations
 
 cdef int NUM_FC = 40  # define the maximum number of outputted curves
-cdef int NUM_FC_SCCD = 20
+cdef int NUM_FC_SCCD = 40
 cdef int NUM_NRT_QUEUE = 240
 DEF DEFAULT_CONSE = 6
 DEF NRT_BAND = 6
@@ -478,7 +478,7 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
                     return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                       np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)), 
                                       SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
-                elif nrt_mode == 5:  # queue recent
+                elif nrt_mode == 5:  # bi status
                     return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                       np.asarray(<output_nrtmodel[:1]>nrt_model),
                                       np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)), 
