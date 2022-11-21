@@ -131,6 +131,12 @@ cdef extern from "../../cxx/s_ccd.h":
                   int *num_fc_pinpoint, double gate_tcg)
 
 
+class NoFitCurves(Exception):
+    """
+    Exception for when fit curves could not be constructed due to no change
+    records, possibly because of too few observations.
+    """
+
 
 #cdef class SccdOutput:
 #    cdef public int position
@@ -257,7 +263,7 @@ def cold_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
         raise RuntimeError("cold function fails for pos = {} ".format(pos))
     else:
         if num_fc <= 0:
-            raise Exception("The COLD function has no change records outputted for pos = {} (possibly due to no enough clear observation)".format(pos))
+            raise NoFitCurves("The COLD function has no change records outputted for pos = {} (possibly due to no enough clear observation)".format(pos))
         else:
             if b_output_cm == False:
                 return np.asarray(<Output_t[:num_fc]>rec_cg) # np.asarray uses also the buffer-protocol and is able to construct
@@ -335,7 +341,7 @@ def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates,
         raise RuntimeError("cold function fails for pos = {} ".format(pos))
     else:
         if num_fc <= 0:
-            raise Exception("The reconstruct function has no change records outputted for pos = {} (possibly due to no enough clear observation)".format(pos))
+            raise NoFitCurves("The reconstruct function has no change records outputted for pos = {} (possibly due to no enough clear observation)".format(pos))
         else:
             return np.asarray(<Output_t[:num_fc]>rec_cg) # np.asarray uses also the buffer-protocol and is able to construct a dtype-object from cython's array
 
