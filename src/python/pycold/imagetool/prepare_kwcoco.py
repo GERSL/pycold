@@ -21,6 +21,7 @@ Limitations:
     * Configurations are hard-coded
 """
 import kwcoco
+import json
 import numpy as np
 import einops
 import functools
@@ -255,8 +256,13 @@ def get_file_name(parent_name):
 def stack_kwcoco(coco_fpath, out_dir):
     """
     Args:
-        coco_fpath (str | PathLike): path to a kwcoco dataset
+        coco_fpath (str | PathLike | CocoDataset):
+            the kwcoco dataset to convert
+
         out_dir (str | PathLike): path to write the data
+
+    Returns:
+        List[Dict]: a list of dictionary result objects
 
     Example:
         >>> from pycold.imagetool.prepare_kwcoco import *  # NOQA
@@ -264,7 +270,7 @@ def stack_kwcoco(coco_fpath, out_dir):
         >>> coco_fpath = grab_demo_kwcoco_dataset()
         >>> dpath = ub.Path.appdir('pycold/tests/stack_kwcoco').ensuredir()
         >>> out_dir = dpath / 'stacked'
-        >>> stack_kwcoco(coco_fpath, out_dir)
+        >>> results = stack_kwcoco(coco_fpath, out_dir)
     """
 
     # TODO: determine the block settings from the config
@@ -277,7 +283,7 @@ def stack_kwcoco(coco_fpath, out_dir):
     out_dir = ub.Path(out_dir)
 
     # Load the kwcoco dataset
-    dset = kwcoco.CocoDataset(coco_fpath)
+    dset = kwcoco.CocoDataset.coerce(coco_fpath)
 
     # A kwcoco dataset can point to multiple images and videos (which are
     # sequences of images). In the future we will likely want to split the main
@@ -285,6 +291,8 @@ def stack_kwcoco(coco_fpath, out_dir):
     # processing, but for now lets just loop over each video and each image in
     # that video.
     videos = dset.videos()
+
+    results = []
 
     for video_id in videos:
 
@@ -303,7 +311,10 @@ def stack_kwcoco(coco_fpath, out_dir):
             coco_image = coco_image.detach()
 
             # Transform the image data into the desired block structure.
-            process_one_coco_image(coco_image, config, out_dir)
+            result = process_one_coco_image(coco_image, config, out_dir)
+            results.append(result)
+
+    return results
 
 
 # This funtion is for decoding QA band value (written by Su Ye)
@@ -341,6 +352,11 @@ def process_one_coco_image(coco_image, config, out_dir):
     Args:
         coco_image (kwcoco.CocoImage): the image to process
         out_dir (Path): path to write the image data
+
+    Returns:
+        Dict: result dictionary with keys:
+            status (str) : either a string passed or failed
+            fpaths (List[str]): a list of files that were written
     """
     n_block_x = config['n_block_x']
     n_block_y = config['n_block_y']
@@ -418,14 +434,6 @@ def process_one_coco_image(coco_image, config, out_dir):
         delayed_im = delayed_im.crop(slice_, clip=False, wrap=False)
         delayed_qa = delayed_qa.crop(slice_, clip=False, wrap=False)
 
-    if 0:
-        # Developer note:
-        # Try running this to get a feel for what the delayed image
-        # representation. Also try removing the optimize call to see what
-        # changes!
-        delayed_im.optimize().write_network_text()
-        delayed_qa.optimize().write_network_text()
-
     # It is important that the categorical QA band is not interpolated or
     # antialiased, whereas the intensity bands should be.
     qa_data = delayed_qa.finalize(interpolation='nearest', antialias=False)
@@ -444,13 +452,6 @@ def process_one_coco_image(coco_image, config, out_dir):
         is_obs = ~is_noobs
         is_obs_clear = is_clear & is_obs
         clear_ratio = is_obs_clear.sum() / is_obs.sum()
-        # changes!
-        delayed_im.optimize().write_network_text()
-        delayed_qa.optimize().write_network_text()
-
-    # It is important that the categorical QA band is not interpolated or
-    # antialiased, whereas the intensity bands should be.
-    qa_data = delayed_qa.finalize(interpolation='nearest', antialias=False)
 
     # Decoding QA band
     qa_unpacked = qabitval_array_c2(qa_data)  # I think it works well...
@@ -472,10 +473,15 @@ def process_one_coco_image(coco_image, config, out_dir):
     else:
         clear_ratio = 1
 
+    result = {
+        'status': None
+    }
+
     if clear_ratio <= clear_threshold:
         logger.warn('Not enough clear observations for {}/{}'.format(
             video_name, image_name))
-        return False
+        result['status'] = 'failed'
+        return result
 
     im_data = delayed_im.finalize(interpolation='cubic', antialias=True)
 
@@ -495,6 +501,15 @@ def process_one_coco_image(coco_image, config, out_dir):
 
     data = np.concatenate([scale_no_thermal, scale_thermal, qa_unpacked], axis=2)
     image_name = get_file_name(coco_image.img['parent_name'])
+
+    result_fpaths = []
+
+    # TODO:
+    # save necessary metadata alongside the npy file so we don't have
+    # to rely on file names.
+    metadata = {
+        'date_captured': coco_image.img['date_captured'],
+    }
 
     if is_partition:
         bw = int(padded_w / n_block_x)  # width of a block
@@ -523,10 +538,32 @@ def process_one_coco_image(coco_image, config, out_dir):
             block_dname = 'block_x{}_y{}'.format(i + 1, j + 1)
             block_dpath = (video_dpath / block_dname).ensuredir()
             block_fpath = block_dpath / (image_name + '.npy')
+
+            metadata.update({
+                'x': i + 1,
+                'y': j + 1,
+                'total_pixels': int(np.prod(block.shape[0:2])),
+                'total_bands': int(block.shape[-1]),
+            })
+            meta_fpath = block_dpath / (image_name + '.json')
+            meta_fpath.write_text(json.dumps(metadata))
             np.save(block_fpath, block)
+            result_fpaths.append(block_fpath)
+            result_fpaths.append(meta_fpath)
         logger.info('Stacked blocked image {}/{}'.format(video_name, image_name))
     else:
+        metadata.update({
+            'total_pixels': int(np.prod(data.shape[0:2])),
+            'total_bands': int(data.shape[-1]),
+        })
         full_fpath = video_dpath / (image_name + '.npy')
+        meta_fpath = video_dpath / (image_name + '.json')
+        meta_fpath.write_text(json.dumps(metadata))
         np.save(full_fpath, data)
+        result_fpaths.append(full_fpath)
+        result_fpaths.append(meta_fpath)
         logger.info('Stacked full image {}/{}'.format(video_name, image_name))
-    return True
+
+    result['status'] = 'passed'
+    result['fpaths'] = result_fpaths
+    return result

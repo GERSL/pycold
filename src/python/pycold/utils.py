@@ -300,7 +300,11 @@ def assemble_array(array_list, n_block_x):
 
 
 def read_blockdata(block_folder, total_pixels, total_bands):
-    img_files = [f for f in os.listdir(block_folder) if f.startswith('L')]
+    """
+    Read landsat-specific preprocessed blocks.
+    """
+    img_files = [f for f in os.listdir(block_folder)
+                 if f.startswith('L') and f.endswith('.npy')]
 
     # sort image files by dates
     img_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder_name[9:13]), 1, 1) +
