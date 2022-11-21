@@ -50,8 +50,8 @@ SENSOR_TO_INFO['L8'] = {
     'quality_interpretation': 'FMASK'  # I dont think this is right.
 }
 
-    ## You may want to check this document for understading how QA band is encoded.
-    ## https://d9-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/s3fs-public/media/files/LSDS-1435%20Landsat%20C2%20US%20ARD%20Data%20Format%20Control%20Book-v3.pdf
+## You may want to check this document for understading how QA band is encoded.
+## https://d9-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/s3fs-public/media/files/LSDS-1435%20Landsat%20C2%20US%20ARD%20Data%20Format%20Control%20Book-v3.pdf
 
 # Register different quality bit standards. (This could/should be moved to a
 # different module for for conciceness)
@@ -146,6 +146,8 @@ def _demo_kwcoco_bands():
     coco_fpath = grab_demo_kwcoco_dataset()
 
     import kwcoco
+    import kwimage
+    import kwplot
     # Load the dataset
     coco_dset = kwcoco.CocoDataset(coco_fpath)
 
@@ -186,6 +188,24 @@ def _demo_kwcoco_bands():
     rgb_data = rgb_delay.finalize()
     qa_data = qa_delay.finalize()
 
+    rgb_canvas = kwimage.normalize_intensity(rgb_data)
+
+    # Because the QA band is categorical, we should be able to make a short
+    # histogram that describes what is inside.
+    qabits_to_count = ub.dict_hist(qa_data.ravel())
+
+    # For the QA band lets assign a color to each category
+    colors = kwimage.Color.distinct(len(qabits_to_count))
+    qabits_to_color = dict(zip(qabits_to_count, colors))
+
+    # Colorize the QA bands
+    colorized = np.empty(qa_data.shape[0:2] + (3,), dtype=np.float32)
+    for qabit, color in qabits_to_color.items():
+        mask = qa_data[:, :, 0] == qabit
+        colorized[mask] = color
+
+    rgb_canvas = kwimage.normalize_intensity(rgb_data)
+
     # Because the QA band is categorical, we should be able to make a short
 
     qa_canvas = colorized
@@ -212,6 +232,7 @@ def _demo_kwcoco_bands():
 
     plt.show()
 
+
 # This function is a temporary way (quick solution) to run COLD algorithm for Landsat 8 Collection 2 by now.
 # One of reasons why file name is important is that it decides how to treat QA band decoding and scaling.
 # We need a Key information: 'sensor (LT5, LE7, LC8, LC9, L30, S30, etc), 'year', 'doy', 'collection (C_1, C_2)'
@@ -229,6 +250,7 @@ def get_file_name(parent_name):
         collection = 'C_2'
     file_name = sensor + path_hv + year + doy + collection
     return file_name
+
 
 def stack_kwcoco(coco_fpath, out_dir):
     """
@@ -283,6 +305,7 @@ def stack_kwcoco(coco_fpath, out_dir):
             # Transform the image data into the desired block structure.
             process_one_coco_image(coco_image, config, out_dir)
 
+
 # This funtion is for decoding QA band value (written by Su Ye)
 # Reference: see page 19-20 (https://d9-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/s3fs-public/media/files/LSDS-1435%20Landsat%20C2%20US%20ARD%20Data%20Format%20Control%20Book-v3.pdf)
 def qabitval_array_c2(qa_data):
@@ -296,21 +319,22 @@ def qabitval_array_c2(qa_data):
         offset value to use
     """
     # NEED HELP: I think replacing value (255, 0, 1, 2, 3, 4) to quality_bits['no_observation']... would be better.
-    unpacked = np.full(qa_data.shape, 255) # quality_bits['no_observation'])
-    QA_CLEAR_unpacked = geek.bitwise_and(qa_data, 1 << 6) # I believe number on the right indicate bits number. For example, 'Clear' flags in bits 6.
-    QA_SHADOW_unpacked = geek.bitwise_and(qa_data, 1 << 4) # 'Cloud shadow' flags in bits 4.
-    QA_CLOUD_unpacked = geek.bitwise_and(qa_data, 1 << 3) # 'Cloud' flags in bits 3.
-    QA_DILATED_unpacked = geek.bitwise_and(qa_data, 1 << 1) # 'Dilated Cloud' flags in bits 1.
-    QA_SNOW_unpacked = geek.bitwise_and(qa_data, 1 << 5) # 'Snow' flags in bits 5.
-    QA_WATER_unpacked = geek.bitwise_and(qa_data, 1 << 7) # 'Water' flags in bits 7.
+    unpacked = np.full(qa_data.shape, 255)   # quality_bits['no_observation'])
+    QA_CLEAR_unpacked = geek.bitwise_and(qa_data, 1 << 6)    # I believe number on the right indicate bits number. For example, 'Clear' flags in bits 6.
+    QA_SHADOW_unpacked = geek.bitwise_and(qa_data, 1 << 4)   # 'Cloud shadow' flags in bits 4.
+    QA_CLOUD_unpacked = geek.bitwise_and(qa_data, 1 << 3)    # 'Cloud' flags in bits 3.
+    QA_DILATED_unpacked = geek.bitwise_and(qa_data, 1 << 1)  # 'Dilated Cloud' flags in bits 1.
+    QA_SNOW_unpacked = geek.bitwise_and(qa_data, 1 << 5)     # 'Snow' flags in bits 5.
+    QA_WATER_unpacked = geek.bitwise_and(qa_data, 1 << 7)    # 'Water' flags in bits 7.
 
-    unpacked[QA_SNOW_unpacked > 0] = 3 # quality_bits['snow']
-    unpacked[QA_SHADOW_unpacked > 0] = 2 # quality_bits['cloud_shadow']
-    unpacked[QA_CLOUD_unpacked > 0] = 4 # quality_bits['cloud']
-    unpacked[QA_DILATED_unpacked > 0] = 4 # quality_bits['cloud']
-    unpacked[QA_CLEAR_unpacked > 0] = 0 # quality_bits['clear_land']
-    unpacked[QA_WATER_unpacked > 0] = 1 # quality_bits['clear_water']
+    unpacked[QA_SNOW_unpacked > 0] = 3     # quality_bits['snow']
+    unpacked[QA_SHADOW_unpacked > 0] = 2   # quality_bits['cloud_shadow']
+    unpacked[QA_CLOUD_unpacked > 0] = 4    # quality_bits['cloud']
+    unpacked[QA_DILATED_unpacked > 0] = 4  # quality_bits['cloud']
+    unpacked[QA_CLEAR_unpacked > 0] = 0    # quality_bits['clear_land']
+    unpacked[QA_WATER_unpacked > 0] = 1    # quality_bits['clear_water']
     return unpacked
+
 
 def process_one_coco_image(coco_image, config, out_dir):
     """
@@ -429,7 +453,7 @@ def process_one_coco_image(coco_image, config, out_dir):
     qa_data = delayed_qa.finalize(interpolation='nearest', antialias=False)
 
     # Decoding QA band
-    qa_unpacked = qabitval_array_c2(qa_data) # I think it works well...
+    qa_unpacked = qabitval_array_c2(qa_data)  # I think it works well...
 
     # First check the quality bands before loading all of the image data.
     # FIXME: the quality bits in this example are wrong.
@@ -472,7 +496,7 @@ def process_one_coco_image(coco_image, config, out_dir):
     data = np.concatenate([scale_no_thermal, scale_thermal, qa_unpacked], axis=2)
     image_name = get_file_name(coco_image.img['parent_name'])
 
-if is_partition:
+    if is_partition:
         bw = int(padded_w / n_block_x)  # width of a block
         bh = int(padded_h / n_block_y)  # height of a block
 
