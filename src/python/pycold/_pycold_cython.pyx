@@ -438,7 +438,7 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, rec_cg,
                   nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], conse, b_c2, b_pinpoint, rec_cg_pinpoint,
-                  &num_fc_pinpoint, gate_tcg, 0)
+                  &num_fc_pinpoint, gate_tcg, 999999)
     if result != 0:
         raise RuntimeError("S-CCD function fails for pos = {} ".format(pos))
     else:

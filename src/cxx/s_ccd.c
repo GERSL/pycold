@@ -2887,7 +2887,6 @@ int sccd_standard
              *nrt_mode = NRT_MONITOR_STANDARD;
         }else{
             if (clrx[n_clr - conse] - nrt_model->obs_date_since1982[0] - ORDINAL_LANDSAT4_LAUNCH < delay_queue_recent){
-                prev_i_break = 0;
                 *nrt_mode = NRT_BISTATUS;
             }else{
                 *nrt_mode = NRT_QUEUE_STANDARD;
