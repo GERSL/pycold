@@ -164,7 +164,8 @@ int step3_processing_end
     int t_start,
     int conse,
     short int *min_rmse,
-    double gate_tcg
+    double gate_tcg,
+    bool change_detected
 );
 
 
