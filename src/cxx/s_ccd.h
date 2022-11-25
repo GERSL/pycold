@@ -32,8 +32,7 @@ int sccd
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
     int *num_fc_b_pinpoint,
-    double gate_tcg,
-    int delay_queue_recent
+    double gate_tcg
 );
 
 int step1_cold_initialize
@@ -188,7 +187,6 @@ int sccd_standard
     float **clry,               /* I: clear pixel curve in Y direction (spectralbands)    */
     int n_clr,
     double tcg,              /* I:  threshold of change magnitude   */
-    int n_clr_record,        /* I:  the number of observation from the last run   */
     Output_sccd *rec_cg,    /* O: offline change records */
     int *num_fc,            /* O: intialize NUM of Functional Curves    */
     int *nrt_mode,             /* O: 1 - monitor mode; 2 - queue mode    */
@@ -200,8 +198,7 @@ int sccd_standard
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
     int *num_fc_b_pinpoint,
-    double gate_tcg,
-    int delay_queue_recent
+    double gate_tcg
 );
 
 

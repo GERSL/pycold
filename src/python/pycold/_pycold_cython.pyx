@@ -128,7 +128,7 @@ cdef extern from "../../cxx/s_ccd.h":
                   long *fmask_buf, long *valid_date_array, int valid_num_scenes, double tcg, int *num_fc, int *nrt_mode,
                   Output_sccd *rec_cg, output_nrtmodel *nrt_model, int *num_nrt_queue, output_nrtqueue *nrt_queue,
                   short int *min_rmse, int conse, bool b_c2, bool b_pinpoint, Output_sccd_pinpoint *rec_cg_pinpoint, 
-                  int *num_fc_pinpoint, double gate_tcg, int delay_queue_recent)
+                  int *num_fc_pinpoint, double gate_tcg)
 
 
 
@@ -345,7 +345,8 @@ def obcold_reconstruct(np.ndarray[np.int64_t, ndim=1] dates,
 def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndim=1] ts_b, np.ndarray[np.int64_t, ndim=1] ts_g,
                 np.ndarray[np.int64_t, ndim=1] ts_r, np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t, np.ndarray[np.int64_t, ndim=1] qas,
-                double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False, b_pinpoint=False, double gate_tcg=9.236):
+                double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False, b_pinpoint=False, double gate_tcg=9.236,
+                bint b_monitor_init=False):
     """
     S-CCD processing. It is required to be done before near real time monitoring
 
@@ -365,15 +366,17 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     	conse: consecutive observation number
     	b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to its current low quality
     	b_pinpoint: bool, output pinpoint break
+    	gate_tcg: the gate change magnitude threshold for defining anomaly
+    	b_monitor_init: bool, output change metrics in the initialization stage
     	Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
-        
     	Returns
     	----------
         namedtupe: SccdOutput
             change records: the S-CCD outputs that characterizes each temporal segment
             rec_cg:
             min_rmse
-            int nrt_mode,             /* O: 0 - void; 1 - monitor mode for standard; 2 - queue mode for standard; 3 - new change; 4 - monitor mode for snow; 5 - queue mode for snow */
+            int nrt_mode,             /* O: 0 - void; 1 - monitor mode for standard; 2 - queue mode for standard;
+                                        3 - monitor mode for snow; 4 - queue mode for snow */
             output_nrtmodel: nrt model if monitor mode, empty if queue mode
             output_nrtqueue: obs queue if queue mode, empty if monitor mode
     """
@@ -434,11 +437,10 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
-
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, rec_cg,
                   nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], conse, b_c2, b_pinpoint, rec_cg_pinpoint,
-                  &num_fc_pinpoint, gate_tcg, 999999)
+                  &num_fc_pinpoint, gate_tcg)
     if result != 0:
         raise RuntimeError("S-CCD function fails for pos = {} ".format(pos))
     else:
@@ -455,12 +457,13 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
                     return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                       np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([]))
                 elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
-                    return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                      np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
-                elif nrt_mode == 5:  # queue recent
-                    return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                      np.asarray(<output_nrtmodel[:1]>nrt_model),
-                                      np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
+                    if b_monitor_init == False:  # output change results in the initialization stage
+                         return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                  np.array([]), np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
+                    else:
+                        return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                          np.asarray(<output_nrtmodel[:1]>nrt_model),
+                                          np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
                 elif nrt_mode == 0:  # void mode
                     return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
                                       np.array([]))
@@ -472,17 +475,18 @@ def sccd_detect(np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.int64_t, ndi
            
                 if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
                     return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                      np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([])), 
-                                      SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+                                       np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([])),
+                                       SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
                 elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
-                    return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                      np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)), 
-                                      SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
-                elif nrt_mode == 5:  # bi status
-                    return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                      np.asarray(<output_nrtmodel[:1]>nrt_model),
-                                      np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)), 
-                                      SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+                    if b_monitor_init == False:  # output change results in the initialization stage
+                        return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                           np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)),
+                                           SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+                    else:
+                        return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                           np.asarray(<output_nrtmodel[:1]>nrt_model),
+                                           np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)),
+                                           SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
                 elif nrt_mode == 0:  # void mode
                     return [SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
                                       np.array([])), SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
@@ -493,7 +497,7 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
                 np.ndarray[np.int64_t, ndim=1] ts_n, np.ndarray[np.int64_t, ndim=1] ts_s1,
                 np.ndarray[np.int64_t, ndim=1] ts_s2, np.ndarray[np.int64_t, ndim=1] ts_t,
                 np.ndarray[np.int64_t, ndim=1] qas, double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False,
-                double gate_tcg=9.236, int delay_queue_recent=0):
+                double gate_tcg=9.236, bint b_monitor_init=False):
     """
     SCCD online update for new observations
 
@@ -513,16 +517,16 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
        pos: position id of the pixel
        conse: consecutive observation number
        b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to its current low quality
-       Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
        gate_tcg: the gate change magnitude threshold for defining anomaly
-       delay_queue_recent: the day number of recent_queue status lasting
+       b_monitor_init: bool, output change metrics in the initialization stage
+       Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
        Returns
        ----------
        namedtupe: SccdOutput
             rec_cg: the S-CCD outputs that characterizes each temporal segment
             min_rmse
             int nrt_mode,             /* O: 0 - void; 1 - monitor mode for standard; 2 - queue mode for standard;
-                                            3 - monitor mode for snow; 4 - queue mode for snow; 5 - new queue */
+                                            3 - monitor mode for snow; 4 - queue mode for snow  */
             nrt_model: nrt model if monitor mode, empty if queue mode
             nrt_queue: obs queue if queue mode, empty if monitor mode
     """
@@ -552,6 +556,10 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     # cdef int num_fc = 0
     # cdef int num_nrt_queue = 0
     cdef int nrt_mode = sccd_pack.nrt_mode
+    # nrt_mode == 5 is the legacy from the previous version, here we forcbly change it to 4 to avoid conflicts
+    # with the previous dataset, will delete it in the future
+    if nrt_mode == 5:
+        nrt_mode = 4
     cdef int num_fc = len(sccd_pack.rec_cg)
     cdef int num_nrt_queue = len(sccd_pack.nrt_queue)
     cdef int num_fc_pinpoint = 0
@@ -567,7 +575,7 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     if num_nrt_queue > 0:
         nrt_queue_new[0:num_nrt_queue] = sccd_pack.nrt_queue[0:num_nrt_queue]
 
-    if nrt_mode == 1 or nrt_mode == 3 or nrt_mode == 5:
+    if nrt_mode == 1 or nrt_mode == 3:
         nrt_model_new = sccd_pack.nrt_model.copy()
     else:
         nrt_model_new = np.empty(1, dtype=nrtmodel_dt)
@@ -602,11 +610,11 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, &rec_cg_view[0],
                   &nrt_model_view[0], &num_nrt_queue, &nrt_queue_view[0], &min_rmse_view[0], conse, b_c2, False,
-                  rec_cg_pinpoint, &num_fc_pinpoint, gate_tcg, delay_queue_recent)
+                  rec_cg_pinpoint, &num_fc_pinpoint, gate_tcg)
     if result != 0:
         raise RuntimeError("sccd_update function fails for pos = {} ".format(pos))
     else:
-        if nrt_mode < 0:
+        if nrt_mode < 0 or nrt_mode > 4:
             raise RuntimeError("No correct nrt_mode returned for pos = {} ".format(pos))
         else:
             # sccd_pack_copy = None
@@ -619,10 +627,11 @@ def sccd_update(sccd_pack, np.ndarray[np.int64_t, ndim=1] dates, np.ndarray[np.i
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                   nrt_model_new, np.array([]))
             elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
-                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                  np.array([]), nrt_queue_new[0:num_nrt_queue])
-            elif nrt_mode == 5:  # queue recent
-                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                  nrt_model_new, nrt_queue_new[0:num_nrt_queue])
+                if b_monitor_init == False:  # output change results in the initialization stage
+                    return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                       np.array([]), nrt_queue_new[0:num_nrt_queue])
+                else:
+                    return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                      nrt_model_new, nrt_queue_new[0:num_nrt_queue])
             elif nrt_mode == 0:  # void mode
                 return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]), np.array([]))

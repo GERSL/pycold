@@ -735,7 +735,7 @@ int main(int argc, char *argv[])
                     }
                     result = sccd(buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], fmask_buf, sdate, valid_scene_count,
                                   tcg, &num_fc, &nrt_mode, s_rec_cg, nrt_model, &num_obs_queue, obs_queue, min_rmse, conse,
-                                  b_c2, b_pinpoint, rec_cg_pinpoint, &num_fc_pinpoint, gate_tcg, 9999);
+                                  b_c2, b_pinpoint, rec_cg_pinpoint, &num_fc_pinpoint, gate_tcg);
 
                     //printf("free stage 9 \n");
                     for(i = 0; i < num_fc; i++)
