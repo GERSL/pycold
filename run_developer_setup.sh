@@ -89,7 +89,7 @@ else
 fi
 
 # Also clean up any shared libraries
-rm src/python/pycold/_pycold_cython.*.so
+rm src/python/pycold/_colds_cython.*.so
 # Clean up old egg links and such
 rm -rf src/python/pycold.egg-info
 rm -rf pycold.egg-info
@@ -204,4 +204,4 @@ echo "$REPO_DPATH/src/python" >> "$EASY_INSTALL_FPATH"
 echo "Quick pycold tests to verify the install:"
 echo "Pycold Version: $(python -c 'import pycold; print(pycold.__version__)')"
 echo "Python Package Location: $(python -c 'import pycold; print(pycold.__file__)')"
-echo "Compiled Cython Module: $(python -c 'import pycold; print(pycold._pycold_cython.__file__)')"
+echo "Compiled Cython Module: $(python -c 'import pycold; print(pycold._colds_cython.__file__)')"

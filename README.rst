@@ -20,7 +20,8 @@ This library provides:
        
 3. Object-based COLD (OB-COLD), integrating spatial information into COLD by using a ‘change object’ view 
            
-    
+The recent applications of S-CCD and OB-COLD could be found in `CONUS Land Watcher <https://gers.users.earthengine.app/view/nrt-conus>`_
+
 1. Pre-work
 -----------
    
@@ -223,7 +224,7 @@ Stochastic continuous change detection. *Remote Sensing of Environment*,
 *252*, 112167.
 
 [OB-COLD] Ye, S., Zhu, Z., & Cao, G., (2022). Object-based continuous monitoring
-of land disturbance. Submitted to Remote Sensing of Environment
+of land disturbance. Remote Sensing of Environment (in revision)
 
 
 .. |Codecov| image:: https://codecov.io/github/GERSL/pycold/badge.svg?branch=devel&service=github
