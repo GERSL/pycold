@@ -280,7 +280,7 @@ class PyClassifierHPC(PyClassifier):
         """
         try:
             self._check_inputs_thematic(config, record_path, tmp_path, seedmap_path, rf_path)
-        except ValueError or FileExistsError as e:
+        except (ValueError, FileExistsError) as e:
             raise e
 
         self.config = config
