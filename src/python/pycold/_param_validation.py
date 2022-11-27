@@ -129,10 +129,6 @@ def make_constraint(constraint):
         return _VerboseHelper()
     if isinstance(constraint, str) and constraint == "missing_values":
         return _MissingValues()
-    if isinstance(constraint, Hidden):
-        constraint = make_constraint(constraint.constraint)
-        constraint.hidden = True
-        return constraint
     raise ValueError(f"Unknown constraint type: {constraint}")
 
 

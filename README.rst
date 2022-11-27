@@ -10,7 +10,7 @@ A Python library for COntinuous monitoring of Land Disturbance (COLD) and its ex
 =============================================================================================================================
 
 The base algorithms were mostly written using C wrapped in Python, and
-have been verified with `MATLAB version <https://github.com/GERSL/COLD>`_.
+have been verified with `MATLAB version <https://github.com/GERSL/COLD>`_. The C codes of the package were partially modified from `C-CCDC <https://github.com/repository-preservation/lcmap-change-detection-c>`_ developed by USGS.
 
 This library provides: 
 
