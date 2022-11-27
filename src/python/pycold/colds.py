@@ -130,7 +130,7 @@ def cold_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.
                         starting_date, n_cm, cm_output_interval, b_c2, gap_days)
 
 
-def obcold_reconstruct(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates, pos, conse, b_c2):
+def obcold_reconstruct(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates, pos=1, conse=6, b_c2=False):
     """
     re-contructructing change records using break dates.
     Parameters
