@@ -183,16 +183,6 @@ int cold
         /* standard_procedure for CCD                                 */
         /*                                                            */
         /**************************************************************/
-//        printf("valid_num_scenes = %d\n", valid_num_scenes);
-//        printf("valid_date_array[0] = %d\n", valid_date_array[0]);
-//        printf("buf_b[0] = %d\n", buf_b[0]);
-//        printf("buf_t[0] = %d\n", buf_t[0]);
-//        printf("fmask_buf[0] = %d\n", fmask_buf[0]);
-//        printf("valid_num_scenes[0] = %d\n", valid_num_scenes);
-//        printf("id_range[0]=%d\n", id_range[0]);
-//        printf("tcg=%f\n", tcg);
-//        printf("conse=%d\n", conse);
-//        printf("num_fc=%d\n", *num_fc);
          result = stand_procedure(valid_num_scenes, valid_date_array, buf_b, buf_g, buf_r, buf_n, buf_s1, buf_s2, buf_t, fmask_buf, id_range,
                                  tcg, conse, b_outputCM, starting_date, rec_cg, num_fc, CM_OUTPUT_INTERVAL, CM_outputs,
                                  CM_outputs_date, b_c2, gap_days);

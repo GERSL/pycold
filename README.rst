@@ -10,7 +10,7 @@ A Python library for COntinuous monitoring of Land Disturbance (COLD) and its ex
 =============================================================================================================================
 
 The base algorithms were mostly written using C wrapped in Python, and
-have been verified with `MATLAB version <https://github.com/GERSL/COLD>`_.
+have been verified with `MATLAB version <https://github.com/GERSL/COLD>`_. The C codes of the package were partially modified from `C-CCDC <https://github.com/repository-preservation/lcmap-change-detection-c>`_ developed by USGS.
 
 This library provides: 
 
@@ -20,7 +20,8 @@ This library provides:
        
 3. Object-based COLD (OB-COLD), integrating spatial information into COLD by using a ‘change object’ view 
            
-    
+The recent applications of S-CCD and OB-COLD could be found in `CONUS Land Watcher <https://gers.users.earthengine.app/view/nrt-conus>`_
+
 1. Pre-work
 -----------
    
@@ -223,7 +224,7 @@ Stochastic continuous change detection. *Remote Sensing of Environment*,
 *252*, 112167.
 
 [OB-COLD] Ye, S., Zhu, Z., & Cao, G., (2022). Object-based continuous monitoring
-of land disturbance. Submitted to Remote Sensing of Environment
+of land disturbance. Remote Sensing of Environment (in revision)
 
 
 .. |Codecov| image:: https://codecov.io/github/GERSL/pycold/badge.svg?branch=devel&service=github
