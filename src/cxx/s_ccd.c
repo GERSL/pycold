@@ -3125,17 +3125,6 @@ int sccd_snow
             free(rmse);
             rmse = NULL;
 
-            status = free_2d_array ((void **)cov_p);
-            if (status != SUCCESS)
-            {
-                RETURN_ERROR ("Freeing memory: cov_p\n", FUNC_NAME, FAILURE);
-            }
-            status = free_2d_array ((void **)state_a);
-            if (status != SUCCESS)
-            {
-                RETURN_ERROR ("Freeing memory: state_a\n", FUNC_NAME, FAILURE);
-            }
-
             for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
             {
                 gsl_vector_free(instance[i_b].Z);
@@ -3147,6 +3136,18 @@ int sccd_snow
                 gsl_vector_free(state_a[i_b]);
                 gsl_matrix_free(cov_p[i_b]);
             }
+
+            status = free_2d_array ((void **)cov_p);
+            if (status != SUCCESS)
+            {
+                RETURN_ERROR ("Freeing memory: cov_p\n", FUNC_NAME, FAILURE);
+            }
+            status = free_2d_array ((void **)state_a);
+            if (status != SUCCESS)
+            {
+                RETURN_ERROR ("Freeing memory: state_a\n", FUNC_NAME, FAILURE);
+            }
+
 
             free(instance);
             instance = NULL;

@@ -406,59 +406,65 @@ cpdef _sccd_detect(np.ndarray[np.int64_t, ndim=1, mode='c'] dates,
     assert ts_t_view.shape[0] == dates_view.shape[0]
     assert qas_view.shape[0] == dates_view.shape[0]
 
-    result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
-                  &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, rec_cg,
-                  nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], conse, b_c2, b_pinpoint, rec_cg_pinpoint,
-                  &num_fc_pinpoint, gate_tcg)
-    if result != 0:
-        raise RuntimeError("S-CCD function fails for pos = {} ".format(pos))
-    else:
-        if nrt_mode < 0:
-            raise RuntimeError("No correct nrt_mode returned for pos = {} ".format(pos))
+    try:
+        result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
+                      &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, rec_cg,
+                      nrt_model, &num_nrt_queue, nrt_queue, &min_rmse_view[0], conse, b_c2, b_pinpoint, rec_cg_pinpoint,
+                      &num_fc_pinpoint, gate_tcg)
+        if result != 0:
+            raise RuntimeError("S-CCD function fails for pos = {} ".format(pos))
         else:
-            if num_fc > 0:
-                output_rec_cg = np.asarray(<Output_sccd[:num_fc]>rec_cg)
+            if nrt_mode < 0:
+                raise RuntimeError("No correct nrt_mode returned for pos = {} ".format(pos))
             else:
-                output_rec_cg = np.array([])
-                
-            if b_pinpoint == False:
-                if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
-                    return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                      np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([]))
-                elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
-                    if b_monitor_init == False:  # output change results in the initialization stage
-                         return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                  np.array([]), np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
-                    else:
-                        return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                          np.asarray(<output_nrtmodel[:1]>nrt_model),
-                                          np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
-                elif nrt_mode == 0:  # void mode
-                    return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
-                                      np.array([]))
-            else:
-                if num_fc_pinpoint > 0:
-                    output_rec_cg_pinpoint = np.asarray(<Output_sccd_pinpoint[:num_fc_pinpoint]>rec_cg_pinpoint)
+                if num_fc > 0:
+                    output_rec_cg = np.asarray(<Output_sccd[:num_fc]>rec_cg)
                 else:
-                    output_rec_cg_pinpoint = np.array([])
-           
-                if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
-                    return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                       np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([])),
-                                       SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
-                elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
-                    if b_monitor_init == False:  # output change results in the initialization stage
-                        return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                           np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)),
-                                           SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+                    output_rec_cg = np.array([])
+
+                if b_pinpoint == False:
+                    if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
+                        return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                          np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([]))
+                    elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
+                        if b_monitor_init == False:  # output change results in the initialization stage
+                             return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                      np.array([]), np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
+                        else:
+                            return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                              np.asarray(<output_nrtmodel[:1]>nrt_model),
+                                              np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue))
+                    elif nrt_mode == 0:  # void mode
+                        return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
+                                          np.array([]))
+                else:
+                    if num_fc_pinpoint > 0:
+                        output_rec_cg_pinpoint = np.asarray(<Output_sccd_pinpoint[:num_fc_pinpoint]>rec_cg_pinpoint)
                     else:
+                        output_rec_cg_pinpoint = np.array([])
+
+                    if nrt_mode == 1 or nrt_mode == 3:  # monitor mode
                         return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
-                                           np.asarray(<output_nrtmodel[:1]>nrt_model),
-                                           np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)),
+                                           np.asarray(<output_nrtmodel[:1]>nrt_model), np.array([])),
                                            SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
-                elif nrt_mode == 0:  # void mode
-                    return [SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
-                                      np.array([])), SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+                    elif nrt_mode == 2 or nrt_mode == 4:  # queue mode
+                        if b_monitor_init == False:  # output change results in the initialization stage
+                            return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                               np.array([]),np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)),
+                                               SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+                        else:
+                            return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
+                                               np.asarray(<output_nrtmodel[:1]>nrt_model),
+                                               np.asarray(<output_nrtqueue[:num_nrt_queue]>nrt_queue)),
+                                               SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+                    elif nrt_mode == 0:  # void mode
+                        return [SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
+                                          np.array([])), SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+    finally:
+        PyMem_Free(rec_cg)
+        PyMem_Free(rec_cg_pinpoint)
+        PyMem_Free(nrt_queue)
+        PyMem_Free(nrt_model)
 
 
 cpdef _sccd_update(sccd_pack,
