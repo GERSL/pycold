@@ -1,7 +1,9 @@
-from ._colds_cython import _cold_detect, _obcold_reconstruct, _sccd_detect, _sccd_update, SccdOutput
+from ._colds_cython import _cold_detect, _obcold_reconstruct, _sccd_update, SccdOutput, SccdWrapper
 import numpy as np
 from ._param_validation import validate_parameter_constraints, Interval, Integral, Real, check_consistent_length, \
     check_1d
+import copy
+
 
 _parameter_constraints: dict = {
     "t_cg": [Interval(Real, 0.0, None, closed="neither")],
@@ -16,6 +18,11 @@ _parameter_constraints: dict = {
     "gate_tcg": [Interval(Real, 0.0, None, closed="neither")],
     "b_monitor_init": ["boolean"]
 }
+
+
+NUM_FC = 40  # define the maximum number of outputted curves
+NUM_FC_SCCD = 40
+NUM_NRT_QUEUE = 240
 
 
 def _validate_params(func_name, **kwargs):
@@ -130,6 +137,7 @@ def cold_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.
                         starting_date, n_cm, cm_output_interval, b_c2, gap_days)
 
 
+
 def obcold_reconstruct(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates, pos=1, conse=6, b_c2=False):
     """
     re-contructructing change records using break dates.
@@ -203,8 +211,10 @@ def sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.
     dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas = _validate_data(dates, ts_b, ts_g, ts_r, ts_n, ts_s1,
                                                                             ts_s2, ts_t, qas)
 
-    return _sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg, pos, conse, b_c2, b_pinpoint,
-                        gate_tcg, b_monitor_init)
+    sccd_wrapper = SccdWrapper()
+    tmp = copy.deepcopy(sccd_wrapper.sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg,
+                                    pos, conse, b_c2, b_pinpoint, gate_tcg, b_monitor_init))
+    return tmp
 
 
 def sccd_update(sccd_pack, dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.0863, pos=1, conse=6,
