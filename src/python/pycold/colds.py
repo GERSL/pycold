@@ -1,4 +1,4 @@
-from ._colds_cython import _cold_detect, _obcold_reconstruct, _sccd_update, SccdOutput, SccdWrapper
+from ._colds_cython import _sccd_update, SccdOutput,  _sccd_detect, _obcold_reconstruct, _cold_detect
 import numpy as np
 from ._param_validation import validate_parameter_constraints, Interval, Integral, Real, check_consistent_length, \
     check_1d
@@ -126,16 +126,17 @@ def cold_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.
     Or
     [change records, cm_outputs, cm_outputs_date] if b_output_cm==True
     """
+
     _validate_params(func_name='cold_detect', t_cg=t_cg, pos=pos, conse=conse, b_output_cm=b_output_cm,
                      starting_date=starting_date, n_cm=n_cm, cm_output_interval=cm_output_interval, b_c2=b_c2,
                      gap_days=gap_days)
+
     # make sure it is c contiguous array and 64 bit
     dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas = _validate_data(dates, ts_b, ts_g, ts_r, ts_n, ts_s1,
                                                                             ts_s2, ts_t, qas)
 
     return _cold_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg, pos, conse, b_output_cm,
                         starting_date, n_cm, cm_output_interval, b_c2, gap_days)
-
 
 
 def obcold_reconstruct(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates, pos=1, conse=6, b_c2=False):
@@ -211,14 +212,16 @@ def sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.
     dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas = _validate_data(dates, ts_b, ts_g, ts_r, ts_n, ts_s1,
                                                                             ts_s2, ts_t, qas)
 
-    sccd_wrapper = SccdWrapper()
-    tmp = copy.deepcopy(sccd_wrapper.sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg,
-                                    pos, conse, b_c2, b_pinpoint, gate_tcg, b_monitor_init))
-    return tmp
+    # sccd_wrapper = SccdDetectWrapper()
+    # tmp = copy.deepcopy(sccd_wrapper.sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg,
+    #                                 pos, conse, b_c2, b_pinpoint, gate_tcg, b_monitor_init))
+    # return tmp
+    return _sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg, pos, conse, b_c2, b_pinpoint,
+                        gate_tcg, b_monitor_init)
 
 
 def sccd_update(sccd_pack, dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.0863, pos=1, conse=6,
-                b_c2=False, b_pinpoint=False, gate_tcg=9.236, b_monitor_init=False):
+                b_c2=False, gate_tcg=9.236, b_monitor_init=False):
     """
     SCCD online update for new observations
     Ye, S., Rogan, J., Zhu, Z., & Eastman, J. R. (2021). A near-real-time approach for monitoring forest
@@ -242,9 +245,6 @@ def sccd_update(sccd_pack, dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qa
     conse: consecutive observation number
     b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel
                 test due to its current low quality
-    b_pinpoint: bool, output pinpoint break where pinpoint is an overdetection of break using conse =3
-                        and threshold = gate_tcg, which are used to simulate the situation of NRT scenario and
-                        for training a machine-learning model
     gate_tcg: the gate change magnitude threshold for defining anomaly
     b_monitor_init: bool, output change metrics during the initialization stage
     Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
@@ -255,7 +255,7 @@ def sccd_update(sccd_pack, dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qa
     if not isinstance(sccd_pack, SccdOutput):
         raise ValueError("The type of sccd_pack has to be namedtuple 'SccdOutput'!")
 
-    _validate_params(func_name='sccd_update', t_cg=t_cg, pos=pos, conse=conse, b_c2=b_c2, b_pinpoint=b_pinpoint,
+    _validate_params(func_name='sccd_update', t_cg=t_cg, pos=pos, conse=conse, b_c2=b_c2, b_pinpoint=False,
                      gate_tcg=gate_tcg, b_monitor_init=b_monitor_init)
 
     dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas = _validate_data(dates, ts_b, ts_g, ts_r, ts_n, ts_s1,
