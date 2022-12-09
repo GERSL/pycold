@@ -1,9 +1,8 @@
-from ._colds_cython import _sccd_update, SccdOutput,  _sccd_detect, _obcold_reconstruct, _cold_detect
+from ._colds_cython import SccdOutput, _sccd_update, _sccd_detect, _obcold_reconstruct, _cold_detect
 import numpy as np
 from ._param_validation import validate_parameter_constraints, Interval, Integral, Real, check_consistent_length, \
     check_1d
-import copy
-
+from .utils import predict_ref
 
 _parameter_constraints: dict = {
     "t_cg": [Interval(Real, 0.0, None, closed="neither")],
@@ -87,6 +86,71 @@ def _validate_data(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break
         return dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates
     else:
         return dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas
+
+
+def _nrt_stablity_test(sccd_plot, threshold, parameters, conse=6):
+    """
+    calculate the valid conse pixel, and the stable observation number out of valid conse
+    Parameters
+    ----------
+    sccd_plot: sccd pack
+    threshold: the change magnitude threshold to define stable obs
+    parameters: pycold parameters
+    conse: the default conse
+
+    Returns
+    -------
+    number of test obs, number of stable obs
+    """
+
+    if sccd_plot.nrt_mode == 0 or sccd_plot.nrt_mode == 3 or sccd_plot.nrt_mode == 4: # snow mode
+        return 0, 0
+    else:
+        pred_ref = np.asarray([[predict_ref(sccd_plot.nrt_model[0]['nrt_coefs'][b],
+                                            sccd_plot.nrt_model[0]['obs_date_since1982'][
+                                                i_conse] + parameters['COMMON'][
+                                                'JULIAN_LANDSAT4_LAUNCH'])
+                                for i_conse in range(parameters['COMMON']['default_conse'])]
+                               for b in range(parameters['SCCD']['NRT_BAND'])])
+        cm = (sccd_plot.nrt_model[0]['obs'][:, 0:parameters['COMMON']['default_conse']] - pred_ref)[1:6, :]  # exclude blue band
+        if sccd_plot.nrt_model['num_obs'] < 18:
+            df = 4
+        else:
+            df = 6
+        cm_normalized = np.sum((cm.T / np.max([sccd_plot.min_rmse[1:6],
+                                               np.sqrt(sccd_plot.nrt_model['rmse_sum'][0][1:6] /
+                                                       (sccd_plot.nrt_model['num_obs'] - df))], axis=0)).T ** 2, axis=0)
+        if sccd_plot.nrt_mode == 2 or sccd_plot.nrt_mode == 5:  # bi mode - legacy
+            valid_test_num = np.min([len(sccd_plot.nrt_queue) - conse, conse])
+            cm_normalized = cm_normalized[(conse - valid_test_num): conse]
+            n_stable = len(cm_normalized[cm_normalized < threshold])
+            return valid_test_num, n_stable
+        elif sccd_plot.nrt_mode == 1:  # monitor mode
+            n_stable = len(cm_normalized[cm_normalized < threshold])
+            return conse, n_stable
+
+
+def test_stablity(sccd_plot, parameters, threshold=15.086, min_test_obs=3, stable_ratio=0.5):
+    """
+    test if the harmonic model is stable
+    Parameters
+    ----------
+    sccd_plot: sccd pack
+    threshold: the change magnitude threshold to define stable obs
+    parameters: pycold parameters
+
+    Returns
+    -------
+    True or false
+    """
+    test_conse, n_stable = _nrt_stablity_test(sccd_plot, threshold, parameters, conse=6)
+    if n_stable < min_test_obs:
+        return False
+    else:
+        if n_stable * 1.0 / test_conse > stable_ratio:
+            return True
+        else:
+            return False
 
 
 def cold_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.0863, pos=1, conse=6,
@@ -252,8 +316,8 @@ def sccd_update(sccd_pack, dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qa
     ----------
     change records: the SCCD outputs that characterizes each temporal segment
     """
-    if not isinstance(sccd_pack, SccdOutput):
-        raise ValueError("The type of sccd_pack has to be namedtuple 'SccdOutput'!")
+    # if not isinstance(sccd_pack, SccdOutput):
+    #     raise ValueError("The type of sccd_pack has to be namedtuple 'SccdOutput'!")
 
     _validate_params(func_name='sccd_update', t_cg=t_cg, pos=pos, conse=conse, b_c2=b_c2, b_pinpoint=False,
                      gate_tcg=gate_tcg, b_monitor_init=b_monitor_init)

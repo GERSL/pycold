@@ -2934,7 +2934,7 @@ int sccd_standard
             num_obs_processed = n_clr - conse - prev_i_break;
             if (num_obs_processed < conse)
                 num_obs_processed = conse;
-            // we update the coefficients each time if the pixel was in the status of 'bi', then overwrite variables
+
             update_cft(num_obs_processed, N_TIMES, MIN_NUM_C, MID_NUM_C, MID_NUM_C,
                        SCCD_NUM_C, &update_num_c);
             for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)

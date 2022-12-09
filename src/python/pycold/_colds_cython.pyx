@@ -190,7 +190,7 @@ cpdef _cold_detect(np.ndarray[np.int64_t, ndim=1, mode='c'] dates, np.ndarray[np
         ts_t: 1d array of shape(observation numbers), time series of thermal band
         qas: 1d array, the QA cfmask bands. '0' - clear; '1' - water; '2' - shadow; '3' - snow; '4' - cloud
         t_cg: threshold of change magnitude, default is chi2.ppf(0.99,5)
-         pos: position id of the pixel
+        pos: position id of the pixel
         conse: consecutive observation number
         b_output_cm: bool, 'True' means outputting change magnitude and change magnitude dates, only for object-based COLD
         starting_date: the starting date of the whole dataset to enable reconstruct CM_date,
@@ -539,16 +539,6 @@ cpdef _sccd_update(sccd_pack,
     cdef long [:] ts_s2_view = ts_s2
     cdef long [:] ts_t_view = ts_t
     cdef long [:] qas_view = qas
-
-    # assert the length
-    assert ts_b_view.shape[0] == dates_view.shape[0]
-    assert ts_g_view.shape[0] == dates_view.shape[0]
-    assert ts_r_view.shape[0] == dates_view.shape[0]
-    assert ts_n_view.shape[0] == dates_view.shape[0]
-    assert ts_s1_view.shape[0] == dates_view.shape[0]
-    assert ts_s2_view.shape[0] == dates_view.shape[0]
-    assert ts_t_view.shape[0] == dates_view.shape[0]
-    assert qas_view.shape[0] == dates_view.shape[0]
 
     result = sccd(&ts_b_view[0], &ts_g_view[0], &ts_r_view[0], &ts_n_view[0], &ts_s1_view[0], &ts_s2_view[0],
                   &ts_t_view[0], &qas_view[0], &dates_view[0], valid_num_scenes, t_cg, &num_fc, &nrt_mode, &rec_cg_view[0],

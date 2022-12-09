@@ -11,4 +11,4 @@ from . import monkey  # NOQA
 
 from . import colds
 # from . import _colds_cython
-from .colds import cold_detect, obcold_reconstruct, sccd_detect, sccd_update
+from .colds import cold_detect, obcold_reconstruct, sccd_detect, sccd_update, test_stablity
