@@ -45,8 +45,7 @@ int sccd
     int valid_num_scenes,       /* I: number of valid scenes under cfmask fill counts  */
     double tcg,                /* I: the change threshold  */
     int *num_fc,                /* O: number of fitting curves                       */
-    int *nrt_mode,              /* O: 0 - void; 1 - monitor mode for standard; 2 - queue mode for standard;
-        3 - unconfirmed queue; 4 - monitor mode for snow; 5 - queue mode for snow */
+    int *nrt_mode,              /* O: 2nd digit: 0 - void; 1 - monitor mode for standard; 2 - queue mode for standard; 3 - monitor mode for snow; 4 - queue mode for snow; 1st digit: 1 - predictability untest */
     Output_sccd *rec_cg,           /* O: historical change records for SCCD results    */
     output_nrtmodel *nrt_model,      /* O: nrt model structure for SCCD results    */
     int *num_obs_queue,             /* O: the number of multispectral observations    */
@@ -57,7 +56,8 @@ int sccd
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
     int *num_fc_pinpoint,
-    double gate_tcg
+    double gate_tcg,
+    double predictability_tcg
 )
 {
     int clear_sum = 0;      /* Total number of clear cfmask pixels          */
@@ -81,9 +81,9 @@ int sccd
     int len_clrx;         /* length of clrx  */
     int n_clr_record;
 
-    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD))
+    if ((*nrt_mode == NRT_QUEUE_SNOW)|(*nrt_mode % 10 == NRT_QUEUE_STANDARD))
         len_clrx = valid_num_scenes + *num_obs_queue;
-    else if ((*nrt_mode  == NRT_MONITOR_SNOW)|(*nrt_mode  == NRT_MONITOR_STANDARD))
+    else if ((*nrt_mode == NRT_MONITOR_SNOW)|(*nrt_mode % 10 == NRT_MONITOR_STANDARD))
         len_clrx = valid_num_scenes + DEFAULT_CONSE;
     else
        len_clrx = valid_num_scenes;
@@ -120,7 +120,7 @@ int sccd
             b_snow = TRUE;
     }else
     {
-        if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_MONITOR_SNOW))
+        if ((*nrt_mode == NRT_QUEUE_SNOW)|(*nrt_mode == NRT_MONITOR_SNOW))
             b_snow = TRUE;
         else
             b_snow = FALSE;
@@ -132,7 +132,7 @@ int sccd
     /*     initializing clrx and clry using existing obs in queue        */
     /*                                                                   */
     /*********************************************************************/
-    if ((*nrt_mode  == NRT_QUEUE_SNOW)|(*nrt_mode  == NRT_QUEUE_STANDARD))
+    if ((*nrt_mode == NRT_QUEUE_SNOW)|(*nrt_mode % 10 == NRT_QUEUE_STANDARD))
     {
         // if queue mode, will append old observation first
         for (i = 0; i < *num_obs_queue; i++){
@@ -141,7 +141,7 @@ int sccd
                 clry[i_b][i] =  obs_queue[i].clry[i_b];
             n_clr++;
         }
-    }else if ((*nrt_mode  == NRT_MONITOR_SNOW)|(*nrt_mode  == NRT_MONITOR_STANDARD))
+    }else if ((*nrt_mode == NRT_MONITOR_SNOW)|(*nrt_mode % 10 == NRT_MONITOR_STANDARD))
     {
         //  if monitor mode, will append output_nrtmodel default conse-1 obs
         for (k = 0; k < DEFAULT_CONSE; k++){
@@ -202,7 +202,7 @@ int sccd
              }
          }
 
-         if ((n_clr > n_clr_record) | (*nrt_mode  == NRT_QUEUE_STANDARD))
+         if ((n_clr > n_clr_record) | (*nrt_mode % 10  == NRT_QUEUE_STANDARD))
          {
 
              /* need to calculate min_rmse at the beginning of the monitoring */
@@ -218,7 +218,7 @@ int sccd
 
             result = sccd_standard(clrx, clry, n_clr, tcg, rec_cg, num_fc, nrt_mode, nrt_model, num_obs_queue,
                                    obs_queue, min_rmse, conse, b_pinpoint, rec_cg_pinpoint, num_fc_pinpoint,
-                                   gate_tcg);
+                                   gate_tcg, predictability_tcg);
 
          }
     }
@@ -2116,7 +2116,7 @@ int step3_processing_end
     float **clry,
     int cur_i,
     int *n_clr,
-    int nrt_mode,
+    int *nrt_mode,
     int i_start,
     int prev_i_break,             /* I: the i_break of the last curve*/
     output_nrtmodel *nrt_model,         /* I/O: the NRT change records */
@@ -2128,7 +2128,8 @@ int step3_processing_end
     int conse,
     short int *min_rmse,
     double gate_tcg,
-    bool change_detected
+    bool change_detected,
+    double predictability_tcg
 )
 {
     int k, k1, k2;
@@ -2156,13 +2157,13 @@ int step3_processing_end
     float *medium_v_dif;
     clock_t t_time = clock();
     float **v_dif_mag;
-    int update_num_c;
+    int update_num_c, i;
 
     // double time_taken;
     t_time = clock();
     int conse_last;
     int valid_conse_last;  // valid conse number after excluding the observations included in the model fitting
-
+    int stable_count = 0;
 
     w = TWO_PI / AVE_DAYS_IN_A_YEAR;
     w2 = 2.0 * w;
@@ -2229,7 +2230,7 @@ int step3_processing_end
 //    printf("step3 timepoint 1 took %f seconds to execute\n", time_taken);
 //    t_time = clock();
 
-    if (nrt_mode != NRT_VOID)
+    if (*nrt_mode != NRT_VOID)
     {
         /****************************************************/
         /*   need to save nrt records for monitor mode      */
@@ -2242,7 +2243,7 @@ int step3_processing_end
              {
                  for(k2 = 0; k2 < DEFAULT_N_STATE; k2++){
                      // printf("k1 = %d, k2 = %d,  p = %f \n", k1, k2, gsl_matrix_get(cov_p[i_b], k1, k2));
-                     if(nrt_mode == NRT_MONITOR_STANDARD)
+                     if(*nrt_mode == NRT_MONITOR_STANDARD)
                         nrt_model->covariance[i_b][k1 * DEFAULT_N_STATE + k2] = (float)gsl_matrix_get(cov_p[i_b], k1, k2);
                      else
                         nrt_model->covariance[i_b][k1 * DEFAULT_N_STATE + k2] = 0;
@@ -2282,7 +2283,7 @@ int step3_processing_end
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             // nrt_model->min_rmse[i_b] = (short int)min_rmse[i_b];
-            if(nrt_mode == NRT_MONITOR_STANDARD)
+            if(*nrt_mode == NRT_MONITOR_STANDARD)
                 nrt_model->H[i_b] = instance[i_b].H;
             else
                 nrt_model->H[i_b] = 0;
@@ -2334,18 +2335,40 @@ int step3_processing_end
 
         /**********************************************************/
         /*                                                        */
-        /*      Assign norm_cm, cm_angle, conse_last              */
+        /*      predictability test                               */
         /*                                                        */
         /**********************************************************/
-        if ((nrt_mode == NRT_QUEUE_STANDARD) && (change_detected == FALSE)) // for bi status, but not for the change just detected
+        if ((*nrt_mode == NRT_QUEUE_STANDARD) && (change_detected == FALSE)) // for bi status, but not for the change just detected
         {
-            valid_conse_last = *n_clr - num_obs_processed;
+            valid_conse_last = *n_clr - num_obs_processed - prev_i_break;
             if (valid_conse_last > conse){
                 valid_conse_last = conse;
             }
         }else{
              valid_conse_last = conse;
         }
+        if (*nrt_mode / 10 == 1)
+        {
+            if (valid_conse_last > 1){
+                for (i = 0; i < valid_conse_last; i++)
+                {
+                    if (v_dif_mag_norm[i] < predictability_tcg){
+                        stable_count = stable_count + 1;
+                    }
+                }
+
+                // if pass the predictability test, change the first digit to zero
+                if ((float)stable_count / valid_conse_last > CORRECT_RATIO_PREDICTABILITY){
+                    *nrt_mode = *nrt_mode - 10;
+                }
+            }
+        }
+
+        /**********************************************************/
+        /*                                                        */
+        /*      Assign norm_cm, cm_angle, conse_last              */
+        /*                                                        */
+        /**********************************************************/
         nrt_model->norm_cm = NA_VALUE;
         nrt_model->cm_angle = NA_VALUE;
         nrt_model->conse_last = 0;
@@ -2461,7 +2484,7 @@ int step3_processing_end
 //        t_time = clock();
     } // if (nrt_mode != NRT_VOID)
 
-    if(nrt_mode == NRT_QUEUE_STANDARD)
+    if(*nrt_mode % 10 == NRT_QUEUE_STANDARD)
     {
         *num_obs_queue = *n_clr - prev_i_break;
         if (*num_obs_queue > MAX_OBS_QUEUE){
@@ -2525,7 +2548,8 @@ int sccd_standard
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
     int *num_fc_pinpoint,
-    double gate_tcg
+    double gate_tcg,
+    double predictability_tcg
 )
 {
     int i_b;
@@ -2633,7 +2657,7 @@ int sccd_standard
     }
 
     /* if the mode is void, we need copy paramater from existing results */
-    if(*nrt_mode == NRT_MONITOR_STANDARD)
+    if(*nrt_mode % 10 == NRT_MONITOR_STANDARD)
     {
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
@@ -2663,7 +2687,7 @@ int sccd_standard
             /*     6. initialize state-space model coefficients       */
             initialize_ssmconstants(DEFAULT_N_STATE, nrt_model->H[i_b], &instance[i_b]);
         }
-    }else if(*nrt_mode == NRT_QUEUE_STANDARD)
+    }else if(*nrt_mode % 10 == NRT_QUEUE_STANDARD)
     {
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
@@ -2698,7 +2722,7 @@ int sccd_standard
     }
 
 
-    if (*nrt_mode  == NRT_MONITOR_STANDARD)
+    if (*nrt_mode % 10 == NRT_MONITOR_STANDARD)
         bl_train = 1;
     else
         bl_train = 0;
@@ -2735,6 +2759,7 @@ int sccd_standard
             /*                                                             */
             /***************************************************************/
             status = INCOMPLETE;
+            change_detected = FALSE;
             if((i_span >= N_TIMES * MID_NUM_C) && (time_span >= (double)MIN_YEARS))
             {
                 /**************************************************************/
@@ -2917,40 +2942,35 @@ int sccd_standard
 
 
     // update the status; num_obs_processed and sum_square_vt are also updated if the status is queue
-    if (*nrt_mode == NRT_MONITOR_STANDARD)
+    if (*nrt_mode % 10 == NRT_MONITOR_STANDARD)
     {
         if (change_detected==TRUE)
-            *nrt_mode = NRT_QUEUE_STANDARD;
+            *nrt_mode = NRT_QUEUE_STANDARD;   // the first digit is 1 meaning that predictability untested
     }
-    else if(*nrt_mode == NRT_QUEUE_STANDARD){
+    else if(*nrt_mode % 10 == NRT_QUEUE_STANDARD){
         if (n_clr < conse)
             RETURN_ERROR("The observation in the queue cannot be smaller than conse \n", FUNC_NAME, FAILURE);
 
-        if (bl_train == 1)
-        {
-             *nrt_mode = NRT_MONITOR_STANDARD;
-        }else
-        {
-            num_obs_processed = n_clr - conse - prev_i_break;
-            if (num_obs_processed < conse)
-                num_obs_processed = conse;
+        num_obs_processed = n_clr - conse - prev_i_break;
+        if (num_obs_processed < conse)
+            num_obs_processed = conse;
 
-            update_cft(num_obs_processed, N_TIMES, MIN_NUM_C, MID_NUM_C, MID_NUM_C,
-                       SCCD_NUM_C, &update_num_c);
-            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+        update_cft(num_obs_processed, N_TIMES, MIN_NUM_C, MID_NUM_C, MID_NUM_C,
+                   SCCD_NUM_C, &update_num_c);
+        for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+        {
+            status = auto_ts_fit_sccd(clrx, clry, i_b, i_b, prev_i_break, prev_i_break + num_obs_processed - 1,
+                                      update_num_c, fit_cft, &rmse_ini[i_b], rec_v_dif);
+            if (status != SUCCESS)
             {
-                status = auto_ts_fit_sccd(clrx, clry, i_b, i_b, prev_i_break, prev_i_break + num_obs_processed - 1,
-                                          update_num_c, fit_cft, &rmse_ini[i_b], rec_v_dif);
-                if (status != SUCCESS)
-                {
-                     RETURN_ERROR ("Calling auto_ts_fit_sccd at the end of time series\n",
-                            FUNC_NAME, FAILURE);
-                }
-                sum_square_vt[i_b] = rmse_ini[i_b] * rmse_ini[i_b] * (num_obs_processed - update_num_c);
-
+                 RETURN_ERROR ("Calling auto_ts_fit_sccd at the end of time series\n",
+                        FUNC_NAME, FAILURE);
             }
-            *nrt_mode = NRT_QUEUE_STANDARD;;
+            sum_square_vt[i_b] = rmse_ini[i_b] * rmse_ini[i_b] * (num_obs_processed - update_num_c);
+
         }
+//            *nrt_mode = NRT_QUEUE_STANDARD;
+
     }
 
 
@@ -2958,10 +2978,10 @@ int sccd_standard
 //    printf("step2_KF_ChangeDetection took %f seconds to execute\n", time_taken);
 //    t_time = clock();
 
-    status = step3_processing_end(instance, cov_p, fit_cft, clrx, clry, i, &n_clr, *nrt_mode,
+    status = step3_processing_end(instance, cov_p, fit_cft, clrx, clry, i, &n_clr, nrt_mode,
                                   i_start, prev_i_break, nrt_model, num_obs_queue,
                                   obs_queue, sum_square_vt, num_obs_processed, t_start,
-                                  conse, min_rmse, gate_tcg, change_detected);
+                                  conse, min_rmse, gate_tcg, change_detected, predictability_tcg);
 
 //    time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
 //    printf("processing_end took %f seconds to execute \n", time_taken);

@@ -15,13 +15,20 @@ _parameter_constraints: dict = {
     "gap_days": [Interval(Real, 0.0, None, closed="left")],
     "b_pinpoint": ["boolean"],
     "gate_tcg": [Interval(Real, 0.0, None, closed="neither")],
-    "b_monitor_init": ["boolean"]
+    "predictability_tcg": [Interval(Real, 0.0, None, closed="neither")],
+    "dist_conse": [Interval(Integral, 0, 6, closed="right")],
+    "t_cg_scale100": [Interval(Real, 0.0, None, closed="neither")],
+    "t_cg_singleband_scale1000": [Interval(Real, None, None, closed="neither")],
+    "t_angle_scale100": [Interval(Integral, 0, 18000, closed="neither")],
+    "transform_mode": ["boolean"]
 }
-
 
 NUM_FC = 40  # define the maximum number of outputted curves
 NUM_FC_SCCD = 40
 NUM_NRT_QUEUE = 240
+DEFAULT_CONSE = 6
+NRT_BAND = 6
+JULIAN_LANDSAT4_LAUNCH = 723742
 
 
 def _validate_params(func_name, **kwargs):
@@ -88,69 +95,69 @@ def _validate_data(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break
         return dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas
 
 
-def _nrt_stablity_test(sccd_plot, threshold, parameters, conse=6):
-    """
-    calculate the valid conse pixel, and the stable observation number out of valid conse
-    Parameters
-    ----------
-    sccd_plot: sccd pack
-    threshold: the change magnitude threshold to define stable obs
-    parameters: pycold parameters
-    conse: the default conse
-
-    Returns
-    -------
-    number of test obs, number of stable obs
-    """
-
-    if sccd_plot.nrt_mode == 0 or sccd_plot.nrt_mode == 3 or sccd_plot.nrt_mode == 4: # snow mode
-        return 0, 0
-    else:
-        pred_ref = np.asarray([[predict_ref(sccd_plot.nrt_model[0]['nrt_coefs'][b],
-                                            sccd_plot.nrt_model[0]['obs_date_since1982'][
-                                                i_conse] + parameters['COMMON'][
-                                                'JULIAN_LANDSAT4_LAUNCH'])
-                                for i_conse in range(parameters['COMMON']['default_conse'])]
-                               for b in range(parameters['SCCD']['NRT_BAND'])])
-        cm = (sccd_plot.nrt_model[0]['obs'][:, 0:parameters['COMMON']['default_conse']] - pred_ref)[1:6, :]  # exclude blue band
-        if sccd_plot.nrt_model['num_obs'] < 18:
-            df = 4
-        else:
-            df = 6
-        cm_normalized = np.sum((cm.T / np.max([sccd_plot.min_rmse[1:6],
-                                               np.sqrt(sccd_plot.nrt_model['rmse_sum'][0][1:6] /
-                                                       (sccd_plot.nrt_model['num_obs'] - df))], axis=0)).T ** 2, axis=0)
-        if sccd_plot.nrt_mode == 2 or sccd_plot.nrt_mode == 5:  # bi mode - legacy
-            valid_test_num = np.min([len(sccd_plot.nrt_queue) - conse, conse])
-            cm_normalized = cm_normalized[(conse - valid_test_num): conse]
-            n_stable = len(cm_normalized[cm_normalized < threshold])
-            return valid_test_num, n_stable
-        elif sccd_plot.nrt_mode == 1:  # monitor mode
-            n_stable = len(cm_normalized[cm_normalized < threshold])
-            return conse, n_stable
-
-
-def test_stablity(sccd_plot, parameters, threshold=15.086, min_test_obs=3, stable_ratio=0.5):
-    """
-    test if the harmonic model is stable
-    Parameters
-    ----------
-    sccd_plot: sccd pack
-    threshold: the change magnitude threshold to define stable obs
-    parameters: pycold parameters
-
-    Returns
-    -------
-    True or false
-    """
-    test_conse, n_stable = _nrt_stablity_test(sccd_plot, threshold, parameters, conse=6)
-    if n_stable < min_test_obs:
-        return False
-    else:
-        if n_stable * 1.0 / test_conse > stable_ratio:
-            return True
-        else:
-            return False
+# def _nrt_stablity_test(sccd_plot, threshold, parameters, conse=6):
+#     """
+#     calculate the valid conse pixel, and the stable observation number out of valid conse
+#     Parameters
+#     ----------
+#     sccd_plot: sccd pack
+#     threshold: the change magnitude threshold to define stable obs
+#     parameters: pycold parameters
+#     conse: the default conse
+#
+#     Returns
+#     -------
+#     number of test obs, number of stable obs
+#     """
+#
+#     if sccd_plot.nrt_mode == 0 or sccd_plot.nrt_mode == 3 or sccd_plot.nrt_mode == 4: # snow mode
+#         return 0, 0
+#     else:
+#         pred_ref = np.asarray([[predict_ref(sccd_plot.nrt_model[0]['nrt_coefs'][b],
+#                                             sccd_plot.nrt_model[0]['obs_date_since1982'][
+#                                                 i_conse] + parameters['COMMON'][
+#                                                 'JULIAN_LANDSAT4_LAUNCH'])
+#                                 for i_conse in range(parameters['COMMON']['default_conse'])]
+#                                for b in range(parameters['SCCD']['NRT_BAND'])])
+#         cm = (sccd_plot.nrt_model[0]['obs'][:, 0:parameters['COMMON']['default_conse']] - pred_ref)[1:6, :]  # exclude blue band
+#         if sccd_plot.nrt_model['num_obs'] < 18:
+#             df = 4
+#         else:
+#             df = 6
+#         cm_normalized = np.sum((cm.T / np.max([sccd_plot.min_rmse[1:6],
+#                                                np.sqrt(sccd_plot.nrt_model['rmse_sum'][0][1:6] /
+#                                                        (sccd_plot.nrt_model['num_obs'] - df))], axis=0)).T ** 2, axis=0)
+#         if sccd_plot.nrt_mode == 2 or sccd_plot.nrt_mode == 5:  # bi mode - legacy
+#             valid_test_num = np.min([len(sccd_plot.nrt_queue) - conse, conse])
+#             cm_normalized = cm_normalized[(conse - valid_test_num): conse]
+#             n_stable = len(cm_normalized[cm_normalized < threshold])
+#             return valid_test_num, n_stable
+#         elif sccd_plot.nrt_mode == 1:  # monitor mode
+#             n_stable = len(cm_normalized[cm_normalized < threshold])
+#             return conse, n_stable
+#
+#
+# def test_stablity(sccd_plot, parameters, threshold=15.086, min_test_obs=3, stable_ratio=0.5):
+#     """
+#     test if the harmonic model is stable
+#     Parameters
+#     ----------
+#     sccd_plot: sccd pack
+#     threshold: the change magnitude threshold to define stable obs
+#     parameters: pycold parameters
+#
+#     Returns
+#     -------
+#     True or false
+#     """
+#     test_conse, n_stable = _nrt_stablity_test(sccd_plot, threshold, parameters, conse=6)
+#     if n_stable < min_test_obs:
+#         return False
+#     else:
+#         if n_stable * 1.0 / test_conse > stable_ratio:
+#             return True
+#         else:
+#             return False
 
 
 def cold_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.0863, pos=1, conse=6,
@@ -262,7 +269,6 @@ def sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.
                         and threshold = gate_tcg, which are used to simulate the situation of NRT scenario and
                         for training a machine-learning model
     gate_tcg: the gate change magnitude threshold for defining anomaly
-    b_monitor_init: bool, output change metrics during the initialization stage
     Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
     Returns
     ----------
@@ -285,7 +291,7 @@ def sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.
 
 
 def sccd_update(sccd_pack, dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.0863, pos=1, conse=6,
-                b_c2=False, gate_tcg=9.236, b_monitor_init=False):
+                b_c2=False, gate_tcg=9.236, predictability_tcg=15.086):
     """
     SCCD online update for new observations
     Ye, S., Rogan, J., Zhu, Z., & Eastman, J. R. (2021). A near-real-time approach for monitoring forest
@@ -310,7 +316,7 @@ def sccd_update(sccd_pack, dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qa
     b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel
                 test due to its current low quality
     gate_tcg: the gate change magnitude threshold for defining anomaly
-    b_monitor_init: bool, output change metrics during the initialization stage
+    predictability_tcg: the threshold for predictability test
     Note that passing 2-d array to c as 2-d pointer does not work, so have to pass separate bands
     Returns
     ----------
@@ -320,11 +326,60 @@ def sccd_update(sccd_pack, dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qa
     #     raise ValueError("The type of sccd_pack has to be namedtuple 'SccdOutput'!")
 
     _validate_params(func_name='sccd_update', t_cg=t_cg, pos=pos, conse=conse, b_c2=b_c2, b_pinpoint=False,
-                     gate_tcg=gate_tcg, b_monitor_init=b_monitor_init)
+                     gate_tcg=gate_tcg, predictability_tcg=predictability_tcg)
 
     dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas = _validate_data(dates, ts_b, ts_g, ts_r, ts_n, ts_s1,
                                                                             ts_s2, ts_t, qas)
 
     return _sccd_update(sccd_pack, dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg, pos, conse, b_c2,
-                        gate_tcg, b_monitor_init)
+                        gate_tcg,  predictability_tcg)
+
+
+def sccd_identify(sccd_pack, dist_conse=6, t_cg_scale100=1508.6, t_cg_singleband_scale1000=-200, t_angle_scale100=4500,
+                  transform_mode=True):
+    """
+    identify disturbance date from sccd_pack
+    Parameters
+    ----------
+    sccd_pack: sccd data structure
+    dist_conse: user-specify disturbance conse
+    t_cg_scale100: user-specify change magnitudes (scale by 100)
+    t_cg_singleband_scale1000: user-specify change magnitude for each band to identify greener direction
+      see Eq. 10 in Zhu, Z., Zhang, J., Yang, Z., Aljaddani, A. H., Cohen, W. B., Qiu, S., & Zhou, C. (2020).
+      Continuous monitoring of land disturbance based on Landsat time series. Remote Sensing of Environment, 238, 111116.
+    t_angle_scale100: (scale by 100)
+    transform_mode: true -> transform the mode to untested predictability once the change has been detected
+    Returns
+    -------
+    0 (no disturbance) or the ordinal date of disturbance occurrence
+    """
+    _validate_params(func_name='sccd_identify', dist_conse=dist_conse, t_cg_scale100=t_cg_scale100,
+                     t_cg_singleband_scale1000=t_cg_singleband_scale1000, t_angle_scale100=t_angle_scale100,
+                     transform_mode=transform_mode)
+    if sccd_pack.nrt_mode == 3 or sccd_pack.nrt_mode == 4 or int(sccd_pack.nrt_mode / 10) == 1:
+        return sccd_pack, 0
+
+    if sccd_pack.nrt_model[0]['conse_last'] >= dist_conse and sccd_pack.nrt_model[0]['norm_cm'] > t_cg_scale100 and \
+            sccd_pack.nrt_model[0]['cm_angle'] < t_angle_scale100:
+        start_index = DEFAULT_CONSE - sccd_pack.nrt_model[0]['conse_last']
+        pred_ref = np.asarray([[predict_ref(sccd_pack.nrt_model[0]['nrt_coefs'][b],
+                                            sccd_pack.nrt_model[0]['obs_date_since1982'][
+                                                i_conse + start_index] + JULIAN_LANDSAT4_LAUNCH)
+                                for i_conse in range(sccd_pack.nrt_model[0]['conse_last'])]
+                               for b in range(NRT_BAND)])
+        cm = sccd_pack.nrt_model[0]['obs'][:, start_index:DEFAULT_CONSE] - pred_ref
+        cm_median = np.median(cm, axis=1)
+        if cm_median[2] < -t_cg_singleband_scale1000 and cm_median[3] > t_cg_singleband_scale1000 \
+                and cm_median[4] < -t_cg_singleband_scale1000:  # greening
+            return sccd_pack, 0
+        else:
+            if transform_mode:
+                if int(sccd_pack.nrt_mode / 10) == 0:
+                    sccd_pack = sccd_pack._replace(nrt_mode=sccd_pack.nrt_mode + 10)
+            return sccd_pack, sccd_pack.nrt_model[0]['obs_date_since1982'][DEFAULT_CONSE - sccd_pack.nrt_model[0]['conse_last']] + JULIAN_LANDSAT4_LAUNCH
+    else:
+        return sccd_pack, 0
+
+
+
 

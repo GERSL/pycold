@@ -32,7 +32,8 @@ int sccd
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
     int *num_fc_b_pinpoint,
-    double gate_tcg
+    double gate_tcg,
+    double predictability_tcg
 );
 
 int step1_cold_initialize
@@ -152,7 +153,7 @@ int step3_processing_end
     float **clry,
     int cur_i,
     int *n_clr,
-    int nrt_mode,
+    int *nrt_mode,
     int i_start,
     int prev_i_break,             /* I: the i_break of the last curve*/
     output_nrtmodel *nrt_model,         /* I/O: the NRT change records */
@@ -164,7 +165,8 @@ int step3_processing_end
     int conse,
     short int *min_rmse,
     double gate_tcg,
-    bool change_detected
+    bool change_detected,
+    double predictability_tcg
 );
 
 
@@ -198,7 +200,8 @@ int sccd_standard
     bool b_pinpoint,
     Output_sccd_pinpoint *rec_cg_pinpoint,           /* O: historical change records for SCCD results    */
     int *num_fc_b_pinpoint,
-    double gate_tcg
+    double gate_tcg,
+    double predictability_tcg
 );
 
 
