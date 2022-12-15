@@ -145,12 +145,13 @@ def qabitval_array_c2(packedint_array):
     QA_SNOW_unpacked = geek.bitwise_and(packedint_array, 1 << 5)
     QA_WATER_unpacked = geek.bitwise_and(packedint_array, 1 << 7)
 
+    unpacked[QA_CLEAR_unpacked > 0] = QA_CLEAR
+    unpacked[QA_WATER_unpacked > 0] = QA_WATER
     unpacked[QA_SNOW_unpacked > 0] = QA_SNOW
     unpacked[QA_SHADOW_unpacked > 0] = QA_SHADOW
     unpacked[QA_CLOUD_unpacked > 0] = QA_CLOUD
     unpacked[QA_DILATED_unpacked > 0] = QA_CLOUD
-    unpacked[QA_CLEAR_unpacked > 0] = QA_CLEAR
-    unpacked[QA_WATER_unpacked > 0] = QA_WATER
+
     return unpacked
 
 
