@@ -2,7 +2,8 @@ from ._colds_cython import SccdOutput, _sccd_update, _sccd_detect, _obcold_recon
 import numpy as np
 from ._param_validation import validate_parameter_constraints, Interval, Integral, Real, check_consistent_length, \
     check_1d
-from .utils import predict_ref
+from .utils import calculate_sccd_cm
+from .app import defaults
 
 _parameter_constraints: dict = {
     "t_cg": [Interval(Real, 0.0, None, closed="neither")],
@@ -26,9 +27,6 @@ _parameter_constraints: dict = {
 NUM_FC = 40  # define the maximum number of outputted curves
 NUM_FC_SCCD = 40
 NUM_NRT_QUEUE = 240
-DEFAULT_CONSE = 6
-NRT_BAND = 6
-JULIAN_LANDSAT4_LAUNCH = 723742
 
 
 def _validate_params(func_name, **kwargs):
@@ -356,27 +354,23 @@ def sccd_identify(sccd_pack, dist_conse=6, t_cg_scale100=1508.6, t_cg_singleband
     _validate_params(func_name='sccd_identify', dist_conse=dist_conse, t_cg_scale100=t_cg_scale100,
                      t_cg_singleband_scale1000=t_cg_singleband_scale1000, t_angle_scale100=t_angle_scale100,
                      transform_mode=transform_mode)
-    if sccd_pack.nrt_mode == 3 or sccd_pack.nrt_mode == 4 or int(sccd_pack.nrt_mode / 10) == 1:
+    if sccd_pack.nrt_mode == defaults['SCCD']['NRT_MONITOR_SNOW'] or \
+            sccd_pack.nrt_mode == defaults['SCCD']['NRT_QUEUE_SNOW'] or int(sccd_pack.nrt_mode / 10) == 1:
         return sccd_pack, 0
 
     if sccd_pack.nrt_model[0]['conse_last'] >= dist_conse and sccd_pack.nrt_model[0]['norm_cm'] > t_cg_scale100 and \
             sccd_pack.nrt_model[0]['cm_angle'] < t_angle_scale100:
-        start_index = DEFAULT_CONSE - sccd_pack.nrt_model[0]['conse_last']
-        pred_ref = np.asarray([[predict_ref(sccd_pack.nrt_model[0]['nrt_coefs'][b],
-                                            sccd_pack.nrt_model[0]['obs_date_since1982'][
-                                                i_conse + start_index] + JULIAN_LANDSAT4_LAUNCH)
-                                for i_conse in range(sccd_pack.nrt_model[0]['conse_last'])]
-                               for b in range(NRT_BAND)])
-        cm = sccd_pack.nrt_model[0]['obs'][:, start_index:DEFAULT_CONSE] - pred_ref
-        cm_median = np.median(cm, axis=1)
+        cm_median = calculate_sccd_cm(sccd_pack)
         if cm_median[2] < -t_cg_singleband_scale1000 and cm_median[3] > t_cg_singleband_scale1000 \
                 and cm_median[4] < -t_cg_singleband_scale1000:  # greening
             return sccd_pack, 0
         else:
             if transform_mode:
-                if int(sccd_pack.nrt_mode / 10) == 0:
-                    sccd_pack = sccd_pack._replace(nrt_mode=sccd_pack.nrt_mode + 10)
-            return sccd_pack, sccd_pack.nrt_model[0]['obs_date_since1982'][DEFAULT_CONSE - sccd_pack.nrt_model[0]['conse_last']] + JULIAN_LANDSAT4_LAUNCH
+                if int(sccd_pack.nrt_mode / 10) == 0 and sccd_pack.nrt_mode != defaults['SCCD']['NRT_MONITOR2QUEUE']:
+                        sccd_pack = sccd_pack._replace(nrt_mode=sccd_pack.nrt_mode + 10)
+            return sccd_pack, sccd_pack.nrt_model[0]['obs_date_since1982'][defaults['SCCD']['DEFAULT_CONSE'] -
+                                                                           sccd_pack.nrt_model[0]['conse_last']] + \
+                    defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH']
     else:
         return sccd_pack, 0
 

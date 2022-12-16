@@ -5,8 +5,8 @@ from os.path import join
 import os
 import datetime as dt
 from collections import namedtuple
-from pycold.app import defaults
 from osgeo import gdal
+from .app import defaults
 
 SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
 
@@ -495,3 +495,23 @@ def generate_rowcolimage(ref_image_path, out_path):
     outdata.SetProjection(proj)
     outdata.FlushCache()
     del ref_image
+
+
+def calculate_sccd_cm(sccd_pack):
+    """
+    Parameters
+    ----------
+    sccd_pack
+
+    Returns
+    -------
+
+    """
+    start_index = defaults['SCCD']['NRT_BAND'] - sccd_pack.nrt_model[0]['conse_last']
+    pred_ref = np.asarray([[predict_ref(sccd_pack.nrt_model[0]['nrt_coefs'][b],
+                                        sccd_pack.nrt_model[0]['obs_date_since1982'][
+                                            i_conse + start_index] + defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH'])
+                            for i_conse in range(sccd_pack.nrt_model[0]['conse_last'])]
+                           for b in range(defaults['SCCD']['NRT_BAND'])])
+    cm = sccd_pack.nrt_model[0]['obs'][:, start_index:defaults['SCCD']['DEFAULT_CONSE']] - pred_ref
+    return np.median(cm, axis=1)

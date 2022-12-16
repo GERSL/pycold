@@ -81,6 +81,10 @@ int sccd
     int len_clrx;         /* length of clrx  */
     int n_clr_record;
 
+    // mode update condition 1
+    if(*nrt_mode % 10 == NRT_MONITOR2QUEUE)
+        *nrt_mode = 10 + NRT_QUEUE_STANDARD;
+
     if ((*nrt_mode == NRT_QUEUE_SNOW)|(*nrt_mode % 10 == NRT_QUEUE_STANDARD))
         len_clrx = valid_num_scenes + *num_obs_queue;
     else if ((*nrt_mode == NRT_MONITOR_SNOW)|(*nrt_mode % 10 == NRT_MONITOR_STANDARD))
@@ -111,6 +115,11 @@ int sccd
         RETURN_ERROR("Error for preprocessing.", FUNC_NAME, ERROR);
     }
 
+    if (*nrt_mode % 10 != 0 && *nrt_mode % 10 != 1 && *nrt_mode % 10 != 2 && *nrt_mode != 5)
+    {
+        RETURN_ERROR("Invalid nrt_mode", FUNC_NAME, ERROR);
+    }
+
     // void status need to first decide if it is snow pixel by sn_pct
     if(*nrt_mode == NRT_VOID){
         sn_pct = (double) sn_sum/ (double) (sn_sum + clear_sum + 0.01);
@@ -125,7 +134,6 @@ int sccd
         else
             b_snow = FALSE;
     }
-
 
     /*********************************************************************/
     /*                                                                   */
@@ -2243,7 +2251,7 @@ int step3_processing_end
              {
                  for(k2 = 0; k2 < DEFAULT_N_STATE; k2++){
                      // printf("k1 = %d, k2 = %d,  p = %f \n", k1, k2, gsl_matrix_get(cov_p[i_b], k1, k2));
-                     if(*nrt_mode == NRT_MONITOR_STANDARD)
+                     if(*nrt_mode % 10 == NRT_MONITOR_STANDARD)
                         nrt_model->covariance[i_b][k1 * DEFAULT_N_STATE + k2] = (float)gsl_matrix_get(cov_p[i_b], k1, k2);
                      else
                         nrt_model->covariance[i_b][k1 * DEFAULT_N_STATE + k2] = 0;
@@ -2283,7 +2291,7 @@ int step3_processing_end
         for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
             // nrt_model->min_rmse[i_b] = (short int)min_rmse[i_b];
-            if(*nrt_mode == NRT_MONITOR_STANDARD)
+            if(*nrt_mode % 10 == NRT_MONITOR_STANDARD)
                 nrt_model->H[i_b] = instance[i_b].H;
             else
                 nrt_model->H[i_b] = 0;
@@ -2338,15 +2346,18 @@ int step3_processing_end
         /*      predictability test                               */
         /*                                                        */
         /**********************************************************/
-        if ((*nrt_mode == NRT_QUEUE_STANDARD) && (change_detected == FALSE)) // for bi status, but not for the change just detected
+        if (*nrt_mode % 10 == NRT_MONITOR_STANDARD) // for bi status, but not for the change just detected
         {
+            valid_conse_last = conse;
+
+        }else{
             valid_conse_last = *n_clr - num_obs_processed - prev_i_break;
             if (valid_conse_last > conse){
                 valid_conse_last = conse;
             }
-        }else{
-             valid_conse_last = conse;
         }
+
+        // need to test predictability
         if (*nrt_mode / 10 == 1)
         {
             if (valid_conse_last > 1){
@@ -2484,7 +2495,7 @@ int step3_processing_end
 //        t_time = clock();
     } // if (nrt_mode != NRT_VOID)
 
-    if(*nrt_mode % 10 == NRT_QUEUE_STANDARD)
+    if((*nrt_mode % 10 == NRT_QUEUE_STANDARD) | (change_detected == TRUE)) // (change_detected == TRUE) meaning will update mode to queue
     {
         *num_obs_queue = *n_clr - prev_i_break;
         if (*num_obs_queue > MAX_OBS_QUEUE){
@@ -2759,7 +2770,6 @@ int sccd_standard
             /*                                                             */
             /***************************************************************/
             status = INCOMPLETE;
-            change_detected = FALSE;
             if((i_span >= N_TIMES * MID_NUM_C) && (time_span >= (double)MIN_YEARS))
             {
                 /**************************************************************/
@@ -2824,7 +2834,9 @@ int sccd_standard
                 /* initialization stage stops, and continious change detection starts */
                 i++;
                 bl_train = 1;
-                *nrt_mode = NRT_MONITOR_STANDARD;
+
+                // update mode - condition 1
+                *nrt_mode = NRT_MONITOR_STANDARD;   // once the initialization is finished, the predictability is forced to be confirmed
              } /* else if(SUCCESS == status) */
 //            time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
 //            printf("Initialization took %f seconds to execute\n", time_taken);
@@ -2942,12 +2954,8 @@ int sccd_standard
 
 
     // update the status; num_obs_processed and sum_square_vt are also updated if the status is queue
-    if (*nrt_mode % 10 == NRT_MONITOR_STANDARD)
+    if((*nrt_mode % 10 == NRT_QUEUE_STANDARD) && (bl_train == 0))
     {
-        if (change_detected==TRUE)
-            *nrt_mode = NRT_QUEUE_STANDARD;   // the first digit is 1 meaning that predictability untested
-    }
-    else if(*nrt_mode % 10 == NRT_QUEUE_STANDARD){
         if (n_clr < conse)
             RETURN_ERROR("The observation in the queue cannot be smaller than conse \n", FUNC_NAME, FAILURE);
 
@@ -2969,7 +2977,6 @@ int sccd_standard
             sum_square_vt[i_b] = rmse_ini[i_b] * rmse_ini[i_b] * (num_obs_processed - update_num_c);
 
         }
-//            *nrt_mode = NRT_QUEUE_STANDARD;
 
     }
 
@@ -2983,11 +2990,15 @@ int sccd_standard
                                   obs_queue, sum_square_vt, num_obs_processed, t_start,
                                   conse, min_rmse, gate_tcg, change_detected, predictability_tcg);
 
-//    time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
-//    printf("processing_end took %f seconds to execute \n", time_taken);
-//    t_time = clock();
 
-
+    // update mode - condition 3
+    if ((*nrt_mode % 10 == NRT_MONITOR_STANDARD) && (bl_train == 0))
+    {
+        if (*nrt_mode / 10 == 1)  // the change has been detected previously, so predictability is not been confirmed
+           *nrt_mode =  NRT_QUEUE_STANDARD + 10;
+        else
+            *nrt_mode =  NRT_MONITOR2QUEUE;   // the third mode
+    }
 
 
     for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
@@ -3059,20 +3070,20 @@ int sccd_snow
 
     gsl_vector** state_a;          /* a vector of a for current i,  multiple band */
     gsl_matrix** cov_p;
-    
+
     temp_v_dif = (float **)allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, n_clr,
                                      sizeof (float));
     if (temp_v_dif == NULL)
     {
         RETURN_ERROR ("Allocating temp_v_dif memory",FUNC_NAME, FAILURE);
     }
-    
+
     rmse = (float *)malloc(TOTAL_IMAGE_BANDS_SCCD * sizeof(float));
     if (rmse == NULL)
     {
         RETURN_ERROR ("Allocating rmse memory", FUNC_NAME, FAILURE);
     }
-    
+
     state_a = (gsl_vector**) allocate_2d_array(TOTAL_IMAGE_BANDS_SCCD, 1, sizeof(gsl_vector));
     if (state_a == NULL)
     {
@@ -3084,7 +3095,7 @@ int sccd_snow
     {
         RETURN_ERROR ("Allocating cov_p memory", FUNC_NAME, FAILURE);
     }
-    
+
 
     /* alloc memory for ssm matrix */
     instance = malloc(TOTAL_IMAGE_BANDS_SCCD * sizeof(ssmodel_constants));
@@ -3291,7 +3302,7 @@ int sccd_snow
 
     /* monitor mode */
     *nrt_status = NRT_MONITOR_SNOW;
-    
+
     status = free_2d_array ((void **) temp_v_dif);
     if (status != SUCCESS)
     {
@@ -3301,7 +3312,7 @@ int sccd_snow
 
     free(rmse);
     rmse = NULL;
-   
+
 
     for(i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
     {
