@@ -2984,6 +2984,12 @@ int sccd_standard
 //    time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
 //    printf("step2_KF_ChangeDetection took %f seconds to execute\n", time_taken);
 //    t_time = clock();
+    if(*nrt_mode == NRT_VOID){
+        if (bl_train == 1)
+            *nrt_mode = NRT_MONITOR_STANDARD;
+        else
+            *nrt_mode = NRT_QUEUE_STANDARD + 10;
+    }
 
     status = step3_processing_end(instance, cov_p, fit_cft, clrx, clry, i, &n_clr, nrt_mode,
                                   i_start, prev_i_break, nrt_model, num_obs_queue,
