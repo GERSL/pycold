@@ -719,8 +719,8 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
             B3 = (10000 * (B3 * 2.75e-05 - 0.2)).astype(np.int16)
             B4 = (10000 * (B4 * 2.75e-05 - 0.2)).astype(np.int16)
             B5 = (10000 * (B5 * 2.75e-05 - 0.2)).astype(np.int16)
-            B6 = (10000 * (B6 * 2.75e-05 - 0.2)).astype(np.int16)
-            B7 = (10 * (B7 * 0.00341802 + 149)).astype(np.int16)
+            B7 = (10000 * (B7 * 2.75e-05 - 0.2)).astype(np.int16)
+            B6 = (10 * (B6 * 0.00341802 + 149)).astype(np.int16)
 
         # if path_array is not None, we will eliminate those observation that has different path with its assigned path
         if path_array is not None:  # meaning that single-path processing
@@ -996,8 +996,8 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
         B3 = (10000 * (B3 * 2.75e-05 - 0.2)).astype(np.int16)
         B4 = (10000 * (B4 * 2.75e-05 - 0.2)).astype(np.int16)
         B5 = (10000 * (B5 * 2.75e-05 - 0.2)).astype(np.int16)
-        B6 = (10000 * (B6 * 2.75e-05 - 0.2)).astype(np.int16)
-        B7 = (10 * (B7 * 0.00341802 + 149)).astype(np.int16)
+        B7 = (10000 * (B7 * 2.75e-05 - 0.2)).astype(np.int16)
+        B6 = (10 * (B6 * 0.00341802 + 149)).astype(np.int16)
 
         if is_partition is True:
             b_width = int(config['n_cols'] / config['n_block_x'])  # width of a block

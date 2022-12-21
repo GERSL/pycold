@@ -415,8 +415,9 @@ def main(rank, n_cores, stack_path, result_path, yaml_path, method, seedmap_path
               .format(block_x, block_y, datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
     # wait for all cores to be finished
-    while not is_finished_cold_blockfinished(result_path, config['n_block_x'] * config['n_block_y']):
-        time.sleep(30)
+    if method == 'OBCOLD':
+        while not is_finished_cold_blockfinished(result_path, config['n_block_x'] * config['n_block_y']):
+            time.sleep(30)
 
     if rank == 1:
         cold_timepoint = datetime.now(tz)

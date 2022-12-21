@@ -377,8 +377,10 @@ cpdef _sccd_detect(np.ndarray[np.int64_t, ndim=1, mode='c'] dates,
     nrt_queue = np.zeros(NUM_NRT_QUEUE, dtype=nrtqueue_dt)
     nrt_model = np.zeros(1, dtype=nrtmodel_dt)
     rec_cg_pinpoint = np.zeros(NUM_FC_SCCD, dtype=pinpoint_dt)
-
     cdef int nrt_mode = 0
+
+    if dates[-1] - dates[0] < 365.25:
+        raise RuntimeError("The input data length is smaller than 1 year for pos = {}".format(pos))
 
     # initiate minimum rmse
     min_rmse = np.full(NRT_BAND, 0, dtype=np.short)
@@ -491,8 +493,10 @@ cpdef _sccd_update(sccd_pack,
     # cdef int num_fc = 0
     # cdef int num_nrt_queue = 0
     cdef int nrt_mode = sccd_pack.nrt_mode
+
     if nrt_mode != 0 and nrt_mode % 10 != 1 and nrt_mode % 10 != 2 and nrt_mode != 3 and nrt_mode != 4 and nrt_mode != 5:
         raise RuntimeError("Invalid nrt_node input {} for pos = {} ".format(nrt_mode, pos))
+
     cdef int num_fc = len(sccd_pack.rec_cg)
     cdef int num_nrt_queue = len(sccd_pack.nrt_queue)
     cdef int num_fc_pinpoint = 0
