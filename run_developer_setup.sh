@@ -59,7 +59,7 @@ if [[ "$(command -v apt)" != "" ]]; then
 else
     echo "
     WARNING: Check and install of system packages is currently only supported
-    on Debian Linux. You will need to verify that ZLIB, GSL, OpenMP are
+    on Debian Linux. You will need to verify that ZLIB, GSL are
     installed before running this script.
     "
 fi

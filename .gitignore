@@ -13,3 +13,10 @@ wheelhouse
 tests/coverage.xml
 tests/.coverage
 tmpfile
+src/cxx/Makefile
+src/cxx/.vscode
+src/cxx/bin
+src/cxx/build
+src/cxx/ccd.dSYM
+.vscode
+src/cxx/ccd

@@ -155,39 +155,39 @@ def qabitval_array_c2(packedint_array):
     return unpacked
 
 
-def load_data(file_name, gdal_driver='GTiff'):
-    '''
-    Converts a GDAL compatable file into a numpy array and associated geodata.
-    The rray is provided so you can run with your processing - the geodata consists of the geotransform and gdal dataset object
-    if you're using an ENVI binary as input, this willr equire an associated .hdr file otherwise this will fail.
-    This needs modifying if you're dealing with multiple bands.
+# def load_data(file_name, gdal_driver='GTiff'):
+#     '''
+#     Converts a GDAL compatable file into a numpy array and associated geodata.
+#     The rray is provided so you can run with your processing - the geodata consists of the geotransform and gdal dataset object
+#     if you're using an ENVI binary as input, this willr equire an associated .hdr file otherwise this will fail.
+#     This needs modifying if you're dealing with multiple bands.
 
-    VARIABLES
-    file_name : file name and path of your file
+#     VARIABLES
+#     file_name : file name and path of your file
 
-    RETURNS
-    image array
-    (geotransform, inDs)
-    '''
-    driver_t = gdal.GetDriverByName(gdal_driver)  # http://www.gdal.org/formats_list.html
-    driver_t.Register()
+#     RETURNS
+#     image array
+#     (geotransform, inDs)
+#     '''
+#     driver_t = gdal.GetDriverByName(gdal_driver)  # http://www.gdal.org/formats_list.html
+#     driver_t.Register()
 
-    inDs = gdal.Open(file_name, gdal.GA_ReadOnly)
-    # print(inDs)
-    if inDs is None:
-        print('Couldnt open this file {}'.format(file_name))
-        sys.exit("Try again!")
+#     inDs = gdal.Open(file_name, gdal.GA_ReadOnly)
+#     # print(inDs)
+#     if inDs is None:
+#         print('Couldnt open this file {}'.format(file_name))
+#         sys.exit("Try again!")
 
-    # Extract some info form the inDs
-    geotransform = inDs.GetGeoTransform()
+#     # Extract some info form the inDs
+#     geotransform = inDs.GetGeoTransform()
 
-    # Get the data as a numpy array
-    band = inDs.GetRasterBand(1)
-    cols = inDs.RasterXSize
-    rows = inDs.RasterYSize
-    image_array = band.ReadAsArray(0, 0, cols, rows)
+#     # Get the data as a numpy array
+#     band = inDs.GetRasterBand(1)
+#     cols = inDs.RasterXSize
+#     rows = inDs.RasterYSize
+#     image_array = band.ReadAsArray(0, 0, cols, rows)
 
-    return image_array, (geotransform, inDs)
+#     return image_array, (geotransform, inDs)
 
 
 def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_partition=True, clear_threshold=0,

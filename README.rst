@@ -55,7 +55,7 @@ could be made.
 2.1 Install Required Libraries
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ZLIB, GSL, and OpenMP libraries are required.
+The ZLIB, GSL libraries are required.
 
 For Ubuntu/Debian systems, they can be installed via:
 
