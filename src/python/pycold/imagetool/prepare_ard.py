@@ -1,12 +1,13 @@
 # Author: Su Ye
-# This script is an example for generating block-based stack files from original ARD zip as intermediate inputs to the
-# COLD algorithm in a HPC environment. As preparation, you need to download '_BT' and '_SR' for all Landsat
-# ARD collection 1.
+# This script is an example for generating block-based stack files from original ARD zip as 
+# intermediate inputs to the COLD algorithm in a HPC environment. As preparation, you need to 
+# download '_BT' and '_SR' for all Landsat ARD collection 1.
 # This script has 4 steps: 1) warp single-path array to limit the observation inputs for each pixel
-# if single_path is set True; 2) unzip all images and unpack bit-based QA bands; 3) partition each 5000*5000 temporal
-# images to blocks and eliminate those image blocks if no clear, water or snow pixel were in it (so to save disk space
-# and  enable independent IO for individual block in later time-series analysis); 4) save each image block to
-# python-native binary format (.npy) into its block folders
+# if single_path is set True; 2) unzip all images and unpack bit-based QA bands; 3) 
+# partition each 5000*5000 temporal images to blocks and eliminate those image blocks if no clear, 
+# water or snow pixel were in it (so to save disk space and enable independent IO for individual
+# block in later time-series analysis); 4) save each image block to python-native binary format 
+# (.npy) into its block folders
 
 # For a 42-year Landsat ARD C1 tile (~3000 images), this script averagely produces ~350 G intermediate disk
 # files, and takes ~12 mins to finish if 200 EPYC 7452 cores are used.
@@ -112,7 +113,8 @@ def qabitval_array(packedint_array):
     """
     unpacked = np.full(packedint_array.shape, QA_FILL)
     QA_CLOUD_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_CLOUD + 1))
-    QA_SHADOW_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_SHADOW + 1))
+    QA_SHADOW_unpacked = geek.bitwise_and(
+        packedint_array, 1 << (QA_SHADOW + 1))
     QA_SNOW_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_SNOW + 1))
     QA_WATER_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_WATER + 1))
     QA_CLEAR_unpacked = geek.bitwise_and(packedint_array, 1 << (QA_CLEAR + 1))
@@ -206,7 +208,8 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
     :return:
     """
     try:
-        QA_band = gdal_array.LoadFile(join(join(source_dir, folder), "{}.Fmask.tif".format(folder)))
+        QA_band = gdal_array.LoadFile(
+            join(join(source_dir, folder), "{}.Fmask.tif".format(folder)))
     except ValueError as e:
         # logger.error('Cannot open QA band for {}: {}'.format(folder, e))
         logger.error('Cannot open QA band for {}: {}'.format(folder, e))
@@ -217,12 +220,13 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
     if clear_threshold > 0:
         clear_ratio = np.sum(np.logical_or(QA_band_unpacked == QA_CLEAR,
                                            QA_band_unpacked == QA_WATER)) \
-                      / np.sum(QA_band_unpacked != QA_FILL)
+            / np.sum(QA_band_unpacked != QA_FILL)
     else:
         clear_ratio = 1
 
     if clear_ratio > clear_threshold:
-        [collection, sensor, tile_id, imagetime, version1, version2] = folder.rsplit('.')
+        [collection, sensor, tile_id, imagetime,
+            version1, version2] = folder.rsplit('.')
         year = imagetime[0:4]
         doy = imagetime[4:7]
         file_name = sensor + tile_id + year + doy + collection + version1
@@ -251,7 +255,8 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
 
             except Exception as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                logger.error(
+                    'Cannot open Landsat bands for {}: {}'.format(folder, e))
                 return False
         elif sensor == 'S30':
             try:
@@ -271,7 +276,8 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
 
             except Exception as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                logger.error(
+                    'Cannot open Landsat bands for {}: {}'.format(folder, e))
                 return False
 
         if (B1 is None) or (B2 is None) or (B3 is None) or (B4 is None) or (B5 is None) or (B6 is None):
@@ -279,7 +285,8 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
             return False
 
         if is_partition is True:
-            b_width = int(config['n_cols'] / config['n_block_x'])  # width of a block
+            # width of a block
+            b_width = int(config['n_cols'] / config['n_block_x'])
             b_height = int(config['n_rows'] / config['n_block_y'])
             bytesize = 2  # short16 = 2 * byte
             # source: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-in-python-using-numpy-d1bf0dd7b6f7
@@ -324,7 +331,8 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
                                                                b_width),
                                                         strides=(config['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 config['n_cols'] * bytesize,
+                                                                 config['n_cols'] *
+                                                                 bytesize,
                                                                  bytesize))
             for i in range(config['n_block_y']):
                 for j in range(config['n_block_x']):
@@ -357,7 +365,7 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
 
 
 def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=True, clear_threshold=0,
-                              low_date_bound=None, upp_date_bound=None):
+                                low_date_bound=None, upp_date_bound=None):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy
     :param source_dir: the parent folder to save image 'folder'
@@ -385,19 +393,20 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
     if clear_threshold > 0:
         clear_ratio = np.sum(np.logical_or(QA_band_unpacked == QA_CLEAR,
                                            QA_band_unpacked == QA_WATER)) \
-                      / np.sum(QA_band_unpacked != QA_FILL)
+            / np.sum(QA_band_unpacked != QA_FILL)
     else:
         clear_ratio = 1
 
     if clear_ratio > clear_threshold:
-        [collection, sensor, tile_id, imagetime, version1, version2, ext] = folder.split('/')[-1].rsplit('.')
+        [collection, sensor, tile_id, imagetime, version1,
+            version2, ext] = folder.split('/')[-1].rsplit('.')
         year = imagetime[0:4]
         doy = imagetime[4:7]
         file_name = sensor + tile_id + year + doy + collection + version1
         if low_date_bound is not None:
             if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) < parse(low_date_bound):
                 return True
-            
+
         if upp_date_bound is not None:
             if (dt.datetime(int(year), 1, 1) + dt.timedelta(int(doy) - 1)) > parse(upp_date_bound):
                 return True
@@ -414,7 +423,8 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
 
             except Exception as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                logger.error(
+                    'Cannot open Landsat bands for {}: {}'.format(folder, e))
                 return False
         elif sensor == 'S30':
             try:
@@ -428,7 +438,8 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
 
             except Exception as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                logger.error(
+                    'Cannot open Landsat bands for {}: {}'.format(folder, e))
                 return False
 
         if (B1 is None) or (B2 is None) or (B3 is None) or (B4 is None) or (B5 is None) or (B6 is None):
@@ -436,7 +447,8 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
             return False
 
         if is_partition is True:
-            b_width = int(config['n_cols'] / config['n_block_x'])  # width of a block
+            # width of a block
+            b_width = int(config['n_cols'] / config['n_block_x'])
             b_height = int(config['n_rows'] / config['n_block_y'])
             bytesize = 2  # short16 = 2 * byte
             # source: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-in-python-using-numpy-d1bf0dd7b6f7
@@ -481,7 +493,8 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
                                                                b_width),
                                                         strides=(config['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 config['n_cols'] * bytesize,
+                                                                 config['n_cols'] *
+                                                                 bytesize,
                                                                  bytesize))
             for i in range(config['n_block_y']):
                 for j in range(config['n_block_x']):
@@ -514,7 +527,7 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
 
 
 def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger, config,
-                            is_partition=True, low_date_bound=None, upp_date_bound=None, b_c2=False):
+                          is_partition=True, low_date_bound=None, upp_date_bound=None, b_c2=False):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy
     :param tmp_path: tmp folder to save unzip image
@@ -536,7 +549,8 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
     if os.path.exists(join(tmp_path, folder)):
         shutil.rmtree(join(tmp_path, folder), ignore_errors=True)
     if os.path.exists(join(tmp_path, folder.replace("SR", "BT"))):
-        shutil.rmtree(join(tmp_path, folder.replace("SR", "BT")), ignore_errors=True)
+        shutil.rmtree(join(tmp_path, folder.replace("SR", "BT")),
+                      ignore_errors=True)
 
     try:
         with tarfile.open(join(source_dir, folder + '.tar')) as tar_ref:
@@ -557,10 +571,12 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                 tar_ref.extractall(join(tmp_path, folder.replace("SR", "BT")))
             except Exception:
                 # logger.warning('Unzip fails for {}'.format(folder.replace("SR", "BT")))
-                logger.error('Unzip fails for {}'.format(folder.replace("SR", "BT")))
+                logger.error('Unzip fails for {}'.format(
+                    folder.replace("SR", "BT")))
                 return
     except IOError as e:
-        logger.error('Unzip fails for {}: {}'.format(folder.replace("SR", "BT"), e))
+        logger.error('Unzip fails for {}: {}'.format(
+            folder.replace("SR", "BT"), e))
         return
 
     if not isdir(join(tmp_path, folder.replace("SR", "BT"))):
@@ -570,10 +586,10 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
     try:
         if b_c2 is False:
             QA_band = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                                       "{}_PIXELQA.tif".format(folder[0:len(folder) - 3])))
+                                               "{}_PIXELQA.tif".format(folder[0:len(folder) - 3])))
         else:
             QA_band = gdal_array.LoadFile(join(join(tmp_path, folder),
-                                                       "{}_QA_PIXEL.TIF".format(folder[0:len(folder) - 3])))
+                                               "{}_QA_PIXEL.TIF".format(folder[0:len(folder) - 3])))
     except ValueError as e:
         # logger.error('Cannot open QA band for {}: {}'.format(folder, e))
         logger.error('Cannot open QA band for {}: {}'.format(folder, e))
@@ -587,7 +603,7 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
     if clear_threshold > 0:
         clear_ratio = np.sum(np.logical_or(QA_band_unpacked == QA_CLEAR,
                                            QA_band_unpacked == QA_WATER)) \
-                      / np.sum(QA_band_unpacked != QA_FILL)
+            / np.sum(QA_band_unpacked != QA_FILL)
     else:
         clear_ratio = 1
 
@@ -603,12 +619,14 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
         elif folder[3] == '9':
             sensor = 'LC9'
         else:
-            logger.error('Sensor is not correctly formatted for the scene {}'.format(folder))
+            logger.error(
+                'Sensor is not correctly formatted for the scene {}'.format(folder))
 
         col = folder[8:11]
         row = folder[11:14]
         year = folder[15:19]
-        doy = datetime(int(year), int(folder[19:21]), int(folder[21:23])).strftime('%j')
+        doy = datetime(int(year), int(folder[19:21]), int(
+            folder[21:23])).strftime('%j')
         collection = "C{}".format(folder[35:36])
         if b_c2 is False:
             version = folder[37:40]
@@ -641,7 +659,8 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                              "{}_BTB6.tif".format(folder[0:len(folder) - 3])))
                 except ValueError as e:
                     # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                    logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                    logger.error(
+                        'Cannot open Landsat bands for {}: {}'.format(folder, e))
                     return
             elif sensor == 'LC8' or 'LC9':
                 try:
@@ -662,7 +681,8 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                              "{}_BTB10.tif".format(folder[0:len(folder) - 3])))
                 except ValueError as e:
                     # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                    logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                    logger.error(
+                        'Cannot open Landsat bands for {}: {}'.format(folder, e))
                     return
         else:
             if sensor == 'LT5' or sensor == 'LE7' or sensor == 'LT4':
@@ -684,7 +704,8 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                              "{}_BT_B6.TIF".format(folder[0:len(folder) - 3])))
                 except ValueError as e:
                     # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                    logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                    logger.error(
+                        'Cannot open Landsat bands for {}: {}'.format(folder, e))
                     return
             elif sensor == 'LC8' or 'LC9':
                 try:
@@ -705,7 +726,8 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                              "{}_BT_B10.TIF".format(folder[0:len(folder) - 3])))
                 except ValueError as e:
                     # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                    logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                    logger.error(
+                        'Cannot open Landsat bands for {}: {}'.format(folder, e))
                     return
 
         if (B1 is None) or (B2 is None) or (B3 is None) or (B4 is None) or (B5 is None) or (B6 is None) or \
@@ -725,9 +747,11 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
         # if path_array is not None, we will eliminate those observation that has different path with its assigned path
         if path_array is not None:  # meaning that single-path processing
             if not os.path.exists(join(join(tmp_path, folder), folder.replace("_SR", ".xml"))):
-                logger.error('Cannot find xml file for {}'.format(join(join(tmp_path, folder), folder.replace("_SR", ".xml"))))
+                logger.error('Cannot find xml file for {}'.format(
+                    join(join(tmp_path, folder), folder.replace("_SR", ".xml"))))
                 return
-            tree = ET.parse(join(join(tmp_path, folder), folder.replace("_SR", ".xml")))
+            tree = ET.parse(join(join(tmp_path, folder),
+                            folder.replace("_SR", ".xml")))
 
             # get root element
             root = tree.getroot()
@@ -750,7 +774,8 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
             QA_band_unpacked[path_array != pathid] = QA_FILL
 
         if is_partition is True:
-            b_width = int(config['n_cols'] / config['n_block_x'])  # width of a block
+            # width of a block
+            b_width = int(config['n_cols'] / config['n_block_x'])
             b_height = int(config['n_rows'] / config['n_block_y'])
             bytesize = 2  # short16 = 2 * byte
             # source: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-in-python-using-numpy-d1bf0dd7b6f7
@@ -795,7 +820,8 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                                                                b_width),
                                                         strides=(config['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 config['n_cols'] * bytesize,
+                                                                 config['n_cols'] *
+                                                                 bytesize,
                                                                  bytesize))
             for i in range(config['n_block_y']):
                 for j in range(config['n_block_x']):
@@ -817,15 +843,18 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                                        QA_blocks[i][j]]).astype(np.int16))
 
         else:
-            np.save(join(out_dir, file_name), np.dstack([B1, B2, B3, B4, B5, B6, B7, QA_band_unpacked]).astype(np.int16))
+            np.save(join(out_dir, file_name), np.dstack(
+                [B1, B2, B3, B4, B5, B6, B7, QA_band_unpacked]).astype(np.int16))
         # scene_list.append(folder_name)
     else:
         # logger.info('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
-        logger.warn('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
+        logger.warn('Not enough clear observations for {}'.format(
+            folder[0:len(folder) - 3]))
 
     # delete unzip folder
     shutil.rmtree(join(tmp_path, folder), ignore_errors=True)
-    shutil.rmtree(join(tmp_path, folder.replace("SR", "BT")), ignore_errors=True)
+    shutil.rmtree(join(tmp_path, folder.replace("SR", "BT")),
+                  ignore_errors=True)
 
 
 def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, clear_threshold, logger, config, bounds,
@@ -864,7 +893,8 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
     try:
         QA_band = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                "{}_QA_PIXEL.TIF".format(folder))),
-                            outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                            outputBounds=[bounds[0], bounds[1],
+                                          bounds[2], bounds[3]], xRes=res, yRes=res,
                             dstNodata=1, srcNodata=1, outputType=gdal.GDT_UInt16).ReadAsArray()
     except ValueError as e:
         # logger.error('Cannot open QA band for {}: {}'.format(folder, e))
@@ -876,7 +906,7 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
     if clear_threshold > 0:
         clear_ratio = np.sum(np.logical_or(QA_band_unpacked == QA_CLEAR,
                                            QA_band_unpacked == QA_WATER)) \
-                      / np.sum(QA_band_unpacked != QA_FILL)
+            / np.sum(QA_band_unpacked != QA_FILL)
     else:
         clear_ratio = 1
 
@@ -892,12 +922,14 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
         elif folder[3] == '4':
             sensor = 'LT4'
         else:
-            logger.error('Sensor is not correctly formatted for the scene {}'.format(folder))
+            logger.error(
+                'Sensor is not correctly formatted for the scene {}'.format(folder))
 
         path = folder[10:13]
         row = folder[13:16]
         year = folder[17:21]
-        doy = datetime(int(year), int(folder[21:23]), int(folder[23:25])).strftime('%j')
+        doy = datetime(int(year), int(folder[21:23]), int(
+            folder[23:25])).strftime('%j')
         collection = "C2"
         version = folder[len(folder) - 2:len(folder)]
         file_name = sensor + path + row + year + doy + collection + version
@@ -915,73 +947,91 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
                 #                               "{}_SR_B1.TIF".format(folder)))
                 B1 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_SR_B1.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
                 B2 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_SR_B2.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0,
                                outputType=gdal.GDT_UInt16).ReadAsArray()
                 B3 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_SR_B3.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0,
                                outputType=gdal.GDT_UInt16).ReadAsArray()
                 B4 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_SR_B4.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0,
                                outputType=gdal.GDT_UInt16).ReadAsArray()
                 B5 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_SR_B5.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
 
                 B6 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_SR_B7.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
                 B7 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_ST_B6.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]],  xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]],  xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
             except ValueError as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                logger.error(
+                    'Cannot open Landsat bands for {}: {}'.format(folder, e))
                 return
         elif sensor == 'LC8' or 'LC9':
             try:
-                B1 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_SR_B2.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                B1 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), 
+                               gdal.Open(join(join(tmp_path, folder),
+                                              "{}_SR_B2.TIF".format(folder))),
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
-                B2 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
+                B2 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, 
+                                                                                       folder),
                                                                                   "{}_SR_B3.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
                 B3 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_SR_B4.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
                 B4 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_SR_B5.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
                 B5 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_SR_B6.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
                 B6 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_SR_B7.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
                 B7 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
                                                                                   "{}_ST_B10.TIF".format(folder))),
-                               outputBounds=[bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
+                               outputBounds=[
+                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
             except ValueError as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                logger.error('Cannot open Landsat bands for {}: {}'.format(folder, e))
+                logger.error(
+                    'Cannot open Landsat bands for {}: {}'.format(folder, e))
                 return
 
         if (B1 is None) or (B2 is None) or (B3 is None) or (B4 is None) or (B5 is None) or (B6 is None) or \
@@ -1000,7 +1050,8 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
         B6 = (10 * (B6 * 0.00341802 + 149)).astype(np.int16)
 
         if is_partition is True:
-            b_width = int(config['n_cols'] / config['n_block_x'])  # width of a block
+            # width of a block
+            b_width = int(config['n_cols'] / config['n_block_x'])
             b_height = int(config['n_rows'] / config['n_block_y'])
             bytesize = 2  # short16 = 2 * byte
             # source: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-
@@ -1046,7 +1097,8 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
                                                                b_width),
                                                         strides=(config['n_cols'] * b_height * bytesize,
                                                                  b_width * bytesize,
-                                                                 config['n_cols'] * bytesize,
+                                                                 config['n_cols'] *
+                                                                 bytesize,
                                                                  bytesize))
             for i in range(config['n_block_y']):
                 for j in range(config['n_block_x']):
@@ -1067,15 +1119,18 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
                                        B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j], QA_blocks[i][j]]).astype(np.int16))
 
         else:
-            np.save(join(out_dir, file_name), np.dstack([B1, B2, B3, B4, B5, B6, B7, QA_band_unpacked]).astype(np.int16))
+            np.save(join(out_dir, file_name), np.dstack(
+                [B1, B2, B3, B4, B5, B6, B7, QA_band_unpacked]).astype(np.int16))
         # scene_list.append(folder_name)
     else:
         # logger.info('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
-        logger.warn('Not enough clear observations for {}'.format(folder[0:len(folder) - 3]))
+        logger.warn('Not enough clear observations for {}'.format(
+            folder[0:len(folder) - 3]))
 
     # delete unzip folder
     shutil.rmtree(join(tmp_path, folder), ignore_errors=True)
-    shutil.rmtree(join(tmp_path, folder.replace("SR", "BT")), ignore_errors=True)
+    shutil.rmtree(join(tmp_path, folder.replace("SR", "BT")),
+                  ignore_errors=True)
 
 
 def checkfinished_step1(tmp_path):
@@ -1183,7 +1238,7 @@ def bbox(f):
 @click.option('--hpc/--dhtc', default=True, help='if it is set for HPC or DHTC environment')
 @click.option('--low_date_bound', type=str, default=None, help='the lower bound of the date range of user interest')
 @click.option('--upp_date_bound', type=str, default=None, help='the upper bound of the date range of user interest')
-@click.option('--collection',  type=click.Choice(['ARD', 'C2', 'HLS', 'HLS14','ARD-C2']), default='ARD',
+@click.option('--collection',  type=click.Choice(['ARD', 'C2', 'HLS', 'HLS14', 'ARD-C2']), default='ARD',
               help='image source category')
 @click.option('--shapefile_path', type=str, default=None)
 @click.option('--id', type=int, default=0, help=' the id of shapefile to crop image, only for C2 image category')
@@ -1203,7 +1258,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
     elif collection == 'HLS':
         folder_list = [f for f in listdir(source_dir) if f.startswith('HLS')]
     elif collection == 'HLS14':
-        folder_list = [y for x in os.walk(source_dir) for y in glob(os.path.join(x[0], '*.hdf'))]
+        folder_list = [y for x in os.walk(source_dir)
+                       for y in glob(os.path.join(x[0], '*.hdf'))]
 
     tmp_path = join(out_dir, 'tmp{}'.format(rank))
 
@@ -1218,7 +1274,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                             filemode='w', level=logging.INFO)  # mode = w enables the log file to be overwritten
         logger = logging.getLogger(__name__)
 
-        logger.info('AutoPrepareDataARD starts: {}'.format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
+        logger.info('AutoPrepareDataARD starts: {}'.format(
+            datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
         if not os.path.exists(out_dir):
             os.mkdir(out_dir)
@@ -1241,16 +1298,20 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                     conus_image = gdal.Open(os.fspath(conus_image_fpath))
 
                 if os.path.exists(join(tmp_path, folder_list[0])):
-                    shutil.rmtree(join(tmp_path, folder_list[0]), ignore_errors=True)
+                    shutil.rmtree(
+                        join(tmp_path, folder_list[0]), ignore_errors=True)
                 with tarfile.open(join(source_dir, folder_list[0] + '.tar')) as tar_ref:
                     try:
                         tar_ref.extractall(join(tmp_path, folder_list[0]))
                     except Exception:
-                        logger.error('Unzip fails for {}'.format(folder_list[0]))
+                        logger.error(
+                            'Unzip fails for {}'.format(folder_list[0]))
                 if collection == 'ARD':
-                    ref_image = gdal.Open(join(tmp_path, folder_list[0], "{}B1.tif".format(folder_list[0])))
+                    ref_image = gdal.Open(
+                        join(tmp_path, folder_list[0], "{}B1.tif".format(folder_list[0])))
                 else:
-                    ref_image = gdal.Open(join(tmp_path, folder_list[0], "{}_B1.TIF".format(folder_list[0])))
+                    ref_image = gdal.Open(
+                        join(tmp_path, folder_list[0], "{}_B1.TIF".format(folder_list[0])))
                 trans = ref_image.GetGeoTransform()
                 proj = ref_image.GetProjection()
                 xmin = trans[0]
@@ -1265,7 +1326,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                 # must close the dst
                 dst = None  # NOQA
                 out_img = None  # NOQA
-                shutil.rmtree(join(tmp_path, folder_list[0]), ignore_errors=True)
+                shutil.rmtree(
+                    join(tmp_path, folder_list[0]), ignore_errors=True)
 
         if collection == 'ARD' or collection == 'ARD-C2':
             ordinal_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder[15:19]), int(folder[19:21]),
@@ -1282,7 +1344,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             ordinal_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder.split('/')[-1][15:19]), 1, 1))
                              + int(folder.split('/')[-1][19:22]) - 1 for folder in folder_list]
         ordinal_dates.sort()
-        file = open(join(out_dir, "starting_last_dates.txt"), "w+")  # need to save out starting and
+        file = open(join(out_dir, "starting_last_dates.txt"),
+                    "w+")  # need to save out starting and
         # lasting date for this tile
         if low_date_bound is not None:
             tmp = pd.Timestamp.toordinal(parse(low_date_bound))
@@ -1311,15 +1374,20 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             # parse tile h and v from folder name
             folder_name = os.path.basename(source_dir)
             if hpc is True:
-                path_array = gdal_array.LoadFile(join(out_dir, 'singlepath_landsat_tile.tif'))
+                path_array = gdal_array.LoadFile(
+                    join(out_dir, 'singlepath_landsat_tile.tif'))
             else:
                 try:
-                    tile_h = int(folder_name[folder_name.find('h') + 1: folder_name.find('h') + 4])
-                    tile_v = int(folder_name[folder_name.find('v') + 1: folder_name.find('v') + 4])
+                    tile_h = int(folder_name[folder_name.find(
+                        'h') + 1: folder_name.find('h') + 4])
+                    tile_v = int(folder_name[folder_name.find(
+                        'v') + 1: folder_name.find('v') + 4])
                     path_array = gdal_array.LoadFile(join(Path(os.path.realpath(__file__)).parent,
                                                           'singlepath_landsat_tile_crop_compress.tif'),
-                                                     xoff=tile_h * config['n_cols'],
-                                                     yoff=tile_v * config['n_rows'],
+                                                     xoff=tile_h *
+                                                     config['n_cols'],
+                                                     yoff=tile_v *
+                                                     config['n_rows'],
                                                      xsize=config['n_cols'],
                                                      ysize=config['n_rows'])  # read a partial array
                     # from a large file
@@ -1333,7 +1401,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
 
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
             new_rank = rank - 1 + i * n_cores
-            if new_rank > (len(folder_list) - 1):  # means that all folder has been processed
+            # means that all folder has been processed
+            if new_rank > (len(folder_list) - 1):
                 break
             folder = folder_list[new_rank]
             single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, clear_threshold, logger,
@@ -1343,7 +1412,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
             new_rank = rank - 1 + i * n_cores
-            if new_rank > (len(folder_list) - 1):  # means that all folder has been processed
+            # means that all folder has been processed
+            if new_rank > (len(folder_list) - 1):
                 break
             folder = folder_list[new_rank]
             single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger,
@@ -1353,7 +1423,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
             new_rank = rank - 1 + i * n_cores
-            if new_rank > (len(folder_list) - 1):  # means that all folder has been processed
+            # means that all folder has been processed
+            if new_rank > (len(folder_list) - 1):
                 break
             folder = folder_list[new_rank]
             single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger,
@@ -1363,7 +1434,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
             new_rank = rank - 1 + i * n_cores
-            if new_rank > (len(folder_list) - 1):  # means that all folder has been processed
+            # means that all folder has been processed
+            if new_rank > (len(folder_list) - 1):
                 break
             folder = folder_list[new_rank]
             single_image_stacking_hls(source_dir, out_dir, logger, config, folder, clear_threshold=clear_threshold,
@@ -1373,12 +1445,13 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
             new_rank = rank - 1 + i * n_cores
-            if new_rank > (len(folder_list) - 1):  # means that all folder has been processed
+            # means that all folder has been processed
+            if new_rank > (len(folder_list) - 1):
                 break
             folder = folder_list[new_rank]
             single_image_stacking_hls14(out_dir, logger, config, folder, clear_threshold=clear_threshold,
-                                      is_partition=is_partition, low_date_bound=low_date_bound,
-                                      upp_date_bound=upp_date_bound)
+                                        is_partition=is_partition, low_date_bound=low_date_bound,
+                                        upp_date_bound=upp_date_bound)
     # create an empty file for signaling the core that has been finished
     with open(os.path.join(out_dir, 'rank{}_finished.txt'.format(rank)), 'w'):
         pass
@@ -1390,7 +1463,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
     # create scene list after stacking is finished and remove folders. Not need it in DHTC
     if rank == 1:
         # remove tmp folder
-        logger.info('Stacking procedure finished: {}'.format(datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
+        logger.info('Stacking procedure finished: {}'.format(
+            datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')))
 
 
 if __name__ == '__main__':

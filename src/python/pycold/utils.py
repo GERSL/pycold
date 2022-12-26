@@ -10,14 +10,29 @@ from .app import defaults
 
 SccdOutput = namedtuple("SccdOutput", "position rec_cg min_rmse nrt_mode nrt_model nrt_queue")
 
-sccd_dt = np.dtype([('t_start', np.int32), ('t_break', np.int32), ('num_obs', np.int32),
-                    ('coefs', np.float32, (6, 6)), ('rmse', np.float32, 6), ('magnitude', np.float32, 6)], align=True)
+sccd_dt = np.dtype(
+    [('t_start', np.int32),
+     ('t_break', np.int32),
+     ('num_obs', np.int32),
+     ('coefs', np.float32, (6, 6)),
+     ('rmse', np.float32, 6),
+     ('magnitude', np.float32, 6)],
+    align=True)
 
 nrtqueue_dt = np.dtype([('clry', np.short, 6), ('clrx_since1982', np.short)], align=True)
-nrtmodel_dt = np.dtype([('t_start_since1982', np.short), ('num_obs', np.short), ('obs', np.short, (6, 6)),
-                        ('obs_date_since1982', np.short, 6), ('covariance', np.float32, (6, 36)),
-                        ('nrt_coefs', np.float32, (6, 6)), ('H', np.float32, 6), ('rmse_sum', np.uint32, 6),
-                        ('norm_cm', np.short), ('cm_angle', np.short), ('conse_last', np.ubyte)], align=True)
+nrtmodel_dt = np.dtype(
+    [('t_start_since1982', np.short),
+     ('num_obs', np.short),
+     ('obs', np.short, (6, 6)),
+     ('obs_date_since1982', np.short, 6),
+     ('covariance', np.float32, (6, 36)),
+     ('nrt_coefs', np.float32, (6, 6)),
+     ('H', np.float32, 6),
+     ('rmse_sum', np.uint32, 6),
+     ('norm_cm', np.short),
+     ('cm_angle', np.short),
+     ('conse_last', np.ubyte)],
+    align=True)
 
 
 def get_block_y(block_id, n_block_x):
@@ -115,13 +130,21 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
     elif prefix == 'CM_direction':
         output_type = np.uint8
 
-    cm_map_list = [np.full((config['n_rows'], config['n_cols']), defaults['COMMON']['NAN_VAL'], dtype=output_type) for x in range(n_cm_maps)]
+    cm_map_list = [
+        np.full(
+            (config['n_rows'],
+             config['n_cols']),
+            defaults['COMMON']['NAN_VAL'],
+            dtype=output_type) for x in range(n_cm_maps)]
     for iblock in range(config['n_blocks']):
         current_block_y = int(np.floor(iblock / config['n_block_x'])) + 1
         current_block_x = iblock % config['n_block_y'] + 1
         try:
-            cm_block = np.load(join(result_path, '{}_x{}_y{}.npy'.format(prefix, current_block_x,
-                                                                         current_block_y))).astype(output_type)
+            cm_block = np.load(
+                join(
+                    result_path, '{}_x{}_y{}.npy'.format(
+                        prefix, current_block_x, current_block_y))).astype(
+                output_type)
         except OSError as e:
             print('Reading CM files fails: {}'.format(e))
         #    continue
@@ -136,17 +159,20 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
                                                  n_cm_maps))
         hori_profile = np.hsplit(cm_block_reshape, n_cm_maps)
         for count, maps in enumerate(cm_map_list):
-            maps[(current_block_y - 1) * config['block_height']:current_block_y * config['block_height'],
-                 (current_block_x - 1) * config['block_width']:current_block_x * config['block_width']] = (
-                     hori_profile[count].reshape(config['block_height'], config['block_width'])
-                 )
+            maps[(current_block_y - 1) * config['block_height']: current_block_y *
+                 config['block_height'],
+                 (current_block_x - 1) * config['block_width']: current_block_x *
+                 config['block_width']] = (hori_profile[count].reshape(
+                     config['block_height'],
+                     config['block_width']))
 
     # output cm images
     for count, cm_map in enumerate(cm_map_list):
         ordinal_date = starting_date + count * config['CM_OUTPUT_INTERVAL']
-        outfile = join(cmmap_path, '{}_maps_{}_{}{}.npy'.format(prefix, str(ordinal_date),
-                                                                pd.Timestamp.fromordinal(ordinal_date).year,
-                                                                get_doy(ordinal_date)))
+        outfile = join(
+            cmmap_path, '{}_maps_{}_{}{}.npy'.format(
+                prefix, str(ordinal_date),
+                pd.Timestamp.fromordinal(ordinal_date).year, get_doy(ordinal_date)))
         np.save(outfile, cm_map)
 
     if clean is True:
@@ -156,7 +182,7 @@ def assemble_cmmaps(config, result_path, cmmap_path, starting_date, n_cm_maps, p
             os.remove(join(result_path, file))
 
 
-def get_rowcol_intile(id, block_width, block_height, block_x, block_y):
+def get_rowcol_intile(index, block_width, block_height, block_x, block_y):
     """
     calculate row and col in original images based on pos index and block location
     Parameters
@@ -176,8 +202,8 @@ def get_rowcol_intile(id, block_width, block_height, block_x, block_y):
     (original_row, original_col)
     row and col number (starting from 1) in original image (e.g., Landsat ARD 5000*5000)
     """
-    original_row = int(id / block_width + (block_y - 1) * block_height + 1)
-    original_col = int(id % block_width + (block_x - 1) * block_width + 1)
+    original_row = int(index / block_width + (block_y - 1) * block_height + 1)
+    original_col = int(index % block_width + (block_x - 1) * block_width + 1)
     return original_row, original_col
 
 
@@ -295,7 +321,8 @@ def assemble_array(array_list, n_block_x):
     an array [nrows, ncols]
     """
     full_feature_array = np.hstack(array_list)
-    full_feature_array = np.vstack(np.hsplit(full_feature_array, n_block_x))  # (nrows, ncols, nfeatures)
+    full_feature_array = np.vstack(
+        np.hsplit(full_feature_array, n_block_x))  # (nrows, ncols, nfeatures)
     return full_feature_array
 
 
@@ -344,9 +371,12 @@ def save_nrtfiles(out_folder, outfile_prefix, sccd_pack, data_ext):
     :param data_ext:
     :return:
     """
-    data_ext.to_csv(join(out_folder, 'spectral_{}_extension.csv').format(outfile_prefix), index=False, header=False)
+    data_ext.to_csv(join(out_folder, 'spectral_{}_extension.csv').format(
+        outfile_prefix), index=False, header=False)
     # data_ini_current.to_csv(join(out_path, 'spectral_{}_ini.csv').format(pid), index=False, header=False)
-    np.asarray(sccd_pack.nrt_mode).tofile(join(out_folder, 'sccd_pack{}_nrt_mode').format(outfile_prefix))
+    np.asarray(
+        sccd_pack.nrt_mode).tofile(
+        join(out_folder, 'sccd_pack{}_nrt_mode').format(outfile_prefix))
     sccd_pack.rec_cg.tofile(join(out_folder, 'sccd_pack{}_rec_cg').format(outfile_prefix))
     sccd_pack.nrt_model.tofile(join(out_folder, 'sccd_pack{}_nrt_model').format(outfile_prefix))
     sccd_pack.nrt_queue.tofile(join(out_folder, 'sccd_pack{}_nrt_queue').format(outfile_prefix))
@@ -381,7 +411,9 @@ def index_sccdpack(sccd_pack_single):
     :return: a namedtuple SccdOutput
     """
     if len(sccd_pack_single) != defaults['SCCD']['PACK_ITEM']:
-        raise Exception("the element number of sccd_pack_single must be {}".format(defaults['SCCD']['PACK_ITEM']))
+        raise Exception(
+            "the element number of sccd_pack_single must be {}".format(
+                defaults['SCCD']['PACK_ITEM']))
 
     # convert to named tuple
     sccd_pack_single = SccdOutput(*sccd_pack_single)
@@ -394,11 +426,11 @@ def index_sccdpack(sccd_pack_single):
         sccd_pack_single = sccd_pack_single._replace(rec_cg=np.asarray(sccd_pack_single.rec_cg,
                                                                        dtype=sccd_dt))
     if len(sccd_pack_single.nrt_model) > 0:
-        sccd_pack_single = sccd_pack_single._replace(nrt_model=np.asarray(sccd_pack_single.nrt_model,
-                                                                          dtype=nrtmodel_dt))
+        sccd_pack_single = sccd_pack_single._replace(
+            nrt_model=np.asarray(sccd_pack_single.nrt_model, dtype=nrtmodel_dt))
     if len(sccd_pack_single.nrt_queue) > 0:
-        sccd_pack_single = sccd_pack_single._replace(nrt_queue=np.asarray(sccd_pack_single.nrt_queue,
-                                                                          dtype=nrtqueue_dt))
+        sccd_pack_single = sccd_pack_single._replace(
+            nrt_queue=np.asarray(sccd_pack_single.nrt_queue, dtype=nrtqueue_dt))
     return sccd_pack_single
 
 
@@ -508,10 +540,13 @@ def calculate_sccd_cm(sccd_pack):
 
     """
     start_index = defaults['SCCD']['NRT_BAND'] - sccd_pack.nrt_model[0]['conse_last']
-    pred_ref = np.asarray([[predict_ref(sccd_pack.nrt_model[0]['nrt_coefs'][b],
-                                        sccd_pack.nrt_model[0]['obs_date_since1982'][
-                                            i_conse + start_index] + defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH'])
-                            for i_conse in range(sccd_pack.nrt_model[0]['conse_last'])]
-                           for b in range(defaults['SCCD']['NRT_BAND'])])
+    pred_ref = np.asarray([[
+        predict_ref(
+            sccd_pack.nrt_model[0]['nrt_coefs'][b],
+            sccd_pack.nrt_model[0]['obs_date_since1982']
+            [i_conse + start_index] +
+            defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH'])
+        for i_conse in range(sccd_pack.nrt_model[0]['conse_last'])]
+        for b in range(defaults['SCCD']['NRT_BAND'])])
     cm = sccd_pack.nrt_model[0]['obs'][:, start_index:defaults['SCCD']['DEFAULT_CONSE']] - pred_ref
     return np.median(cm, axis=1)
