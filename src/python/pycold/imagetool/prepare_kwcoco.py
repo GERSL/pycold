@@ -41,216 +41,227 @@ SENSOR_TO_INFO = {}
 SENSOR_TO_INFO['L8'] = {
     'sensor_name': 'Landsat-8',
     'intensity_channels': 'blue|green|red|nir|swir16|swir22|lwir11',
-    'quality_channels': 'qa_pixel',
-    # I'm not sure how to interpret the quality mask here. I'll need to dig in
-    # more to figure out what it is. But it should be whatever is in the
-    # landsat-c2ard-bt, landsat-c2ard-sr STAC collections.
-    # But the idea is we should associate this data with a quality
-    # interpretation to simplify the processing code.
-    # The data is being read as 21824, which is "0101010101000000"
-    'quality_interpretation': 'FMASK'  # I dont think this is right.
-}
+    'quality_channels': 'cloudmask',
+    'quality_interpretation': 'FMASK'
+    } # The name of quality_channels for Drop 4 is 'cloudmask'.
 
-## You may want to check this document for understading how QA band is encoded.
-## https://d9-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/s3fs-public/media/files/LSDS-1435%20Landsat%20C2%20US%20ARD%20Data%20Format%20Control%20Book-v3.pdf
-
-# Register different quality bit standards. (This could/should be moved to a
-# different module for for conciceness)
-QUALITY_BIT_INTERPRETATIONS = {}
+# Register different quality bit standards.
+QA_INTERPRETATIONS = {}
 
 # These are specs for TA1 processed data
-# https://smartgitlab.com/TE/standards/-/wikis/Data-Output-Specifications#quality-band
-QUALITY_BIT_INTERPRETATIONS['TA1'] = {
-    'TnE'           : 1 << 0,  # T&E binary mask
-    'dilated_cloud' : 1 << 1,
-    'cirrus'        : 1 << 2,
-    'cloud'         : 1 << 3,
-    'cloud_shadow'  : 1 << 4,
-    'snow'          : 1 << 5,
-    'clear'         : 1 << 6,
-    'water'         : 1 << 7,
+QA_BIT = {
+    'clear'         : 1 << 0,
+    'cloud'         : 1 << 1,
+    'cloud_adj'     : 1 << 2,
+    'shadow'        : 1 << 3,
+    'snow'          : 1 << 4,
+    'water'         : 1 << 5,
 }
 
-# This will be used for value of decoding.
-# After decoding QA band, it will include only value of 0, 1, 2, 3, 4, and 255.
-QUALITY_BIT_INTERPRETATIONS['FMASK'] = {
-    'clear_land'     : 0,
-    'clear_water'    : 1,
-    'cloud_shadow'   : 2,
-    'snow'           : 3,
-    'cloud'          : 4,
-    'no_observation' : 255,
+QA_INTERPRETATIONS['FMASK'] = {
+    'clear'         : 0,
+    'water'         : 1,
+    'cloud_shadow'  : 2,
+    'snow'          : 3,
+    'cloud'         : 4,
+    'no_obs'        : 255,
 }
+QUALITY_BIT_INTERPRETATIONS = {}
 
+# function for decoding HLS qa band
+def qa_decoding(qa_array):
+    """
+    This function is modified from qabitval_array_HLS function
+    (https://github.com/GERSL/pycold/blob/c5b380eccc2916e5c3aec0bbd2b1982e114b75b1/src/python/pycold/imagetool/prepare_ard.py#L74)
+    """
+    unpacked = np.full(qa_array.shape, QA_INTERPRETATIONS['FMASK']['clear'])
+
+    QA_CLOUD_unpacked = geek.bitwise_and(qa_array, QA_BIT['cloud'])
+    QA_CLOUD_ADJ = geek.bitwise_and(qa_array, QA_BIT['cloud_adj'])
+    QA_SHADOW_unpacked = geek.bitwise_and(qa_array, QA_BIT['shadow'])
+    QA_SNOW_unpacked = geek.bitwise_and(qa_array, QA_BIT['snow'])
+    QA_WATER_unpacked = geek.bitwise_and(qa_array, QA_BIT['water'])
+
+    unpacked[QA_WATER_unpacked > 0] = QA_INTERPRETATIONS['FMASK']['water']
+    unpacked[QA_SNOW_unpacked > 0] = QA_INTERPRETATIONS['FMASK']['snow']
+    unpacked[QA_SHADOW_unpacked > 0] = QA_INTERPRETATIONS['FMASK']['cloud_shadow']
+    unpacked[QA_CLOUD_ADJ > 0] = QA_INTERPRETATIONS['FMASK']['cloud']
+    unpacked[QA_CLOUD_unpacked > 0] = QA_INTERPRETATIONS['FMASK']['cloud']
+    unpacked[qa_array == QA_INTERPRETATIONS['FMASK']['no_obs']] = QA_INTERPRETATIONS['FMASK']['no_obs']
+
+    return unpacked
+
+def qa_decoding_no_boundary(qa_array):
+    """
+    This function is modified from qabitval_array_HLS function
+    (https://github.com/GERSL/pycold/blob/c5b380eccc2916e5c3aec0bbd2b1982e114b75b1/src/python/pycold/imagetool/prepare_ard.py#L74)
+    """
+    unpacked = np.full(qa_array.shape, QA_INTERPRETATIONS['FMASK']['clear'])
+
+    QA_CLOUD_unpacked = geek.bitwise_and(qa_array, QA_BIT['cloud'])
+    QA_CLOUD_ADJ = geek.bitwise_and(qa_array, QA_BIT['cloud_adj'])
+    QA_SHADOW_unpacked = geek.bitwise_and(qa_array, QA_BIT['shadow'])
+    QA_SNOW_unpacked = geek.bitwise_and(qa_array, QA_BIT['snow'])
+    QA_WATER_unpacked = geek.bitwise_and(qa_array, QA_BIT['water'])
+
+    unpacked[QA_WATER_unpacked > 0] = QA_INTERPRETATIONS['FMASK']['water']
+    unpacked[QA_SNOW_unpacked > 0] = QA_INTERPRETATIONS['FMASK']['snow']
+    unpacked[QA_SHADOW_unpacked > 0] = QA_INTERPRETATIONS['FMASK']['cloud_shadow']
+    unpacked[QA_CLOUD_unpacked > 0] = QA_INTERPRETATIONS['FMASK']['cloud']
+    unpacked[QA_CLOUD_ADJ > 0] = QA_INTERPRETATIONS['FMASK']['clear']
+    unpacked[qa_array == QA_INTERPRETATIONS['FMASK']['no_obs']] = QA_INTERPRETATIONS['FMASK']['no_obs']
+
+    return unpacked
 
 def setup_logging():
     # TODO: handle HPC things here in addition to stdout for doctests
     logging.basicConfig(level='INFO')
 
 
-def grab_demo_kwcoco_dataset():
-    """
-    Get a demo kwcoco dataset for use in testing
-
-    Returns:
-        Path: the path to the kwcoco dataset
-    """
-    # Register the name of the dataset, how to obtain it, and verify it.
-    dataset_info = {
-        'name': 'Aligned-DemoKHQ-2022-09-19-V7',
-        # The CID is the IPFS Content ID
-        'cid': 'bafybeigdkhphpa3n3rdv33w7g6tukmprdnch7g4bp4hc6ebmcr76y6yhwu',
-        # The sha512 is the hash of the zipfile we expect to grab.
-        'sha512': '6b98195f1d695c695d622ad9debeec93586e518de5934350a17001',
-    }
-    dpath = ub.Path.appdir('pycold/tests/demodata/kwcoco').ensuredir()
-
-    coco_fpath = dpath / dataset_info['name'] / 'data.kwcoco.json'
-    if not coco_fpath.exists():
-        # If the data does not already exist
-        # Use IPFS to download a demo kwcoco file with LandSat bands
-        filename = dataset_info['name'] + '.zip'
-        url = f'https://ipfs.io/ipfs/{dataset_info["cid"]}?filename={filename}'
-        zip_fpath = ub.download(
-            url=url,
-            fname=filename,
-            hash_prefix=dataset_info['sha512'],
-            hasher='sha512')
-        # Unzip the data
-        import zipfile
-        zfile = zipfile.ZipFile(zip_fpath)
-        zfile.extractall(dpath)
-
-        if __debug__:
-            # The first item should be the name of the bundle folder
-            expected_bundle_name = coco_fpath.parent.name
-            got_bundle_name = zfile.filelist[0].filename.strip('/')
-            if got_bundle_name != expected_bundle_name:
-                print(f'expected_bundle_name={expected_bundle_name}')
-                print(f'got_bundle_name={got_bundle_name}')
-
-        if not coco_fpath.exists():
-            raise AssertionError(
-                'The zipfile did not contain the expected dataset')
-
-    return coco_fpath
-
-
-def _demo_kwcoco_bands():
-    """
-    This is a quick example illustrating how to dig into a single kwcoco image.
-
-    This does not belong in the main logic and should be moved to an examples
-    or tutorial folder. But it can live here for now.
-    """
-    from pycold.imagetool.prepare_kwcoco import grab_demo_kwcoco_dataset
-    coco_fpath = grab_demo_kwcoco_dataset()
-
-    import kwcoco
-    import kwimage
-    import kwplot
-    # Load the dataset
-    coco_dset = kwcoco.CocoDataset(coco_fpath)
-
-    # Grab one arbitrary image id
-    image_id = coco_dset.images()[0]
-
-    coco_img = coco_dset.coco_image(image_id)
-
-    # Concept: all important metadata lives in the coco_img.img dictionary
-    # But that's messsy to work with, so lets demo the API instead
-
-    # One thing to note is that all file paths will either be absolute
-    # or relative to the bundle "dpath".
-
-    print(f'coco_dset.bundle_dpath={coco_dset.bundle_dpath}')
-
-    # We can get a sense of what lives in the coco image by looking at its
-    # asset objects.
-    for asset_index, asset in enumerate(coco_img.iter_asset_objs()):
-        print('+ --- Asset {} --- '.format(asset_index))
-        print(f'  * file_name = {asset["file_name"]}')
-        print(f'  * channels = {asset["channels"]}')
-        print(f'  * parent_file_name= {asset["parent_file_name"]}')
-
-    # A concicse list of all channels is available here using the kwcoco
-    # channel spec.
-    print(f'coco_img.channels={coco_img.channels}')
-
-    # We can use the "delay" method to construct a delayed load object and
-    # manipluate how we will load the image for a particular set of bands
-    # before we actually do it. Lets load two items of data: the RGB and QA
-    # bands.
-
-    rgb_delay = coco_img.delay('red|green|blue')
-    qa_delay = coco_img.delay('qa_pixel')
-
-    # The finalize method tells the delayed operations to execute.
-    rgb_data = rgb_delay.finalize()
-    qa_data = qa_delay.finalize()
-
-    rgb_canvas = kwimage.normalize_intensity(rgb_data)
-
-    # Because the QA band is categorical, we should be able to make a short
-    # histogram that describes what is inside.
-    qabits_to_count = ub.dict_hist(qa_data.ravel())
-
-    # For the QA band lets assign a color to each category
-    colors = kwimage.Color.distinct(len(qabits_to_count))
-    qabits_to_color = dict(zip(qabits_to_count, colors))
-
-    # Colorize the QA bands
-    colorized = np.empty(qa_data.shape[0:2] + (3,), dtype=np.float32)
-    for qabit, color in qabits_to_color.items():
-        mask = qa_data[:, :, 0] == qabit
-        colorized[mask] = color
-
-    rgb_canvas = kwimage.normalize_intensity(rgb_data)
-
-    # Because the QA band is categorical, we should be able to make a short
-
-    qa_canvas = colorized
-    legend = kwplot.make_legend_img(qabits_to_color)  # Make a legend
-
-    # Stack things together into a nice single picture
-    qa_canvas = kwimage.stack_images([qa_canvas, legend], axis=1)
-    canvas = kwimage.stack_images([rgb_canvas, qa_canvas], axis=1)
-
-    ### Note, I'm not sure if the system the user is has an X server
-    ### or if this works in Jupyter notebooks. I will document the way I view
-    ### images on my machine in an IPython terminal, but I will also show how
-    ### to save these figures to disk so you can rsync them to a machine or do
-    ### whatever you normally do to look at an image.
-
-    ### HEADLESS METHOD
-    kwimage.imwrite('canvas.png', canvas)
-
-    ### IPYTHON METHOD
-    import kwplot
-    plt = kwplot.autoplt()
-
-    kwplot.imshow(canvas)
-
-    plt.show()
-
-
-# This function is a temporary way (quick solution) to run COLD algorithm for Landsat 8 Collection 2 by now.
-# One of reasons why file name is important is that it decides how to treat QA band decoding and scaling.
-# We need a Key information: 'sensor (LT5, LE7, LC8, LC9, L30, S30, etc), 'year', 'doy', 'collection (C_1, C_2)'
-# In specific, sensor name includes information about 'ARD' data or 'HLS' data or just 'Landsat' data etc.
-# We need to think about better way to handle this issue in the future...
-def get_file_name(parent_name):
-    sensor = parent_name.split('_')[0]
-    path_hv = parent_name.split('_')[2]
-    year = parent_name.split('_')[3][:4]
-    doy = datetime(int(year), int(parent_name[19:21]), int(parent_name[21:23])).strftime('%j')
-    collection = parent_name.split('_')[5]
-    if sensor == 'LC08':
-        sensor = 'LC8'
-    if collection == '02':
-        collection = 'C_2'
-    file_name = sensor + path_hv + year + doy + collection
-    return file_name
+# def grab_demo_kwcoco_dataset():
+#     """
+#     Get a demo kwcoco dataset for use in testing
+#
+#     Returns:
+#         Path: the path to the kwcoco dataset
+#     """
+#     # Register the name of the dataset, how to obtain it, and verify it.
+#     dataset_info = {
+#         'name': 'Aligned-DemoKHQ-2022-09-19-V7',
+#         # The CID is the IPFS Content ID
+#         'cid': 'bafybeigdkhphpa3n3rdv33w7g6tukmprdnch7g4bp4hc6ebmcr76y6yhwu',
+#         # The sha512 is the hash of the zipfile we expect to grab.
+#         'sha512': '6b98195f1d695c695d622ad9debeec93586e518de5934350a17001',
+#     }
+#     dpath = ub.Path.appdir('pycold/tests/demodata/kwcoco').ensuredir()
+#
+#     coco_fpath = dpath / dataset_info['name'] / 'data.kwcoco.json'
+#     if not coco_fpath.exists():
+#         # If the data does not already exist
+#         # Use IPFS to download a demo kwcoco file with LandSat bands
+#         filename = dataset_info['name'] + '.zip'
+#         url = f'https://ipfs.io/ipfs/{dataset_info["cid"]}?filename={filename}'
+#         zip_fpath = ub.download(
+#             url=url,
+#             fname=filename,
+#             hash_prefix=dataset_info['sha512'],
+#             hasher='sha512')
+#         # Unzip the data
+#         import zipfile
+#         zfile = zipfile.ZipFile(zip_fpath)
+#         zfile.extractall(dpath)
+#
+#         if __debug__:
+#             # The first item should be the name of the bundle folder
+#             expected_bundle_name = coco_fpath.parent.name
+#             got_bundle_name = zfile.filelist[0].filename.strip('/')
+#             if got_bundle_name != expected_bundle_name:
+#                 print(f'expected_bundle_name={expected_bundle_name}')
+#                 print(f'got_bundle_name={got_bundle_name}')
+#
+#         if not coco_fpath.exists():
+#             raise AssertionError(
+#                 'The zipfile did not contain the expected dataset')
+#
+#     return coco_fpath
+#
+#
+# def _demo_kwcoco_bands():
+#     """
+#     This is a quick example illustrating how to dig into a single kwcoco image.
+#
+#     This does not belong in the main logic and should be moved to an examples
+#     or tutorial folder. But it can live here for now.
+#     """
+#     from pycold.imagetool.prepare_kwcoco import grab_demo_kwcoco_dataset
+#     coco_fpath = grab_demo_kwcoco_dataset()
+#
+#     import kwcoco
+#     import kwimage
+#     import kwplot
+#     # Load the dataset
+#     coco_dset = kwcoco.CocoDataset(coco_fpath)
+#
+#     # Grab one arbitrary image id
+#     image_id = coco_dset.images()[0]
+#
+#     coco_img = coco_dset.coco_image(image_id)
+#
+#     # Concept: all important metadata lives in the coco_img.img dictionary
+#     # But that's messsy to work with, so lets demo the API instead
+#
+#     # One thing to note is that all file paths will either be absolute
+#     # or relative to the bundle "dpath".
+#
+#     print(f'coco_dset.bundle_dpath={coco_dset.bundle_dpath}')
+#
+#     # We can get a sense of what lives in the coco image by looking at its
+#     # asset objects.
+#     for asset_index, asset in enumerate(coco_img.iter_asset_objs()):
+#         print('+ --- Asset {} --- '.format(asset_index))
+#         print(f'  * file_name = {asset["file_name"]}')
+#         print(f'  * channels = {asset["channels"]}')
+#         print(f'  * parent_file_name= {asset["parent_file_name"]}')
+#
+#     # A concicse list of all channels is available here using the kwcoco
+#     # channel spec.
+#     print(f'coco_img.channels={coco_img.channels}')
+#
+#     # We can use the "delay" method to construct a delayed load object and
+#     # manipluate how we will load the image for a particular set of bands
+#     # before we actually do it. Lets load two items of data: the RGB and QA
+#     # bands.
+#
+#     rgb_delay = coco_img.delay('red|green|blue')
+#     qa_delay = coco_img.delay('qa_pixel')
+#
+#     # The finalize method tells the delayed operations to execute.
+#     rgb_data = rgb_delay.finalize()
+#     qa_data = qa_delay.finalize()
+#
+#     rgb_canvas = kwimage.normalize_intensity(rgb_data)
+#
+#     # Because the QA band is categorical, we should be able to make a short
+#     # histogram that describes what is inside.
+#     qabits_to_count = ub.dict_hist(qa_data.ravel())
+#
+#     # For the QA band lets assign a color to each category
+#     colors = kwimage.Color.distinct(len(qabits_to_count))
+#     qabits_to_color = dict(zip(qabits_to_count, colors))
+#
+#     # Colorize the QA bands
+#     colorized = np.empty(qa_data.shape[0:2] + (3,), dtype=np.float32)
+#     for qabit, color in qabits_to_color.items():
+#         mask = qa_data[:, :, 0] == qabit
+#         colorized[mask] = color
+#
+#     rgb_canvas = kwimage.normalize_intensity(rgb_data)
+#
+#     # Because the QA band is categorical, we should be able to make a short
+#
+#     qa_canvas = colorized
+#     legend = kwplot.make_legend_img(qabits_to_color)  # Make a legend
+#
+#     # Stack things together into a nice single picture
+#     qa_canvas = kwimage.stack_images([qa_canvas, legend], axis=1)
+#     canvas = kwimage.stack_images([rgb_canvas, qa_canvas], axis=1)
+#
+#     ### Note, I'm not sure if the system the user is has an X server
+#     ### or if this works in Jupyter notebooks. I will document the way I view
+#     ### images on my machine in an IPython terminal, but I will also show how
+#     ### to save these figures to disk so you can rsync them to a machine or do
+#     ### whatever you normally do to look at an image.
+#
+#     ### HEADLESS METHOD
+#     kwimage.imwrite('canvas.png', canvas)
+#
+#     ### IPYTHON METHOD
+#     import kwplot
+#     plt = kwplot.autoplt()
+#
+#     kwplot.imshow(canvas)
+#
+#     plt.show()
 
 
 def stack_kwcoco(coco_fpath, out_dir):
@@ -284,70 +295,29 @@ def stack_kwcoco(coco_fpath, out_dir):
 
     # Load the kwcoco dataset
     dset = kwcoco.CocoDataset.coerce(coco_fpath)
-
-    # A kwcoco dataset can point to multiple images and videos (which are
-    # sequences of images). In the future we will likely want to split the main
-    # kwcoco file into many smaller ones so we can take advantage of parallel
-    # processing, but for now lets just loop over each video and each image in
-    # that video.
     videos = dset.videos()
-
     results = []
 
     for video_id in videos:
 
-        # Get the image ids of each image in this video seqeunce
-        images = dset.images(video_id=video_id)
+        if video_id == 17: # testing for US_C000 site
+            # Get the image ids of each image in this video seqeunce
+            images = dset.images(video_id=video_id)
 
-        for image_id in images:
+            for image_id in images:
+                coco_image : kwcoco.CocoImage = dset.coco_image(image_id)
+                coco_image = coco_image.detach()
 
-            # Construct a CocoImage object which provides access to all
-            # underlying metadata and a concicse API to efficiently sample
-            # image pixels.
-            coco_image : kwcoco.CocoImage = dset.coco_image(image_id)
-
-            # Using detach separates the image from the parent dataset which
-            # will allow for easier parallel processing
-            coco_image = coco_image.detach()
-
-            # Transform the image data into the desired block structure.
-            result = process_one_coco_image(coco_image, config, out_dir)
-            results.append(result)
+                # For now, it supports only L8
+                if coco_image.img['sensor_coarse'] == 'L8':
+                    adj_cloud = False
+                    # Transform the image data into the desired block structure.
+                    result = process_one_coco_image(coco_image, config, out_dir, adj_cloud)
+                    results.append(result)
 
     return results
 
-
-# This funtion is for decoding QA band value (written by Su Ye)
-# Reference: see page 19-20 (https://d9-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/s3fs-public/media/files/LSDS-1435%20Landsat%20C2%20US%20ARD%20Data%20Format%20Control%20Book-v3.pdf)
-def qabitval_array_c2(qa_data):
-    """
-    Institute a hierarchy of qa values that may be flagged in the bitpacked
-    value for collection 2 data
-    fill > cloud > shadow > snow > water > clear
-    Args:
-        packedint: int value to bit check
-    Returns:
-        offset value to use
-    """
-    # NEED HELP: I think replacing value (255, 0, 1, 2, 3, 4) to quality_bits['no_observation']... would be better.
-    unpacked = np.full(qa_data.shape, 255)   # quality_bits['no_observation'])
-    QA_CLEAR_unpacked = geek.bitwise_and(qa_data, 1 << 6)    # I believe number on the right indicate bits number. For example, 'Clear' flags in bits 6.
-    QA_SHADOW_unpacked = geek.bitwise_and(qa_data, 1 << 4)   # 'Cloud shadow' flags in bits 4.
-    QA_CLOUD_unpacked = geek.bitwise_and(qa_data, 1 << 3)    # 'Cloud' flags in bits 3.
-    QA_DILATED_unpacked = geek.bitwise_and(qa_data, 1 << 1)  # 'Dilated Cloud' flags in bits 1.
-    QA_SNOW_unpacked = geek.bitwise_and(qa_data, 1 << 5)     # 'Snow' flags in bits 5.
-    QA_WATER_unpacked = geek.bitwise_and(qa_data, 1 << 7)    # 'Water' flags in bits 7.
-
-    unpacked[QA_SNOW_unpacked > 0] = 3     # quality_bits['snow']
-    unpacked[QA_SHADOW_unpacked > 0] = 2   # quality_bits['cloud_shadow']
-    unpacked[QA_CLOUD_unpacked > 0] = 4    # quality_bits['cloud']
-    unpacked[QA_DILATED_unpacked > 0] = 4  # quality_bits['cloud']
-    unpacked[QA_CLEAR_unpacked > 0] = 0    # quality_bits['clear_land']
-    unpacked[QA_WATER_unpacked > 0] = 1    # quality_bits['clear_water']
-    return unpacked
-
-
-def process_one_coco_image(coco_image, config, out_dir):
+def process_one_coco_image(coco_image, config, out_dir, adj_cloud):
     """
     Args:
         coco_image (kwcoco.CocoImage): the image to process
@@ -373,8 +343,11 @@ def process_one_coco_image(coco_image, config, out_dir):
     video_dpath = (out_dir / video_name).ensuredir()
 
     # Other relevant coco metadata
-    coco_image.img['date_captured']
-    coco_image.img['frame_index']
+    date_captured = coco_image.img['date_captured']
+    ordinal_date = datetime.strptime(date_captured[:10], '%Y-%m-%d').toordinal()
+    frame_index = coco_image.img['frame_index']
+    n_cols = coco_image.img['width']
+    n_rows = coco_image.img['height']
 
     # Determine what sensor the image is from.
     # Note: if kwcoco needs to register more fine-grained sensor
@@ -388,27 +361,10 @@ def process_one_coco_image(coco_image, config, out_dir):
     intensity_channels = sensor_info['intensity_channels']
     quality_channels = sensor_info['quality_channels']
     quality_interpretation = sensor_info['quality_interpretation']
-    quality_bits = QUALITY_BIT_INTERPRETATIONS[quality_interpretation]
-
+    quality_bits = QA_INTERPRETATIONS[quality_interpretation]
     # Specify how we are going to handle spatial resampling and nodata
     delay_kwargs = {
-        # Note on the "nodata_method" argument to delay:
-        # This argument tells kwcoco how to handle nodata values in the
-        # underlying imagery.
-        # Using None will tell kwcoco to return nodata value as-is.
-        # Using 'float' tells kwcoco to convert all dtypes to float32 and
-        # use nan to fill nodata values.
-        # Using 'ma' will tell kwcoco to return numpy masked arrays
-        # over nodata values.
-        # Using ma would be best in this case, but it currently isn't
-        # as tested as float.
-        # 'nodata_method': 'ma',
-        # 'nodata_method': 'float',
         'nodata_method': None,
-
-        # Note on the "space" argument to delay:
-        # By specifying "Video Space" kwcoco will ensure all images in
-        # the sequence are pixel aligned
         'space': 'video',
     }
 
@@ -438,23 +394,12 @@ def process_one_coco_image(coco_image, config, out_dir):
     # antialiased, whereas the intensity bands should be.
     qa_data = delayed_qa.finalize(interpolation='nearest', antialias=False)
 
-    # First check the quality bands before loading all of the image data.
-    # FIXME: the quality bits in this example are wrong.
-    # Setting the threshold to zero to bypass for now.
-    clear_threshold = 0
-    if clear_threshold > 0:
-        clear_bits = functools.reduce(
-            operator.or_, ub.take(quality_bits, ['clear_land', 'clear_water']))
-        noobs_bits = functools.reduce(
-            operator.or_, ub.take(quality_bits, ['no_observation']))
-        is_clear = (qa_data & clear_bits) > 0
-        is_noobs = (qa_data & noobs_bits) > 0
-        is_obs = ~is_noobs
-        is_obs_clear = is_clear & is_obs
-        clear_ratio = is_obs_clear.sum() / is_obs.sum()
-
     # Decoding QA band
-    qa_unpacked = qabitval_array_c2(qa_data)  # I think it works well...
+    adj_cloud = False
+    if adj_cloud == True:
+        qa_unpacked = qa_decoding(qa_data)
+    else:
+        qa_unpacked = qa_decoding_no_boundary(qa_data)
 
     # First check the quality bands before loading all of the image data.
     # FIXME: the quality bits in this example are wrong.
@@ -485,22 +430,10 @@ def process_one_coco_image(coco_image, config, out_dir):
 
     im_data = delayed_im.finalize(interpolation='cubic', antialias=True)
 
-    # Scaling surface reflectance/temperature is required.
-    # source: https://www.usgs.gov/faqs/how-do-i-use-scale-factor-landsat-level-2-science-products?qtnews_science_products=0#qt-news_science_products
-    # There must have been a fancy way...I think idea here is clear to you...Feel free to edit it!
-    no_thermal = im_data[:, :, 0:6]
-    thermal = im_data[:, :, 6]
-    scale_no_thermal = (10000 * (no_thermal * 2.75e-05 - 0.2)).astype(np.int16)
-    scale_no_thermal = scale_no_thermal.clip(min=0)  # change negative value to 0, just in case this value would affect COLD model
-    scale_thermal = (10 * (thermal * 0.00341802 + 149)).astype(np.int16)
-    scale_thermal[scale_thermal == 1490] = 0  # change 1490 (value of 0 before scaling) to 0, just in case this value would affect COLD model
-    scale_thermal = np.expand_dims(scale_thermal, axis=2)
-
     # NOTE: if we enable a nodata method, we will need to handle it here.
     # NOTE: if any intensity modification needs to be done handle it here.
 
-    data = np.concatenate([scale_no_thermal, scale_thermal, qa_unpacked], axis=2)
-    image_name = get_file_name(coco_image.img['parent_name'])
+    data = np.concatenate([im_data, qa_unpacked], axis=2)
 
     result_fpaths = []
 
@@ -508,7 +441,15 @@ def process_one_coco_image(coco_image, config, out_dir):
     # save necessary metadata alongside the npy file so we don't have
     # to rely on file names.
     metadata = {
-        'date_captured': coco_image.img['date_captured'],
+        'date_captured': date_captured,
+        'ordinal_date': ordinal_date,
+        'n_cols': n_cols,
+        'n_rows': n_rows,
+        'padded_n_cols': padded_w,
+        'padded_n_rows': padded_h,
+        'n_block_x': n_block_x,
+        'n_block_y': n_block_y,
+        'adj_cloud': adj_cloud
     }
 
     if is_partition:
@@ -567,3 +508,10 @@ def process_one_coco_image(coco_image, config, out_dir):
     result['status'] = 'passed'
     result['fpaths'] = result_fpaths
     return result
+
+# FIXME: I wasn't sure how to update grab_demo_kwcoco_dataset(). So I manually defined coco_fpath...
+coco_fpath = '/home/jws18003/data/dvc-repos/smart_data_dvc/Aligned-Drop4-2022-08-08-TA1-S2-L8-ACC/data.kwcoco.json'
+dpath = ub.Path.appdir('/gpfs/scratchfs1/zhz18039/jws18003/kwcoco').ensuredir()
+out_dir = dpath / 'stacked'
+
+stack_kwcoco(coco_fpath, out_dir)
