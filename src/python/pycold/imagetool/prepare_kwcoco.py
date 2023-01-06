@@ -348,7 +348,6 @@ def process_one_coco_image(coco_image, config, out_dir, adj_cloud):
     frame_index = coco_image.img['frame_index']
     n_cols = coco_image.img['width']
     n_rows = coco_image.img['height']
-
     # Determine what sensor the image is from.
     # Note: if kwcoco needs to register more fine-grained sensor
     # information we can do that.
@@ -376,7 +375,6 @@ def process_one_coco_image(coco_image, config, out_dir, adj_cloud):
 
     # Check what shape the data would be loaded with if we finalized right now.
     h, w = delayed_im.shape[0:2]
-
     # Determine if padding is necessary to properly break the data into blocks.
     padded_w = int(np.ceil(w / n_block_x) * n_block_x)
     padded_h = int(np.ceil(h / n_block_y) * n_block_y)
@@ -434,13 +432,13 @@ def process_one_coco_image(coco_image, config, out_dir, adj_cloud):
     # NOTE: if any intensity modification needs to be done handle it here.
 
     data = np.concatenate([im_data, qa_unpacked], axis=2)
-
     result_fpaths = []
 
     # TODO:
     # save necessary metadata alongside the npy file so we don't have
     # to rely on file names.
     metadata = {
+        'image_name' : image_name,
         'date_captured': date_captured,
         'ordinal_date': ordinal_date,
         'n_cols': n_cols,
