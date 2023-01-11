@@ -117,7 +117,83 @@ def setup_logging():
     # TODO: handle HPC things here in addition to stdout for doctests
     logging.basicConfig(level='INFO')
 
+####################################################################################
+#                   Functions for Artificial Surface Index (ASI)                   #
+#  See original code: https://github.com/GERSL/ASI_py/blob/main/ASI_standalone.py  #
+####################################################################################
 
+def hist_cut(band, mask, fill_value=-9999, k=3, minmax='std'):
+    if minmax == 'std':
+        mean = band[mask].mean()
+        std = band[mask].std()
+        low_val = (mean - k * std)
+        high_val = (mean + k * std)
+    else:
+        low_val, high_val = minmax # use specified value range.
+    is_low = band < low_val
+    is_high = band > high_val
+    mask_invalid_index = is_low | is_high
+    band[mask_invalid_index] = fill_value
+    return band, ~mask_invalid_index
+
+
+def minmax_norm(band, mask, fill_value=-9999):
+    max_val = band[mask].max()
+    min_val = band[mask].min()
+    extent = max_val - min_val
+    if extent != 0:
+        shifted = band - min_val
+        scaled = shifted / extent
+        band[mask] = scaled[mask]    
+    band[~mask] = fill_value
+    return band
+
+# Artificial Surface Index (ASI) is designed based the surface reflectance imagery of Landsat 8.
+def artificial_surface_index(Blue, Green, Red, NIR, SWIR1, SWIR2, Scale, MaskValid_Obs, fillV):
+    ##### The calculation chain.
+
+    # Artificial surface Factor (AF).
+    AF = (NIR - Blue) / (NIR + Blue) + 0.000001
+    AF, MaskValid_AF = hist_cut(AF, MaskValid_Obs, fillV, 6, [-1, 1])
+    MaskValid_AF_U = MaskValid_AF & MaskValid_Obs
+    AF_Norm = minmax_norm(AF, MaskValid_AF_U, fillV)
+
+    # Vegetation Suppressing Factor (VSF).
+    MSAVI = ( (2*NIR+1*Scale) - np.sqrt((2*NIR+1*Scale)**2 - 8*(NIR-Red)) ) / 2 # Modified Soil Adjusted Vegetation Index (MSAVI).
+    MSAVI, MaskValid_MSAVI = hist_cut( MSAVI, MaskValid_Obs, fillV, 6, [-1, 1])
+    NDVI = (NIR - Red) / (NIR + Red) + 0.000001
+    NDVI, MaskValid_NDVI  = hist_cut(NDVI, MaskValid_Obs, fillV, 6, [-1, 1])
+    VSF = 1 - MSAVI*NDVI
+    MaskValid_VSF = MaskValid_MSAVI & MaskValid_NDVI & MaskValid_Obs
+    VSF_Norm = minmax_norm(VSF, MaskValid_VSF, fillV)
+
+    # Soil Suppressing Factor (SSF).
+    # Derive the Modified Bare soil Index (MBI).
+    MBI = (SWIR1 - SWIR2 - NIR) / (SWIR1 + SWIR2 + NIR) + 0.5
+    MBI, MaskValid_MBI = hist_cut(MBI, MaskValid_Obs, fillV, 6, [-0.5, 1.5])
+    # Deriving Enhanced-MBI based on MBI and MNDWI.
+    MNDWI = (Green - SWIR1) / (Green + SWIR1) + 0.000001
+    MNDWI, MaskValid_MNDWI = hist_cut(MNDWI, MaskValid_Obs, fillV, 6, [-1, 1])
+    EMBI = ((MBI+0.5) - (MNDWI+1)) / ((MBI+0.5) + (MNDWI+1))
+    EMBI, MaskValid_EMBI = hist_cut(EMBI, MaskValid_Obs, fillV, 6, [-1, 1])
+    # Derive SSF.
+    SSF = (1 - EMBI)
+    MaskValid_SSF = MaskValid_MBI & MaskValid_MNDWI & MaskValid_EMBI & MaskValid_Obs
+    SSF_Norm = minmax_norm(SSF, MaskValid_SSF, fillV)
+
+    # Modulation Factor (MF).
+    MF = (Blue + Green - NIR - SWIR1) / (Blue + Green + NIR + SWIR1) + 0.000001
+    MF, MaskValid_MF = hist_cut(MF, MaskValid_Obs, fillV, 6, [-1, 1])
+    MaskValid_MF_U = MaskValid_MF & MaskValid_Obs
+    MF_Norm = minmax_norm(MF, MaskValid_MF_U, fillV)
+
+    # Derive Artificial Surface Index (ASI).
+    ASI = AF_Norm * SSF_Norm * VSF_Norm * MF_Norm
+    MaskValid_ASI = MaskValid_AF_U & MaskValid_VSF & MaskValid_SSF & MaskValid_MF_U & MaskValid_Obs    
+    ASI[~MaskValid_ASI] = fillV
+    
+    return ASI
+    
 # def grab_demo_kwcoco_dataset():
 #     """
 #     Get a demo kwcoco dataset for use in testing
@@ -288,6 +364,8 @@ def stack_kwcoco(coco_fpath, out_dir):
     config = {
         'n_block_x': 20,
         'n_block_y': 20,
+        'adj_cloud': False,
+        'mode'     : 'ASI' #None # 'ASI'
     }
 
     # TODO: configure
@@ -312,12 +390,12 @@ def stack_kwcoco(coco_fpath, out_dir):
                 if coco_image.img['sensor_coarse'] == 'L8':
                     adj_cloud = False
                     # Transform the image data into the desired block structure.
-                    result = process_one_coco_image(coco_image, config, out_dir, adj_cloud)
+                    result = process_one_coco_image(coco_image, config, out_dir)
                     results.append(result)
 
     return results
 
-def process_one_coco_image(coco_image, config, out_dir, adj_cloud):
+def process_one_coco_image(coco_image, config, out_dir):
     """
     Args:
         coco_image (kwcoco.CocoImage): the image to process
@@ -330,6 +408,9 @@ def process_one_coco_image(coco_image, config, out_dir, adj_cloud):
     """
     n_block_x = config['n_block_x']
     n_block_y = config['n_block_y']
+    adj_cloud = config['adj_cloud']
+    mode      = config['mode']
+    
     is_partition = True  # hard coded
 
     # Use the COCO name as a unique filename id.
@@ -391,7 +472,6 @@ def process_one_coco_image(coco_image, config, out_dir, adj_cloud):
     # It is important that the categorical QA band is not interpolated or
     # antialiased, whereas the intensity bands should be.
     qa_data = delayed_qa.finalize(interpolation='nearest', antialias=False)
-
     # Decoding QA band
     adj_cloud = False
     if adj_cloud == True:
@@ -430,8 +510,45 @@ def process_one_coco_image(coco_image, config, out_dir, adj_cloud):
 
     # NOTE: if we enable a nodata method, we will need to handle it here.
     # NOTE: if any intensity modification needs to be done handle it here.
+    
+    if mode == 'ASI':
+        Scale = 10000
+        fill_value = -9999
+        B1 = im_data[:, :, 0]
+        B2 = im_data[:, :, 1]
+        B3 = im_data[:, :, 2]
+        B4 = im_data[:, :, 3]
+        B5 = im_data[:, :, 4]
+        B6 = im_data[:, :, 5]
+        MaskValid_Obs = ((B1>0) & (B1<1*Scale) &
+                        (B2>0) & (B2<1*Scale) &
+                        (B3>0) & (B3<1*Scale) &
+                        (B4>0) & (B4<1*Scale) &
+                        (B5>0) & (B5<1*Scale) &
+                        (B6>0) & (B6<1*Scale)
+                        )
+        
+        # Calculating ASI
+        ASI = artificial_surface_index(B1, B2, B3, B4, B5, B6, Scale, MaskValid_Obs, fill_value)
+        # Get land mask.        
+        MNDWI = (B2 - B5) / (B2 + B5) + 0.000001
+        MNDWI, MaskValid_MNDWI = hist_cut(MNDWI, MaskValid_Obs, fill_value, 6, [-1, 1])
+        Water_Th = 0; # Water threshold for MNDWI (may need to be adjusted for different study areas).
+        MaskLand = (MNDWI<Water_Th)
 
-    data = np.concatenate([im_data, qa_unpacked], axis=2)
+        # Convert dtype from float32 to int16
+        ASI = ASI * Scale
+        ASI = ASI.astype('int16')
+        ASI[ASI == 0] = fill_value     
+
+        # Exclude water pixels.
+        ASI[~MaskLand] = fill_value
+        ASI = ASI.reshape(ASI.shape[0], ASI.shape[1], 1)
+        data = np.concatenate([im_data[:,:,1:5], ASI, qa_unpacked], axis=2)
+
+    else:
+        data = np.concatenate([im_data, qa_unpacked], axis=2)
+    
     result_fpaths = []
 
     # TODO:
@@ -447,7 +564,8 @@ def process_one_coco_image(coco_image, config, out_dir, adj_cloud):
         'padded_n_rows': padded_h,
         'n_block_x': n_block_x,
         'n_block_y': n_block_y,
-        'adj_cloud': adj_cloud
+        'adj_cloud': adj_cloud,
+        'mode': mode
     }
 
     if is_partition:
