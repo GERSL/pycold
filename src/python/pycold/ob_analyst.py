@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
+from typing import Optional
 # import datetime
 from cv2 import floodFill
 import cv2 as cv2
@@ -9,6 +10,7 @@ from astropy.convolution import convolve
 from scipy import stats
 from scipy.stats import chi2
 from os.path import join, exists
+from logging import Logger
 from pycold.utils import get_block_x, get_block_y, read_blockdata, get_rowcol_intile
 from pycold.app import defaults
 from pycold import obcold_reconstruct
@@ -17,6 +19,10 @@ from skimage.measure import label as sklabel
 from skimage.segmentation import watershed
 import logging
 import sys
+from pycold.common import DatasetInfo
+
+
+NAN_VAL = -9999
 
 
 def cmname_fromdate(ordinal_date):
@@ -27,10 +33,11 @@ def cmname_fromdate(ordinal_date):
     Returns:
         CM file name
     """
-    return 'CM_maps_{}_{}{}'.format(str(ordinal_date),
-                                    pd.Timestamp.fromordinal(ordinal_date).year,
-                                    str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3))
-
+    return "CM_maps_{}_{}{}".format(
+        str(ordinal_date),
+        pd.Timestamp.fromordinal(ordinal_date).year,
+        str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3),
+    )
 
 
 def cmdatename_fromdate(ordinal_date):
@@ -41,8 +48,11 @@ def cmdatename_fromdate(ordinal_date):
     Returns:
         CM date file name
     """
-    return 'CM_date_maps_{}_{}{}'.format(str(ordinal_date), pd.Timestamp.fromordinal(ordinal_date).year,
-                                              str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3))
+    return "CM_date_maps_{}_{}{}".format(
+        str(ordinal_date),
+        pd.Timestamp.fromordinal(ordinal_date).year,
+        str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3),
+    )
 
 
 def obiaresname_fromdate(ordinal_date):
@@ -53,19 +63,28 @@ def obiaresname_fromdate(ordinal_date):
     Returns:
         CM file name
     """
-    return 'obiaresult_{}_{}{}'.format(str(ordinal_date),
-                                       pd.Timestamp.fromordinal(ordinal_date).year,
-                                       str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3))
+    return "obiaresult_{}_{}{}".format(
+        str(ordinal_date),
+        pd.Timestamp.fromordinal(ordinal_date).year,
+        str(pd.Timestamp.fromordinal(ordinal_date).timetuple().tm_yday).zfill(3),
+    )
 
 
-def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keyword, classification_map, parameters=None):
+def is_change_object(
+    stats_lut_row,
+    uniform_threshold,
+    uniform_sizeslope,
+    keyword,
+    classification_map,
+    parameters=None,
+):
     """
     parameters
     ----------
-    is_thematic: True -> that has thematic inputs; False-> default config will be applied
+    is_thematic: True -> that has thematic inputs; False-> default parameter will be applied
     stats_lut_row: a table of ['id', 'change magnitude', 'mode of lc category', 'pixel number']
-    uniform_threshold: grid searching usage, overwriting default config
-    uniform_sizeslope: grid searching usage, overwriting default config
+    uniform_threshold: grid searching usage, overwriting default parameter
+    uniform_sizeslope: grid searching usage, overwriting default parameter
     keyword: string, keyword to calculate change magnitude, 'cm_average' or 'cm_median'
 
     Returns: boolean
@@ -82,16 +101,16 @@ def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keywor
     # ice: 7
     # barren: 8
     if parameters is None:
-        parameters = defaults
+        parameters = defaults["OBCOLD"]
 
-    log10_size = np.log10(int(stats_lut_row['npixels']))
+    log10_size = np.log10(int(stats_lut_row["npixels"]))
     intercept = 0.95
     if classification_map is None:
-        if log10_size * parameters['OBCOLD']['default_sizeslope'] + intercept < 2:
-            scale = log10_size * parameters['OBCOLD']['default_sizeslope'] + intercept
+        if log10_size * parameters["default_sizeslope"] + intercept < 2:
+            scale = log10_size * parameters["default_sizeslope"] + intercept
         else:
             scale = 2
-        if np.double(stats_lut_row[keyword]) * scale > parameters['OBCOLD']['default_threshold']:
+        if np.double(stats_lut_row[keyword]) * scale > parameters["default_threshold"]:
             return True
         else:
             return False
@@ -107,93 +126,93 @@ def is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope, keywor
             else:
                 return False
         else:
-            if int(stats_lut_row['mode']) == 255:
+            if int(stats_lut_row["mode"]) == 255:
                 # intercept = 1 - config['default_sizeslope']
-                if log10_size * parameters['OBCOLD']['default_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['OBCOLD']['default_sizeslope'] + intercept
+                if log10_size * parameters["default_sizeslope"] + intercept < 2:
+                    scale = log10_size * parameters["default_sizeslope"] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['OBCOLD']['default_threshold']:
+                if float(stats_lut_row[keyword]) * scale > parameters["default_threshold"]:
                     return True
                 else:
                     return False
-            elif int(stats_lut_row['mode']) == 1:  # develop in LCMAP
+            elif int(stats_lut_row["mode"]) == 1:  # develop in LCMAP
                 # intercept = 1 - config['C1_sizeslope']
-                if log10_size * parameters['OBCOLD']['C1_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['OBCOLD']['C1_sizeslope'] + intercept
+                if log10_size * parameters["C1_sizeslope"] + intercept < 2:
+                    scale = log10_size * parameters["C1_sizeslope"] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['OBCOLD']['C1_threshold']:
+                if float(stats_lut_row[keyword]) * scale > parameters["C1_threshold"]:
                     return True
                 else:
                     return False
-            elif int(stats_lut_row['mode']) == 2:  # cropland in LCMAP
+            elif int(stats_lut_row["mode"]) == 2:  # cropland in LCMAP
                 # intercept = 1 - config['C2_sizeslope']
-                if log10_size * parameters['OBCOLD']['C2_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['OBCOLD']['C2_sizeslope'] + intercept
+                if log10_size * parameters["C2_sizeslope"] + intercept < 2:
+                    scale = log10_size * parameters["C2_sizeslope"] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['OBCOLD']['C2_threshold']:
+                if float(stats_lut_row[keyword]) * scale > parameters["C2_threshold"]:
                     return True
                 else:
                     return False
-            elif int(stats_lut_row['mode']) == 3:  # grassland in LCMAP
+            elif int(stats_lut_row["mode"]) == 3:  # grassland in LCMAP
                 # intercept = 1 - config['C3_sizeslope']
-                if log10_size * parameters['OBCOLD']['C3_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['OBCOLD']['C3_sizeslope'] + intercept
+                if log10_size * parameters["C3_sizeslope"] + intercept < 2:
+                    scale = log10_size * parameters["C3_sizeslope"] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['OBCOLD']['C3_threshold']:
+                if float(stats_lut_row[keyword]) * scale > parameters["C3_threshold"]:
                     return True
                 else:
                     return False
-            elif int(stats_lut_row['mode']) == 4:  # forest in LCMAP
+            elif int(stats_lut_row["mode"]) == 4:  # forest in LCMAP
                 # intercept = 1 - config['C4_sizeslope']
-                if log10_size * parameters['OBCOLD']['C4_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['OBCOLD']['C4_sizeslope'] + intercept
+                if log10_size * parameters["C4_sizeslope"] + intercept < 2:
+                    scale = log10_size * parameters["C4_sizeslope"] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['OBCOLD']['C4_threshold']:
+                if float(stats_lut_row[keyword]) * scale > parameters["C4_threshold"]:
                     return True
                 else:
                     return False
-            elif int(stats_lut_row['mode']) == 5:  # water in LCMAP
+            elif int(stats_lut_row["mode"]) == 5:  # water in LCMAP
                 # intercept = 1 - config['C5_sizeslope']
-                if log10_size * parameters['OBCOLD']['C5_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['OBCOLD']['C5_sizeslope'] + intercept
+                if log10_size * parameters["C5_sizeslope"] + intercept < 2:
+                    scale = log10_size * parameters["C5_sizeslope"] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['OBCOLD']['C5_threshold']:
+                if float(stats_lut_row[keyword]) * scale > parameters["C5_threshold"]:
                     return True
                 else:
                     return False
-            elif int(stats_lut_row['mode']) == 6:  # wetland in LCMAP
+            elif int(stats_lut_row["mode"]) == 6:  # wetland in LCMAP
                 # intercept = 1 - config['C6_sizeslope']
-                if log10_size * parameters['OBCOLD']['C6_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['OBCOLD']['C6_sizeslope'] + intercept
+                if log10_size * parameters["C6_sizeslope"] + intercept < 2:
+                    scale = log10_size * parameters["C6_sizeslope"] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['OBCOLD']['C6_threshold']:
+                if float(stats_lut_row[keyword]) * scale > parameters["C6_threshold"]:
                     return True
                 else:
                     return False
-            elif int(stats_lut_row['mode']) == 7:  # ice in LCMAP
+            elif int(stats_lut_row["mode"]) == 7:  # ice in LCMAP
                 # intercept = 1 - config['C7_sizeslope']
-                if log10_size * parameters['OBCOLD']['C7_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['OBCOLD']['C7_sizeslope'] + intercept
+                if log10_size * parameters["C7_sizeslope"] + intercept < 2:
+                    scale = log10_size * parameters["C7_sizeslope"] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['OBCOLD']['C7_threshold']:
+                if float(stats_lut_row[keyword]) * scale > parameters["C7_threshold"]:
                     return True
                 else:
                     return False
-            elif int(stats_lut_row['mode']) == 8:  # barren in LCMAP
+            elif int(stats_lut_row["mode"]) == 8:  # barren in LCMAP
                 # intercept = 1 - config['C8_sizeslope']
-                if log10_size * parameters['OBCOLD']['C8_sizeslope'] + intercept < 2:
-                    scale = log10_size * parameters['OBCOLD']['C8_sizeslope'] + intercept
+                if log10_size * parameters["C8_sizeslope"] + intercept < 2:
+                    scale = log10_size * parameters["C8_sizeslope"] + intercept
                 else:
                     scale = 2
-                if float(stats_lut_row[keyword]) * scale > parameters['OBCOLD']['C8_threshold']:
+                if float(stats_lut_row[keyword]) * scale > parameters["C8_threshold"]:
                     return True
                 else:
                     return False
@@ -213,7 +232,7 @@ def modeby(input_array, index_array):
     # Get argsort indices, to be used to sort a and b in the next steps
     # input_array = classification_map
     # index_array = object_map
-    sidx = index_array.argsort(kind='mergesort')
+    sidx = index_array.argsort(kind="mergesort")
     a_sorted = input_array[sidx]
     b_sorted = index_array[sidx]
 
@@ -236,7 +255,7 @@ def mode_median_by(input_array_mode, input_array_median, index_array):
     Returns:
         a list of modes for splitted subarray following ascending order of unique id
     """
-    sidx = index_array.argsort(kind='mergesort')
+    sidx = index_array.argsort(kind="mergesort")
     a1_sorted = input_array_mode[sidx]
     a2_sorted = input_array_median[sidx]
     b_sorted = index_array[sidx]
@@ -252,8 +271,17 @@ def mode_median_by(input_array_mode, input_array_median, index_array):
     return mode_list, median_list
 
 
-def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_l1_date=None,  floodfill_ratio=None,
-                           parameters=None, b_dist_prob_map=False, date_interval=60, peak_threshold=None):
+def segmentation_floodfill(
+    cm_array: np.ndarray,
+    cm_date_array: np.ndarray,
+    cm_array_l1: Optional[np.ndarray] = None,
+    cm_array_l1_date: Optional[np.ndarray] = None,
+    floodfill_ratio: Optional[float] = None,
+    parameters: Optional[dict] = None,
+    b_dist_prob_map: Optional[bool] = False,
+    date_interval: int = 60,
+    peak_threshold: Optional[float] = None
+):
     """
     hierachical segmentation based on floodfill
     Parameters
@@ -264,6 +292,7 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
     cm_array_l1_date: 2-d numpy array
     floodfill_ratio: float
         the change magnitude ratio of the considered pixel over the seed pixel to be included into the cluster
+    parameters: parameter dictionary 
     b_dist_prob_map: boolean
         if true, cm_array is probability
     date_interval: the date interval for cm_date_array to connect adjacent pixels within the floodfill process
@@ -284,13 +313,13 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
     # cm_array_l1_date = None
     # floodfill_ratio = None
     if parameters is None:
-        parameters = defaults
+        parameters = defaults["OBCOLD"]
 
     [n_rows, n_cols] = cm_array.shape
     if floodfill_ratio is None:
-        floodfill_ratio = parameters['OBCOLD']['floodfill_thres']
+        floodfill_ratio = parameters["floodfill_thres"]
     if cm_array_l1_date is None:
-        cm_array_l1_date = np.full((n_rows, n_cols), parameters['COMMON']['NAN_VAL'], dtype=np.int32)
+        cm_array_l1_date = np.full((n_rows, n_cols), NAN_VAL, dtype=np.int32)
 
     # assign valid CM values in the stack into current cm array where NA values are
     if b_dist_prob_map:
@@ -304,13 +333,12 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
         if peak_threshold is None:
             peak_threshold = chi2.ppf(0.90, 5)
         if cm_array_l1 is None:
-            cm_array_l1 = np.full((n_rows, n_cols), parameters['COMMON']['NAN_VAL'], dtype=np.int16)
-        cm_array_l1[cm_array_l1 < (chi2.ppf(0.90, 5)*parameters['OBCOLD']['cm_scale'])] = parameters['COMMON']['NAN_VAL']
-        cm_array[cm_array == parameters['COMMON']['NAN_VAL']] = cm_array_l1[cm_array == parameters['COMMON']['NAN_VAL']]
-        cm_array = cm_array.astype(float) / parameters['OBCOLD']['cm_scale']
+            cm_array_l1 = np.full((n_rows, n_cols), NAN_VAL, dtype=np.int16)
+        cm_array_l1[cm_array_l1 < (chi2.ppf(0.90, 5) * parameters["cm_scale"])] = NAN_VAL
+        cm_array[cm_array == NAN_VAL] = cm_array_l1[cm_array == NAN_VAL]
+        cm_array = cm_array.astype(float) / parameters["cm_scale"]
 
-    cm_date_array[cm_date_array == parameters['COMMON']['NAN_VAL']] = \
-        cm_array_l1_date[cm_date_array == parameters['COMMON']['NAN_VAL']]
+    cm_date_array[cm_date_array == NAN_VAL] = cm_array_l1_date[cm_date_array == NAN_VAL]
 
     # free memory
     del cm_array_l1
@@ -325,11 +353,11 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
 
     # using gaussian kernel ( with 1 sigma value) to smooth images in hpc_preparation for floodfill
     kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
-    cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary='extend', preserve_nan=True)
+    cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary="extend", preserve_nan=True)
     if b_dist_prob_map:
         cm_array_gaussian_s1[np.isnan(cm_array)] = 0
     else:
-        cm_array_gaussian_s1[np.isnan(cm_array)] = parameters['COMMON']['NAN_VAL']
+        cm_array_gaussian_s1[np.isnan(cm_array)] = NAN_VAL
     del cm_array
 
     # seed_index = peak_local_max(cm_array_gaussian_s1, threshold_abs=peak_threshold,
@@ -346,7 +374,9 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
     floodflags_base = 8
     floodflags_base |= cv2.FLOODFILL_MASK_ONLY
     floodflags_base |= cv2.FLOODFILL_FIXED_RANGE
-    cm_stack = np.dstack([cm_array_gaussian_s1, cm_array_gaussian_s1, cm_date_array]).astype(np.float32)
+    cm_stack = np.dstack([cm_array_gaussian_s1, cm_array_gaussian_s1, cm_date_array]).astype(
+        np.float32
+    )
     for i in range(len(seed_index)):
         # print(i)
         remainder = i % 255
@@ -354,25 +384,32 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
         seedcm = cm_array_gaussian_s1[tuple(seed_index[i])]
         # gradiant = np.max([seedcm*floodfill_ratio, (seedcm-peak_threshold)])
         gradiant = seedcm * floodfill_ratio
-        num, im, mask_s1, rect = floodFill(cm_stack, mask_s1, tuple(reversed(seed_index[i])), 0,
-                                           loDiff=[gradiant, gradiant, date_interval],
-                                           upDiff=[gradiant, gradiant, date_interval],
-                                           flags=floodflags)
+        num, im, mask_s1, rect = floodFill(
+            cm_stack,
+            mask_s1,
+            tuple(reversed(seed_index[i])),
+            0,
+            loDiff=[gradiant, gradiant, date_interval],
+            upDiff=[gradiant, gradiant, date_interval],
+            flags=floodflags,
+        )
         # the opencv mask only supports 8-bit, we hack it by updating the label value for every 255 object
         if remainder == 254:
             no = int(i / 255)
-            mask_label_s1[(mask_label_s1 == 0) & (mask_s1 > 0)] = mask_s1[(mask_label_s1 == 0)
-                                                                          & (mask_s1 > 0)].astype(int) + no * 255
+            mask_label_s1[(mask_label_s1 == 0) & (mask_s1 > 0)] = (
+                mask_s1[(mask_label_s1 == 0) & (mask_s1 > 0)].astype(int) + no * 255
+            )
         # flood_fill(cm_array_log, tuple(reversed(seed_index[i])), new_value=-np.ceil(floodfill_threshold)*2-i,
         #            tolerance=floodfill_threshold, connectivity=2, in_place=True)
 
     if len(seed_index) > 0:
         # processing the rest that hasn't be recorded into mask_label
         no = int(i / 255)
-        mask_label_s1[(mask_label_s1 == 0) & (mask_s1 > 0)] = mask_s1[(mask_label_s1 == 0) & (mask_s1 > 0)].astype(
-            int) + no * 255
+        mask_label_s1[(mask_label_s1 == 0) & (mask_s1 > 0)] = (
+            mask_s1[(mask_label_s1 == 0) & (mask_s1 > 0)].astype(int) + no * 255
+        )
 
-    object_map_s1 = mask_label_s1[1:n_rows + 1, 1:n_cols + 1].astype(np.int32)
+    object_map_s1 = mask_label_s1[1: n_rows + 1, 1: n_cols + 1].astype(np.int32)
 
     # free memory
     del cm_stack
@@ -388,11 +425,14 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
 
     # unique always returned sorted list
     unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
-    mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
+    mean_list = (
+        np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape))
+        / count_s1
+    )
     # mean_list = np.sqrt(np.bincount(ids_s1.astype(int),
     # weights=np.square(cm_array_gaussian_s1.astype(np.int64)).reshape(ids_s1.shape)) / count_s1)
-    mean_list[unq_s1 == 0] = parameters['COMMON']['NAN_VAL']  # force mean of unchanged objects to be -9999
-    s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
+    mean_list[unq_s1 == 0] = NAN_VAL  # force mean of unchanged objects to be -9999
+    s1_info = pd.DataFrame({"label": unq_s1, "mean_intensity": mean_list})
     object_map_s2 = object_map_s1.copy()
     object_map_s2[object_map_s2 > 0] = 1
     object_map_s2 = sklabel(object_map_s2, connectivity=2, background=0)
@@ -402,7 +442,7 @@ def segmentation_floodfill(cm_array,  cm_date_array, cm_array_l1=None, cm_array_
     # mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
     # mean_list = np.sqrt(np.bincount(ids_s1.astype(int),
     # weights=np.square(cm_array_gaussian_s1.astype(np.int64)).reshape(ids_s1.shape)) / count_s1)
-    # mean_list[unq_s1 == 0] = parameters['COMMON']['NAN_VAL']  # force mean of unchanged objects to be -9999
+    # mean_list[unq_s1 == 0] = NAN_VAL  # force mean of unchanged objects to be -9999
     # s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
     # object_map_s1 = object_map_s2.copy()
     return object_map_s1, cm_date_array, object_map_s2, s1_info
@@ -419,8 +459,14 @@ def normalize_clip(data, min, max, na_val=None):
     return tmp
 
 
-def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_date=None,  low_bound=None,
-                      parameters=None):
+def segmentation_slic(
+    cm_array,
+    cm_date_array,
+    cm_array_l1=None,
+    cm_array_l1_date=None,
+    low_bound=None,
+    parameters=None,
+):
     """
     hierachical segmentation based on slic
     Parameters
@@ -443,24 +489,23 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
         s1_info: a zipped list of id and average change magnitude in the superpixel level
     """
     if parameters is None:
-        parameters = defaults
+        parameters = defaults["OBCOLD"]
 
     if low_bound is None:
-        low_bound = chi2.ppf(parameters['OBCOLD']['gate_probability'], 5)
+        low_bound = chi2.ppf(parameters["gate_probability"], 5)
     else:
         low_bound = low_bound
     [n_rows, n_cols] = cm_array.shape
     if cm_array_l1 is None:
-        cm_array_l1 = np.full((n_rows, n_cols), parameters['COMMON']['NAN_VAL'], dtype=np.int16)
+        cm_array_l1 = np.full((n_rows, n_cols), NAN_VAL, dtype=np.int16)
     if cm_array_l1_date is None:
-        cm_array_l1_date = np.full((n_rows, n_cols), parameters['COMMON']['NAN_VAL'], dtype=np.int32)
+        cm_array_l1_date = np.full((n_rows, n_cols), NAN_VAL, dtype=np.int32)
 
     # assign valid CM values in the stack into current cm array where NA values are
-    cm_array[cm_array == parameters['COMMON']['NAN_VAL']] = cm_array_l1[cm_array == parameters['COMMON']['NAN_VAL']]
-    cm_array = cm_array.astype(float) / parameters['OBCOLD']['cm_scale']
+    cm_array[cm_array == NAN_VAL] = cm_array_l1[cm_array == NAN_VAL]
+    cm_array = cm_array.astype(float) / parameters["cm_scale"]
 
-    cm_date_array[cm_date_array == parameters['COMMON']['NAN_VAL']] = \
-        cm_array_l1_date[cm_date_array == parameters['COMMON']['NAN_VAL']]
+    cm_date_array[cm_date_array == NAN_VAL] = cm_array_l1_date[cm_date_array == NAN_VAL]
 
     #######################################################################################
     #                               Scale 1: change superpixel                            #
@@ -470,8 +515,8 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
 
     # using gaussian kernel ( with 1 sigma value) to smooth images in hpc_preparation for floodfill
     kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
-    cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary='extend', preserve_nan=True)
-    cm_array_gaussian_s1[np.isnan(cm_array)] = parameters['COMMON']['NAN_VAL']
+    cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary="extend", preserve_nan=True)
+    cm_array_gaussian_s1[np.isnan(cm_array)] = NAN_VAL
 
     mask = np.full_like(cm_array_gaussian_s1, fill_value=0)
     mask[cm_array_gaussian_s1 > low_bound] = 1
@@ -481,29 +526,37 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
     #     cm_date_min = np.min(cm_date_selected)
     #     cm_date_max = np.max(cm_date_selected)
     # else:
-    #     cm_date_min = parameters['COMMON']['NAN_VAL']
-    #     cm_date_max = parameters['COMMON']['NAN_VAL']
+    #     cm_date_min = NAN_VAL
+    #     cm_date_max = NAN_VAL
     cm_stack = cm_array_gaussian_s1
 
     n_segments = int(np.ceil(len(mask[mask == 1]) / 25))
     ell = np.unique(sklabel(mask))
     # n_segments = len(ell) * 2
-    #if n_segments == 0:
+    # if n_segments == 0:
     #    object_map_s1 = np.full_like(mask, 0)
     if len(ell) == 1 and ell[0] == 0:
         object_map_s1 = np.full_like(mask, 0)
     else:
-        object_map_s1 = slic(cm_stack, mask=mask, n_segments=n_segments, compactness=0.01,
-                             min_size_factor=n_segments / cm_stack.shape[0] / cm_stack.shape[1])
+        object_map_s1 = slic(
+            cm_stack,
+            mask=mask,
+            n_segments=n_segments,
+            compactness=0.01,
+            min_size_factor=n_segments / cm_stack.shape[0] / cm_stack.shape[1],
+        )
 
     # superpixel-level object status
     # s1_info = pd.DataFrame(regionprops_table(object_map_s1, cm_array_gaussian_s1, cache=False,
     #                                          properties=['label', 'mean_intensity']))
     unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
-    mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
+    mean_list = (
+        np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape))
+        / count_s1
+    )
     # mean_list = np.sqrt(np.bincount(ids_s1.astype(int), weights=np.square(cm_array_gaussian_s1.astype(np.int64)).reshape(ids_s1.shape)) / count_s1)
-    mean_list[unq_s1 == 0] = parameters['COMMON']['NAN_VAL']  # force mean of unchanged objects to be -9999
-    s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
+    mean_list[unq_s1 == 0] = NAN_VAL  # force mean of unchanged objects to be -9999
+    s1_info = pd.DataFrame({"label": unq_s1, "mean_intensity": mean_list})
     #######################################################################################
     #                                 Scale 2: change patch                              #
     #######################################################################################
@@ -545,8 +598,14 @@ def segmentation_slic(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_dat
     return object_map_s1, cm_date_array, object_map_s2, s1_info
 
 
-def segmentation_watershed(cm_array, cm_date_array, cm_array_l1=None, cm_array_l1_date=None, low_bound=None,
-                           parameters=None):
+def segmentation_watershed(
+    cm_array,
+    cm_date_array,
+    cm_array_l1=None,
+    cm_array_l1_date=None,
+    low_bound=None,
+    parameters=None,
+):
     """
     hierachical segmentation based on watershed
     Parameters
@@ -568,24 +627,23 @@ def segmentation_watershed(cm_array, cm_date_array, cm_array_l1=None, cm_array_l
         s1_info: a zipped list of id and average change magnitude in the superpixel level
     """
     if parameters is None:
-        parameters = defaults
+        parameters = defaults["OBCOLD"]
 
     if low_bound is None:
-        low_bound = chi2.ppf(parameters['OBCOLD']['gate_probability'], 5)
+        low_bound = chi2.ppf(parameters["gate_probability"], 5)
     else:
         low_bound = low_bound
     [n_rows, n_cols] = cm_array.shape
     if cm_array_l1 is None:
-        cm_array_l1 = np.full((n_rows, n_cols), parameters['COMMON']['NAN_VAL'], dtype=np.int16)
+        cm_array_l1 = np.full((n_rows, n_cols), NAN_VAL, dtype=np.int16)
     if cm_array_l1_date is None:
-        cm_array_l1_date = np.full((n_rows, n_cols), parameters['COMMON']['NAN_VAL'], dtype=np.int32)
+        cm_array_l1_date = np.full((n_rows, n_cols), NAN_VAL, dtype=np.int32)
 
     # assign valid CM values in the stack into current cm array where NA values are
-    cm_array[cm_array == parameters['COMMON']['NAN_VAL']] = cm_array_l1[cm_array == parameters['COMMON']['NAN_VAL']]
-    cm_array = cm_array.astype(float) / parameters['OBCOLD']['cm_scale']
+    cm_array[cm_array == NAN_VAL] = cm_array_l1[cm_array == NAN_VAL]
+    cm_array = cm_array.astype(float) / parameters["cm_scale"]
 
-    cm_date_array[cm_date_array == parameters['COMMON']['NAN_VAL']] = \
-         cm_array_l1_date[cm_date_array == parameters['COMMON']['NAN_VAL']]
+    cm_date_array[cm_date_array == NAN_VAL] = cm_array_l1_date[cm_date_array == NAN_VAL]
 
     #######################################################################################
     #                               Scale 1: change superpixel                            #
@@ -595,8 +653,8 @@ def segmentation_watershed(cm_array, cm_date_array, cm_array_l1=None, cm_array_l
 
     # using gaussian kernel ( with 1 sigma value) to smooth images in hpc_preparation for floodfill
     kernel = Gaussian2DKernel(x_stddev=bandwidth, y_stddev=bandwidth)
-    cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary='extend', preserve_nan=True)
-    cm_array_gaussian_s1[np.isnan(cm_array)] = parameters['COMMON']['NAN_VAL']
+    cm_array_gaussian_s1 = convolve(cm_array, kernel, boundary="extend", preserve_nan=True)
+    cm_array_gaussian_s1[np.isnan(cm_array)] = NAN_VAL
 
     mask = np.full_like(cm_array_gaussian_s1, fill_value=0)
     mask[cm_array_gaussian_s1 > low_bound] = 1
@@ -609,9 +667,12 @@ def segmentation_watershed(cm_array, cm_date_array, cm_array_l1=None, cm_array_l
     # s1_info = pd.DataFrame(regionprops_table(object_map_s1, cm_array_gaussian_s1, cache=False,
     #                                          properties=['label', 'mean_intensity']))
     unq_s1, ids_s1, count_s1 = np.unique(object_map_s1, return_inverse=True, return_counts=True)
-    mean_list = np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape)) / count_s1
-    mean_list[unq_s1 == 0] = parameters['COMMON']['NAN_VAL']  # force mean of unchanged objects to be -9999
-    s1_info = pd.DataFrame({'label': unq_s1, 'mean_intensity': mean_list})
+    mean_list = (
+        np.bincount(ids_s1.astype(int), weights=cm_array_gaussian_s1.reshape(ids_s1.shape))
+        / count_s1
+    )
+    mean_list[unq_s1 == 0] = NAN_VAL  # force mean of unchanged objects to be -9999
+    s1_info = pd.DataFrame({"label": unq_s1, "mean_intensity": mean_list})
     #######################################################################################
     #                                 Scale 2: change patch                              #
     #######################################################################################
@@ -622,8 +683,15 @@ def segmentation_watershed(cm_array, cm_date_array, cm_array_l1=None, cm_array_l
     return object_map_s1, cm_date_array, object_map_s2, s1_info
 
 
-def object_analysis(object_map_s1, object_map_s2, s1_info, classification_map=None,
-                    uniform_threshold=None, uniform_sizeslope=None, parameters=None):
+def object_analysis(
+    object_map_s1,
+    object_map_s2,
+    s1_info,
+    classification_map=None,
+    uniform_threshold=None,
+    uniform_sizeslope=None,
+    parameters=None,
+):
     """
     Args:
         object_map_s1: 2-d array, object map for superpixel
@@ -645,20 +713,26 @@ def object_analysis(object_map_s1, object_map_s2, s1_info, classification_map=No
 
     unq_s2, ids_s2, count_s2 = np.unique(object_map_s2, return_inverse=True, return_counts=True)
     lut_dict_s2 = dict(zip(unq_s2, count_s2))
-    size_map = np.vectorize(lut_dict_s2.get)(object_map_s2)  # we use size of scale 2 to represent object szie
+    size_map = np.vectorize(lut_dict_s2.get)(
+        object_map_s2
+    )  # we use size of scale 2 to represent object szie
 
     # def pixelmode(regionmask):
     #     return stats.mode(regionmask)
-    class_labels = s1_info['label'].to_list()
+    class_labels = s1_info["label"].to_list()
     if classification_map is None:
         class_list = [255] * len(s1_info)
     else:
-        class_list = modeby(classification_map.astype(np.int16).reshape(ids_s2.shape), object_map_s1.reshape(ids_s2.shape))
+        class_list = modeby(
+            classification_map.astype(np.int16).reshape(ids_s2.shape),
+            object_map_s1.reshape(ids_s2.shape),
+        )
 
         # mode_list = mode_list[1:]
         # mode_list = regionprops_table(object_map_s1, classification_map, extra_properties=(pixelmode))
-    size_list = modeby(size_map.reshape(ids_s2.shape),
-                       object_map_s1.reshape(ids_s2.shape))  # the mode of s1 objects in sizemap
+    size_list = modeby(
+        size_map.reshape(ids_s2.shape), object_map_s1.reshape(ids_s2.shape)
+    )  # the mode of s1 objects in sizemap
 
     # mode_list = regionprops_table(object_map_s1, size_map, extra_properties=(pixelmode, ))
     # mode_list, median_list = mode_median_by(classification_map.reshape(ids_s2.shape),
@@ -676,20 +750,36 @@ def object_analysis(object_map_s1, object_map_s2, s1_info, classification_map=No
     change_group = []
     if len(class_labels) > 0:  # if non-background change objects > 0
         for index in class_labels:
-            stats_lut_row = stats_lut.loc[stats_lut['label'] == index]
-            if is_change_object(stats_lut_row, uniform_threshold, uniform_sizeslope,
-                                'mean_intensity', classification_map, parameters):
+            stats_lut_row = stats_lut.loc[stats_lut["label"] == index]
+            if is_change_object(
+                stats_lut_row,
+                uniform_threshold,
+                uniform_sizeslope,
+                "mean_intensity",
+                classification_map,
+                parameters,
+            ):
                 change_group.append(index)
         change_map[np.isin(object_map_s1, change_group)] = 1
     return change_map
 
 
 class ObjectAnalystHPC:
-    def __init__(self, config, stack_path, result_path, starting_date, band_num=7, cmmap_path=None, obia_path=None,
-                 obcold_recg_path=None, thematic_path=None):
+    def __init__(
+        self,
+        dataset_info: DatasetInfo,
+        stack_path: str,
+        result_path: str,
+        starting_date: int,
+        band_num: int = 7,
+        cmmap_path: Optional[str] = None,
+        obia_path: Optional[str] = None,
+        obcold_recg_path: Optional[str] = None,
+        thematic_path: Optional[str] = None,
+    ):
         """
         Args:
-            config: pycold configuration file
+            dataset_info: dataset_info
             stack_path: the path of stack dataset
             result_path: the path of COLD rec_cg result
             starting_date: the starting date of the dataset to be processed
@@ -698,21 +788,18 @@ class ObjectAnalystHPC:
             obcold_recg_path: the path of obcold change records, the default is 'result_path/obcold'
             thematic_path: : the path of classification maps, None represents no thematic maps were used for procedure
         """
-        self.config = config
-        self.config['block_width'] = int(self.config['n_cols'] / self.config['n_block_x'])
-        self.config['block_height'] = int(self.config['n_rows'] / self.config['n_block_y'])
-        self.config['n_blocks'] = self.config['n_block_x'] * self.config['n_block_y']
+        self.dataset_info = dataset_info
         self.thematic_path = thematic_path
         if cmmap_path is None:  # default path
-            self.cmmap_path = join(result_path, 'cm_maps')
+            self.cmmap_path = join(result_path, "cm_maps")
         else:
             self.cmmap_path = cmmap_path
         if obia_path is None:  # default path
-            self.obia_path = join(result_path, 'OBIAresults')
+            self.obia_path = join(result_path, "OBIAresults")
         else:
             self.obia_path = obia_path
         if obcold_recg_path is None:  # default path
-            self.obcold_recg_path = join(result_path, 'obcold')
+            self.obcold_recg_path = join(result_path, "obcold")
         else:
             self.obcold_recg_path = obcold_recg_path
         self.stack_path = stack_path
@@ -721,24 +808,24 @@ class ObjectAnalystHPC:
         self.band_num = band_num
 
     @staticmethod
-    def _check_inputs(config, stack_path, result_path, cmmap_path, obia_path, obcold_recg_path,
-                      thematic_path):
-        if type(config['n_rows']) != int or config['n_rows'] < 0:
+    def _check_inputs(dataset_info, stack_path, result_path, cmmap_path, obia_path,
+                      obcold_recg_path, thematic_path):
+        if (isinstance(dataset_info.n_rows, int) is False) or (dataset_info.n_rows < 0):
             raise ValueError('n_rows must be positive integer')
-        if type(config['n_cols']) != int or config['n_cols'] < 0:
+        if (isinstance(dataset_info.n_cols, int) is False) or (dataset_info.n_cols < 0):
             raise ValueError('n_cols must be positive integer')
-        if type(config['n_block_x']) != int or config['n_block_x'] < 0:
+        if (isinstance(dataset_info.n_block_x, int) is False) or (dataset_info.n_block_x < 0):
             raise ValueError('n_block_x must be positive integer')
-        if type(config['n_block_y']) != int or config['n_block_y'] < 0:
+        if (isinstance(dataset_info.n_block_y, int) is False) or (dataset_info.n_block_y < 0):
             raise ValueError('n_block_y must be positive integer')
-        if type(config['n_block_y']) != int or config['n_block_y'] < 0:
+        if (isinstance(dataset_info.n_block_y, int) is False) or (dataset_info.n_block_y < 0):
             raise ValueError('n_block_y must be positive integer')
 
         if os.path.isdir(stack_path) is False:
-            raise FileExistsError('No such directory: {}'.format(stack_path))
+            raise FileExistsError("No such directory: {}".format(stack_path))
 
         if os.path.isdir(result_path) is False:
-            raise FileExistsError('No such directory: {}'.format(result_path))
+            raise FileExistsError("No such directory: {}".format(result_path))
 
     def hpc_preparation(self):
         """
@@ -763,22 +850,34 @@ class ObjectAnalystHPC:
                 raise e
 
     def get_lastyear_cmap_fromdate(self, date):
-        if pd.Timestamp.fromordinal(date).year - 1 < self.year_lowbound:  # we used the the year before the date
+        if (
+            pd.Timestamp.fromordinal(date).year - 1 < self.year_lowbound
+        ):  # we used the the year before the date
             classified_year = self.year_lowbound
         else:
             classified_year = pd.Timestamp.fromordinal(date).year - 1
         try:
-            classification_map = np.load(join(self.thematic_path, 'yearlyclassification_{}.npy'.format(classified_year)))
+            classification_map = np.load(
+                join(self.thematic_path, "yearlyclassification_{}.npy".format(classified_year))
+            )
         except IOError as e:
             raise e
         return classification_map
 
-    def obia_execute(self, date, floodfill_ratio=None, uniform_threshold=None, uniform_sizeslope=None,
-                     method='floodfill'):
+    def obia_execute(
+        self,
+        date: int,
+        floodfill_ratio: Optional[float] = None,
+        uniform_threshold: Optional[float] = None,
+        uniform_sizeslope: Optional[float] = None,
+        method: str = "floodfill",
+        cm_output_interval: int = 60
+
+    ):
         """
         a function for executing OBIA pipeline
         Args:
-            date: the date as an index of the temporal snapshot to be processed
+            date: the ordinal date as an index of the temporal snapshot to be processed
             floodfill_ratio: the ratio of change magnitude relative to the seed pixel value as the fixed range for connecting
                              neighborhood in the floodfill algorithm
                              (https://docs.opencv.org/3.4/d7/d1b/group__imgproc__misc.html#gaf1f55a048f8a45bc3383586e80b1f0d0)
@@ -791,42 +890,94 @@ class ObjectAnalystHPC:
         Returns:
 
         """
-        if date - self.config['CM_OUTPUT_INTERVAL'] < self.starting_date:
-            change_map = np.full((self.config['n_rows'], self.config['n_cols']), 0,
-                                  dtype=np.byte)
-            cm_date_array_updated = np.full((self.config['n_rows'], self.config['n_cols']), 0,
-                                            dtype=np.int32)
+        if date - cm_output_interval < self.starting_date:
+            change_map = np.full(
+                (self.dataset_info.n_rows, self.dataset_info.n_cols),
+                0, dtype=np.byte)
+            cm_date_array_updated = np.full(
+                (self.dataset_info.n_rows, self.dataset_info.n_cols), 0, dtype=np.int32
+            )
         else:
-            if method == 'floodfill':
-                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = (
-                    segmentation_floodfill(np.load(join(self.cmmap_path, cmname_fromdate(date) + '.npy')),
-                                           np.load(join(self.cmmap_path, cmdatename_fromdate(date) + '.npy')),
-                                           np.load(join(self.cmmap_path, cmname_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')),
-                                           np.load(join(self.cmmap_path, cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')))
+            if method == "floodfill":
+                [
+                    object_map_s1,
+                    cm_date_array_updated,
+                    object_map_s2,
+                    s1_info,
+                ] = segmentation_floodfill(
+                    np.load(join(self.cmmap_path, cmname_fromdate(date) + ".npy")),
+                    np.load(join(self.cmmap_path, cmdatename_fromdate(date) + ".npy")),
+                    np.load(
+                        join(
+                            self.cmmap_path,
+                            cmname_fromdate(date - cm_output_interval) + ".npy",
+                        )
+                    ),
+                    np.load(
+                        join(
+                            self.cmmap_path,
+                            cmdatename_fromdate(date - cm_output_interval) + ".npy",
+                        )
+                    ),
                 )
-            elif method == 'slic':
-                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = (
-                    segmentation_slic(np.load(join(self.cmmap_path, cmname_fromdate(date) + '.npy')),
-                                      np.load(join(self.cmmap_path, cmdatename_fromdate(date) + '.npy')),
-                                      np.load(join(self.cmmap_path, cmname_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')),
-                                      np.load(join(self.cmmap_path, cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')))
+            elif method == "slic":
+                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation_slic(
+                    np.load(join(self.cmmap_path, cmname_fromdate(date) + ".npy")),
+                    np.load(join(self.cmmap_path, cmdatename_fromdate(date) + ".npy")),
+                    np.load(
+                        join(
+                            self.cmmap_path,
+                            cmname_fromdate(date - cm_output_interval) + ".npy",
+                        )
+                    ),
+                    np.load(
+                        join(
+                            self.cmmap_path,
+                            cmdatename_fromdate(date - cm_output_interval) + ".npy",
+                        )
+                    ),
                 )
-            elif method == 'watershed':
-                [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = (
-                    segmentation_watershed(np.load(join(self.cmmap_path, cmname_fromdate(date) + '.npy')),
-                                           np.load(join(self.cmmap_path, cmdatename_fromdate(date) + '.npy')),
-                                           np.load(join(self.cmmap_path, cmname_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')),
-                                           np.load(join(self.cmmap_path, cmdatename_fromdate(date - self.config['CM_OUTPUT_INTERVAL']) + '.npy')))
+            elif method == "watershed":
+                [
+                    object_map_s1,
+                    cm_date_array_updated,
+                    object_map_s2,
+                    s1_info,
+                ] = segmentation_watershed(
+                    np.load(join(self.cmmap_path, cmname_fromdate(date) + ".npy")),
+                    np.load(join(self.cmmap_path, cmdatename_fromdate(date) + ".npy")),
+                    np.load(
+                        join(
+                            self.cmmap_path,
+                            cmname_fromdate(date - cm_output_interval) + ".npy",
+                        )
+                    ),
+                    np.load(
+                        join(
+                            self.cmmap_path,
+                            cmdatename_fromdate(date - cm_output_interval) + ".npy",
+                        )
+                    ),
                 )
 
             if self.thematic_path is not None:
                 classification_map = self.get_lastyear_cmap_fromdate(date)
-                change_map = object_analysis(object_map_s1, object_map_s2, s1_info,
-                                             classification_map=classification_map,
-                                             uniform_threshold=uniform_threshold, uniform_sizeslope=uniform_sizeslope)
+                change_map = object_analysis(
+                    object_map_s1,
+                    object_map_s2,
+                    s1_info,
+                    classification_map=classification_map,
+                    uniform_threshold=uniform_threshold,
+                    uniform_sizeslope=uniform_sizeslope,
+                )
             else:
-                change_map = object_analysis(object_map_s1, object_map_s2, s1_info,
-                                             uniform_threshold=uniform_threshold, uniform_sizeslope=uniform_sizeslope)
+                change_map = object_analysis(
+                    object_map_s1,
+                    object_map_s2,
+                    s1_info,
+                    uniform_threshold=uniform_threshold,
+                    uniform_sizeslope=uniform_sizeslope,
+                )
         self.save_obiaresult(date, change_map, cm_date_array_updated)
 
     def save_obiaresult(self, date, change_map, cm_date_array_updated):
@@ -846,18 +997,29 @@ class ObjectAnalystHPC:
         cm_date_array_updated[cm_date_array_updated < 0] = 0
         # need yo load date snapshot
         # cm_date_snapshot = np.load(join(self.cmmap_path, cmdatename_fromdate(date)+'.npy'))
-        result_blocks = np.lib.stride_tricks.as_strided(np.multiply(change_map, cm_date_array_updated).astype(np.int32),
-                                                        shape=(self.config['n_block_y'], self.config['n_block_x'],
-                                                               self.config['block_height'], self.config['block_width']),
-                                                        strides=(self.config['n_cols'] * self.config['block_height'] * bytesize,
-                                                                 self.config['block_width'] * bytesize,
-                                                                 self.config['n_cols'] * bytesize, bytesize))
-        for i in range(self.config['n_block_y']):
-            for j in range(self.config['n_block_x']):
-                np.save(join(self.obia_path, filenm + '_x{}_y{}.npy'.format(j + 1, i + 1)),
-                        result_blocks[i][j])
+        result_blocks = np.lib.stride_tricks.as_strided(
+            np.multiply(change_map, cm_date_array_updated).astype(np.int32),
+            shape=(
+                self.dataset_info.n_block_y,
+                self.dataset_info.n_block_x,
+                self.dataset_info.block_height,
+                self.dataset_info.block_width,
+            ),
+            strides=(
+                self.dataset_info.n_cols * self.dataset_info.block_height * bytesize,
+                self.dataset_info.block_width * bytesize,
+                self.dataset_info.n_cols * bytesize,
+                bytesize,
+            ),
+        )
+        for i in range(self.dataset_info.n_block_y):
+            for j in range(self.dataset_info.n_block_x):
+                np.save(
+                    join(self.obia_path, filenm + "_x{}_y{}.npy".format(j + 1, i + 1)),
+                    result_blocks[i][j],
+                )
 
-        with open(join(self.obia_path, 'tmp_OBIA_{}_finished.txt'.format(date)), 'w'):
+        with open(join(self.obia_path, "tmp_OBIA_{}_finished.txt".format(date)), "w"):
             pass
 
     def is_finished_object_analysis(self, date_list):
@@ -869,7 +1031,7 @@ class ObjectAnalystHPC:
             True -> finished; False -> not finished
         """
         for date in date_list:
-            if not exists(join(self.obia_path, 'tmp_OBIA_{}_finished.txt'.format(date))):
+            if not exists(join(self.obia_path, "tmp_OBIA_{}_finished.txt".format(date))):
                 return False
         return True
 
@@ -882,20 +1044,38 @@ class ObjectAnalystHPC:
         Returns:
             block-specific obia results which are formatted as 0 or break dates
         """
-        obia_files = [f for f in os.listdir(self.obia_path) if f.startswith('obiaresult')
-                      and f.endswith('_x{}_y{}.npy'.format(block_x, block_y))]
+        obia_files = [
+            f
+            for f in os.listdir(self.obia_path)
+            if f.startswith("obiaresult") and f.endswith("_x{}_y{}.npy".format(block_x, block_y))
+        ]
         # sort image files by dates
-        cm_dates = [int(f[f.find('obiaresult_') + len('obiaresult_'):
-                          f.find('obiaresult_') + len('obiaresult_') + 6])
-                    for f in obia_files]
+        cm_dates = [
+            int(
+                f[
+                    f.find("obiaresult_")
+                    + len("obiaresult_"): f.find("obiaresult_")
+                    + len("obiaresult_")
+                    + 6
+                ]
+            )
+            for f in obia_files
+        ]
         files_date_zip = sorted(zip(cm_dates, obia_files))
 
-        obia_tstack = [np.load(join(self.obia_path, f[1])).reshape(self.config['block_width'] *
-                                                                   self.config['block_height'])
-                       for count, f in enumerate(files_date_zip)]
+        obia_tstack = [
+            np.load(join(self.obia_path, f[1])).reshape(
+                self.dataset_info.block_width * self.dataset_info.block_height
+            )
+            for count, f in enumerate(files_date_zip)
+        ]
         return np.vstack(obia_tstack)
 
-    def reconstruct_reccg(self, block_id, img_stack=None, img_dates_sorted=None, logger=None):
+    def reconstruct_reccg(self, block_id: int,
+                          img_stack: Optional[np.ndarray] = None,
+                          img_dates_sorted: Optional[np.ndarray] = None,
+                          logger: Optional[Logger] = None,
+                          conse: int = 6):
         """
         the third step of OBCOLD, it reconstructs the new temporal segment based on the new spatially adjusted break
         Args:
@@ -907,40 +1087,50 @@ class ObjectAnalystHPC:
             change records
         """
         if logger is None:
-            logging.basicConfig(level=logging.DEBUG,
-                                format='%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s',
-                                stream=sys.stdout)
+            logging.basicConfig(
+                level=logging.DEBUG,
+                format="%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s",
+                stream=sys.stdout,
+            )
             logger = logging.getLogger(__name__)
         else:
             logger = logger
 
-        block_y = get_block_y(block_id, self.config['n_block_x'])
-        block_x = get_block_x(block_id, self.config['n_block_x'])
+        block_y = get_block_y(block_id, self.dataset_info.n_block_x)
+        block_x = get_block_x(block_id, self.dataset_info.n_block_x)
         if img_stack is None and img_dates_sorted is None:
-            block_folder = join(self.stack_path, 'block_x{}_y{}'.format(block_x, block_y))
-            img_stack, img_dates_sorted = read_blockdata(block_folder, self.config['n_cols'] * self.config['n_rows'],
-                                                         self.band_num + 1)
+            block_folder = join(self.stack_path, "block_x{}_y{}".format(block_x, block_y))
+            img_stack, img_dates_sorted = read_blockdata(
+                block_folder, self.dataset_info.n_cols * self.dataset_info.n_rows, self.band_num + 1
+            )
         obia_breaks = self.get_allobiaresult_asarray(block_x, block_y)
         result_collect = []
-        for pos in range(self.config['block_width'] * self.config['block_height']):
-            original_row, original_col = get_rowcol_intile(pos, self.config['block_width'],
-                                                           self.config['block_height'], block_x, block_y)
+        for pos in range(self.dataset_info.block_width * self.dataset_info.block_height):
+            original_row, original_col = get_rowcol_intile(
+                pos, self.dataset_info.block_width, self.dataset_info.block_height, block_x, block_y
+            )
 
             try:
-                obcold_result = obcold_reconstruct(img_dates_sorted,
-                                                   img_stack[pos, 0, :].astype(np.int64),
-                                                   img_stack[pos, 1, :].astype(np.int64),
-                                                   img_stack[pos, 2, :].astype(np.int64),
-                                                   img_stack[pos, 3, :].astype(np.int64),
-                                                   img_stack[pos, 4, :].astype(np.int64),
-                                                   img_stack[pos, 5, :].astype(np.int64),
-                                                   img_stack[pos, 6, :].astype(np.int64),
-                                                   img_stack[pos, 7, :].astype(np.int64),
-                                                   obia_breaks[:, pos].astype(np.int64),
-                                                   conse=self.config['conse'],
-                                                   pos=self.config['n_cols'] * (original_row - 1) + original_col)
+                obcold_result = obcold_reconstruct(
+                    img_dates_sorted,
+                    img_stack[pos, 0, :].astype(np.int64),
+                    img_stack[pos, 1, :].astype(np.int64),
+                    img_stack[pos, 2, :].astype(np.int64),
+                    img_stack[pos, 3, :].astype(np.int64),
+                    img_stack[pos, 4, :].astype(np.int64),
+                    img_stack[pos, 5, :].astype(np.int64),
+                    img_stack[pos, 6, :].astype(np.int64),
+                    img_stack[pos, 7, :].astype(np.int64),
+                    obia_breaks[:, pos].astype(np.int64),
+                    conse=conse,
+                    pos=self.dataset_info.n_cols * (original_row - 1) + original_col,
+                )
             except RuntimeError:
-                logger.error("COLD fails at original_row {}, original_col {}".format(original_row, original_col))
+                logger.error(
+                    "COLD fails at original_row {}, original_col {}".format(
+                        original_row, original_col
+                    )
+                )
             except Exception:  # pass exception
                 pass
             else:
@@ -948,7 +1138,11 @@ class ObjectAnalystHPC:
         return result_collect
 
     def save_obcoldrecords(self, block_id, result_collect):
-        block_x = get_block_x(block_id, self.config['n_block_x'])
-        block_y = get_block_y(block_id, self.config['n_block_x'])
-        np.save(join(self.obcold_recg_path, 'record_change_x{}_y{}_obcold.npy'.format(block_x, block_y)),
-                np.hstack(result_collect))
+        block_x = get_block_x(block_id, self.dataset_info.n_block_x)
+        block_y = get_block_y(block_id, self.dataset_info.n_block_x)
+        np.save(
+            join(
+                self.obcold_recg_path, "record_change_x{}_y{}_obcold.npy".format(block_x, block_y)
+            ),
+            np.hstack(result_collect),
+        )

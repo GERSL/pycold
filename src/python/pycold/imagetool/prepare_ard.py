@@ -1,12 +1,12 @@
 # Author: Su Ye
-# This script is an example for generating block-based stack files from original ARD zip as 
-# intermediate inputs to the COLD algorithm in a HPC environment. As preparation, you need to 
+# This script is an example for generating block-based stack files from original ARD zip as
+# intermediate inputs to the COLD algorithm in a HPC environment. As preparation, you need to
 # download '_BT' and '_SR' for all Landsat ARD collection 1.
 # This script has 4 steps: 1) warp single-path array to limit the observation inputs for each pixel
-# if single_path is set True; 2) unzip all images and unpack bit-based QA bands; 3) 
-# partition each 5000*5000 temporal images to blocks and eliminate those image blocks if no clear, 
+# if single_path is set True; 2) unzip all images and unpack bit-based QA bands; 3)
+# partition each 5000*5000 temporal images to blocks and eliminate those image blocks if no clear,
 # water or snow pixel were in it (so to save disk space and enable independent IO for individual
-# block in later time-series analysis); 4) save each image block to python-native binary format 
+# block in later time-series analysis); 4) save each image block to python-native binary format
 # (.npy) into its block folders
 
 # For a 42-year Landsat ARD C1 tile (~3000 images), this script averagely produces ~350 G intermediate disk
@@ -17,8 +17,10 @@ import shutil
 import tarfile
 import logging
 import time
+from typing import Optional
 import datetime as dt
 import xml.etree.ElementTree as ET
+from logging import Logger
 import yaml
 import click
 from pytz import timezone
@@ -36,6 +38,8 @@ from dateutil.parser import parse
 from osgeo import gdal_array
 from osgeo import gdal
 import fiona
+from pycold.common import DatasetInfo
+from pycold.utils import class_from_dict
 
 
 # define constant here
@@ -72,7 +76,7 @@ def mask_value(vector, val):
     return vector == val
 
 
-def qabitval_array_HLS(packedint_array):
+def qabitval_array_HLS(packedint_array: np.ndarray):
     """
     Institute a hierarchy of qa values that may be flagged in the bitpacked
     value.
@@ -101,7 +105,7 @@ def qabitval_array_HLS(packedint_array):
     return unpacked
 
 
-def qabitval_array(packedint_array):
+def qabitval_array(packedint_array: np.ndarray):
     """
     Institute a hierarchy of qa values that may be flagged in the bitpacked
     value.
@@ -127,7 +131,7 @@ def qabitval_array(packedint_array):
     return unpacked
 
 
-def qabitval_array_c2(packedint_array):
+def qabitval_array_c2(packedint_array: np.ndarray):
     """
     Institute a hierarchy of qa values that may be flagged in the bitpacked
     value for c2
@@ -192,15 +196,20 @@ def qabitval_array_c2(packedint_array):
 #     return image_array, (geotransform, inDs)
 
 
-def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_partition=True, clear_threshold=0,
-                              low_date_bound=None, upp_date_bound=None):
+def single_image_stacking_hls(source_dir: str,
+                              out_dir: str,
+                              logger: Logger,
+                              dataset_info: DatasetInfo,
+                              folder: str, is_partition: bool = True, clear_threshold: float = 0.0,
+                              low_date_bound: Optional[str] = None,
+                              upp_date_bound: Optional[str] = None):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy
     :param source_dir: the parent folder to save image 'folder'
     :param out_dir: the folder to save result
     :param folder: the folder name of image
     :param logger: the handler of logger file
-    :param config
+    :param data_info: data info data class
     :param is_partition: True, partition each image into blocks; False, save original size of image
     :param clear_threshold: threshold of clear pixel percentage, if lower than threshold, won't be processed
     :param low_date_bound: the lower date of user interested date range
@@ -286,56 +295,54 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
 
         if is_partition is True:
             # width of a block
-            b_width = int(config['n_cols'] / config['n_block_x'])
-            b_height = int(config['n_rows'] / config['n_block_y'])
             bytesize = 2  # short16 = 2 * byte
             # source: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-in-python-using-numpy-d1bf0dd7b6f7
-            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
+            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
             QA_blocks = np.lib.stride_tricks.as_strided(QA_band_unpacked,
-                                                        shape=(config['n_block_y'],
-                                                               config['n_block_x'], b_height,
-                                                               b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] *
+                                                        shape=(dataset_info.n_block_y,
+                                                               dataset_info.n_block_x, dataset_info.block_height,
+                                                               dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols *
                                                                  bytesize,
                                                                  bytesize))
-            for i in range(config['n_block_y']):
-                for j in range(config['n_block_x']):
+            for i in range(dataset_info.n_block_y):
+                for j in range(dataset_info.n_block_x):
                     # check if no valid pixels in the chip, then eliminate
                     qa_unique = np.unique(QA_blocks[i][j])
 
@@ -348,10 +355,18 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
                         continue
 
                     block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
-                    np.save(join(join(out_dir, block_folder), file_name),
-                            np.dstack([B1_blocks[i][j], B2_blocks[i][j], B3_blocks[i][j], B4_blocks[i][j],
-                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j],
-                                       QA_blocks[i][j]]).astype(np.int16))
+                    np.save(
+                        join(join(out_dir, block_folder),
+                             file_name),
+                        np.dstack(
+                            [B1_blocks[i][j],
+                             B2_blocks[i][j],
+                             B3_blocks[i][j],
+                             B4_blocks[i][j],
+                             B5_blocks[i][j],
+                             B6_blocks[i][j],
+                             B7_blocks[i][j],
+                             QA_blocks[i][j]]).astype(np.int16))
 
         else:
             np.save(join(out_dir, file_name),
@@ -364,15 +379,17 @@ def single_image_stacking_hls(source_dir, out_dir, logger, config, folder, is_pa
     return True
 
 
-def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=True, clear_threshold=0,
-                                low_date_bound=None, upp_date_bound=None):
+def single_image_stacking_hls14(out_dir: str, logger: Logger, dataset_info: DatasetInfo,
+                                folder: str, is_partition: bool = True, clear_threshold: int = 0,
+                                low_date_bound: Optional[str] = None,
+                                upp_date_bound: Optional[str] = None):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy
     :param source_dir: the parent folder to save image 'folder'
     :param out_dir: the folder to save result
     :param folder: the folder name of image
     :param logger: the handler of logger file
-    :param config
+    :param dataset_info: dataset information dataclass
     :param is_partition: True, partition each image into blocks; False, save original size of image
     :param clear_threshold: threshold of clear pixel percentage, if lower than threshold, won't be processed
     :param low_date_bound: the lower bound of user interested date range
@@ -448,56 +465,54 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
 
         if is_partition is True:
             # width of a block
-            b_width = int(config['n_cols'] / config['n_block_x'])
-            b_height = int(config['n_rows'] / config['n_block_y'])
             bytesize = 2  # short16 = 2 * byte
             # source: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-in-python-using-numpy-d1bf0dd7b6f7
-            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
+            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
             QA_blocks = np.lib.stride_tricks.as_strided(QA_band_unpacked,
-                                                        shape=(config['n_block_y'],
-                                                               config['n_block_x'], b_height,
-                                                               b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] *
+                                                        shape=(dataset_info.n_block_y,
+                                                               dataset_info.n_block_x, dataset_info.block_height,
+                                                               dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols *
                                                                  bytesize,
                                                                  bytesize))
-            for i in range(config['n_block_y']):
-                for j in range(config['n_block_x']):
+            for i in range(dataset_info.n_block_y):
+                for j in range(dataset_info.n_block_x):
                     # check if no valid pixels in the chip, then eliminate
                     qa_unique = np.unique(QA_blocks[i][j])
 
@@ -510,10 +525,18 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
                         continue
 
                     block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
-                    np.save(join(join(out_dir, block_folder), file_name),
-                            np.dstack([B1_blocks[i][j], B2_blocks[i][j], B3_blocks[i][j], B4_blocks[i][j],
-                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j],
-                                       QA_blocks[i][j]]).astype(np.int16))
+                    np.save(
+                        join(join(out_dir, block_folder),
+                             file_name),
+                        np.dstack(
+                            [B1_blocks[i][j],
+                             B2_blocks[i][j],
+                             B3_blocks[i][j],
+                             B4_blocks[i][j],
+                             B5_blocks[i][j],
+                             B6_blocks[i][j],
+                             B7_blocks[i][j],
+                             QA_blocks[i][j]]).astype(np.int16))
 
         else:
             np.save(join(out_dir, file_name),
@@ -526,8 +549,11 @@ def single_image_stacking_hls14(out_dir, logger, config, folder, is_partition=Tr
     return True
 
 
-def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger, config,
-                          is_partition=True, low_date_bound=None, upp_date_bound=None, b_c2=False):
+def single_image_stacking(tmp_path: str, source_dir: str, out_dir: str, folder: str,
+                          clear_threshold: float, path_array: np.ndarray, logger: Logger,
+                          dataset_info: DatasetInfo,
+                          is_partition: bool = True, low_date_bound: Optional[str] = None,
+                          upp_date_bound: Optional[str] = None, b_c2: bool = False):
     """
     unzip single image, convert bit-pack qa to byte value, and save as numpy
     :param tmp_path: tmp folder to save unzip image
@@ -538,11 +564,11 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
     :param path_array: path array has the same dimension of inputted image, and the pixel value indicates
                       the path which the pixel belongs to; if path_array == none, we will use all path
     :param logger: the handler of logger file
-    :param config
+    :param dataset_info: dataset information
     :param is_partition: True, partition each image into blocks; False, save original size of image
     :param low_date_bound: the lower bound of user interested year range
     :param upp_date_bound: the upper bound of user interested year range
-    :param b_c2:
+    :param b_c2: False
     :return:
     """
     # unzip SR
@@ -775,56 +801,54 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
 
         if is_partition is True:
             # width of a block
-            b_width = int(config['n_cols'] / config['n_block_x'])
-            b_height = int(config['n_rows'] / config['n_block_y'])
             bytesize = 2  # short16 = 2 * byte
             # source: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-in-python-using-numpy-d1bf0dd7b6f7
-            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(config['n_block_y'],
-                                                        config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
+            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(dataset_info.n_block_y,
+                                                        dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
             QA_blocks = np.lib.stride_tricks.as_strided(QA_band_unpacked,
-                                                        shape=(config['n_block_y'],
-                                                               config['n_block_x'], b_height,
-                                                               b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] *
+                                                        shape=(dataset_info.n_block_y,
+                                                               dataset_info.n_block_x, dataset_info.block_height,
+                                                               dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols *
                                                                  bytesize,
                                                                  bytesize))
-            for i in range(config['n_block_y']):
-                for j in range(config['n_block_x']):
+            for i in range(dataset_info.n_block_y):
+                for j in range(dataset_info.n_block_x):
                     # check if no valid pixels in the chip, then eliminate
                     qa_unique = np.unique(QA_blocks[i][j])
 
@@ -837,10 +861,18 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                         continue
 
                     block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
-                    np.save(join(join(out_dir, block_folder), file_name),
-                            np.dstack([B1_blocks[i][j], B2_blocks[i][j], B3_blocks[i][j], B4_blocks[i][j],
-                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j],
-                                       QA_blocks[i][j]]).astype(np.int16))
+                    np.save(
+                        join(join(out_dir, block_folder),
+                             file_name),
+                        np.dstack(
+                            [B1_blocks[i][j],
+                             B2_blocks[i][j],
+                             B3_blocks[i][j],
+                             B4_blocks[i][j],
+                             B5_blocks[i][j],
+                             B6_blocks[i][j],
+                             B7_blocks[i][j],
+                             QA_blocks[i][j]]).astype(np.int16))
 
         else:
             np.save(join(out_dir, file_name), np.dstack(
@@ -857,8 +889,10 @@ def single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold
                   ignore_errors=True)
 
 
-def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, clear_threshold, logger, config, bounds,
-                                      is_partition=True, low_date_bound=None, upp_date_bound=None):
+def single_image_stacking_collection2(
+        tmp_path: str, source_dir: str, out_dir: str, folder: str, clear_threshold: float,
+        logger: Logger, dataset_info: DatasetInfo, bounds: list, is_partition: bool = True,
+        low_date_bound: Optional[str] = None, upp_date_bound: Optional[str] = None):
     """
     for collection 2
     :param tmp_path: tmp folder to save unzip image
@@ -867,7 +901,7 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
     :param folder: the folder name of image
     :param clear_threshold: threshold of clear pixel percentage, if lower than threshold, won't be processed
     :param logger: the handler of logger file
-    :param config
+    :param dataset_info:DatasetInfo
     :param is_partition: True, partition each image into blocks; False, save original size of image
     :param low_date_bound: the lower bound of user interested date range
     :param upp_date_bound: the upper bound of user interested date range
@@ -891,11 +925,15 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
         # return
 
     try:
-        QA_band = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                               "{}_QA_PIXEL.TIF".format(folder))),
-                            outputBounds=[bounds[0], bounds[1],
-                                          bounds[2], bounds[3]], xRes=res, yRes=res,
-                            dstNodata=1, srcNodata=1, outputType=gdal.GDT_UInt16).ReadAsArray()
+        QA_band = gdal.Warp(
+            os.path.join(tmp_path, '_tmp_img'),
+            gdal.Open(join(join(tmp_path, folder),
+                           "{}_QA_PIXEL.TIF".format(folder))),
+            outputBounds=[bounds[0],
+                          bounds[1],
+                          bounds[2],
+                          bounds[3]],
+            xRes=res, yRes=res, dstNodata=1, srcNodata=1, outputType=gdal.GDT_UInt16).ReadAsArray()
     except ValueError as e:
         # logger.error('Cannot open QA band for {}: {}'.format(folder, e))
         logger.error('Cannot open QA band for {}: {}'.format(folder, e))
@@ -945,45 +983,77 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
             try:
                 # B1 = gdal_array.LoadFile(join(join(tmp_path, folder),
                 #                               "{}_SR_B1.TIF".format(folder)))
-                B1 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_SR_B1.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
-                B2 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_SR_B2.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0,
+                B1 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_SR_B1.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
                                outputType=gdal.GDT_UInt16).ReadAsArray()
-                B3 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_SR_B3.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0,
+                B2 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_SR_B2.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
                                outputType=gdal.GDT_UInt16).ReadAsArray()
-                B4 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_SR_B4.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0,
+                B3 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_SR_B3.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
                                outputType=gdal.GDT_UInt16).ReadAsArray()
-                B5 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_SR_B5.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
+                B4 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_SR_B4.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
+                               outputType=gdal.GDT_UInt16).ReadAsArray()
+                B5 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_SR_B5.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
+                               outputType=gdal.GDT_UInt16).ReadAsArray()
 
-                B6 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_SR_B7.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
-                B7 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_ST_B6.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]],  xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
+                B6 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_SR_B7.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
+                               outputType=gdal.GDT_UInt16).ReadAsArray()
+                B7 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_ST_B6.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
+                               outputType=gdal.GDT_UInt16).ReadAsArray()
             except ValueError as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
                 logger.error(
@@ -991,43 +1061,72 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
                 return
         elif sensor == 'LC8' or 'LC9':
             try:
-                B1 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), 
+                B1 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
                                gdal.Open(join(join(tmp_path, folder),
                                               "{}_SR_B2.TIF".format(folder))),
                                outputBounds=[
                                    bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
                                dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
-                B2 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, 
-                                                                                       folder),
-                                                                                  "{}_SR_B3.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
-                B3 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_SR_B4.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
-                B4 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_SR_B5.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
-                B5 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_SR_B6.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
-                B6 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_SR_B7.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
-                B7 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'), gdal.Open(join(join(tmp_path, folder),
-                                                                                  "{}_ST_B10.TIF".format(folder))),
-                               outputBounds=[
-                                   bounds[0], bounds[1], bounds[2], bounds[3]], xRes=res, yRes=res,
-                               dstNodata=0, srcNodata=0, outputType=gdal.GDT_UInt16).ReadAsArray()
+                B2 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_SR_B3.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
+                               outputType=gdal.GDT_UInt16).ReadAsArray()
+                B3 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_SR_B4.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
+                               outputType=gdal.GDT_UInt16).ReadAsArray()
+                B4 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_SR_B5.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
+                               outputType=gdal.GDT_UInt16).ReadAsArray()
+                B5 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_SR_B6.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
+                               outputType=gdal.GDT_UInt16).ReadAsArray()
+                B6 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_SR_B7.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
+                               outputType=gdal.GDT_UInt16).ReadAsArray()
+                B7 = gdal.Warp(os.path.join(tmp_path, '_tmp_img'),
+                               gdal.Open(
+                                   join(join(tmp_path, folder),
+                                        "{}_ST_B10.TIF".format(folder))),
+                               outputBounds=[bounds[0],
+                                             bounds[1],
+                                             bounds[2],
+                                             bounds[3]],
+                               xRes=res, yRes=res, dstNodata=0, srcNodata=0,
+                               outputType=gdal.GDT_UInt16).ReadAsArray()
             except ValueError as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
                 logger.error(
@@ -1051,57 +1150,55 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
 
         if is_partition is True:
             # width of a block
-            b_width = int(config['n_cols'] / config['n_block_x'])
-            b_height = int(config['n_rows'] / config['n_block_y'])
             bytesize = 2  # short16 = 2 * byte
             # source: https://towardsdatascience.com/efficiently-splitting-an-image-into-tiles-
             # in-python-using-numpy-d1bf0dd7b6f7
-            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(config['n_block_y'],
-                                                                   config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(config['n_block_y'],
-                                                                   config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(config['n_block_y'],
-                                                                   config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(config['n_block_y'],
-                                                                   config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(config['n_block_y'],
-                                                                   config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(config['n_block_y'],
-                                                                   config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
-            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(config['n_block_y'],
-                                                                   config['n_block_x'], b_height, b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] * bytesize, bytesize))
+            B1_blocks = np.lib.stride_tricks.as_strided(B1, shape=(dataset_info.n_block_y,
+                                                                   dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B2_blocks = np.lib.stride_tricks.as_strided(B2, shape=(dataset_info.n_block_y,
+                                                                   dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B3_blocks = np.lib.stride_tricks.as_strided(B3, shape=(dataset_info.n_block_y,
+                                                                   dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B4_blocks = np.lib.stride_tricks.as_strided(B4, shape=(dataset_info.n_block_y,
+                                                                   dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B5_blocks = np.lib.stride_tricks.as_strided(B5, shape=(dataset_info.n_block_y,
+                                                                   dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B6_blocks = np.lib.stride_tricks.as_strided(B6, shape=(dataset_info.n_block_y,
+                                                                   dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
+            B7_blocks = np.lib.stride_tricks.as_strided(B7, shape=(dataset_info.n_block_y,
+                                                                   dataset_info.n_block_x, dataset_info.block_height, dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols * bytesize, bytesize))
             QA_blocks = np.lib.stride_tricks.as_strided(QA_band_unpacked,
-                                                        shape=(config['n_block_y'],
-                                                               config['n_block_x'], b_height,
-                                                               b_width),
-                                                        strides=(config['n_cols'] * b_height * bytesize,
-                                                                 b_width * bytesize,
-                                                                 config['n_cols'] *
+                                                        shape=(dataset_info.n_block_y,
+                                                               dataset_info.n_block_x, dataset_info.block_height,
+                                                               dataset_info.block_width),
+                                                        strides=(dataset_info.n_cols * dataset_info.block_height * bytesize,
+                                                                 dataset_info.block_width * bytesize,
+                                                                 dataset_info.n_cols *
                                                                  bytesize,
                                                                  bytesize))
-            for i in range(config['n_block_y']):
-                for j in range(config['n_block_x']):
+            for i in range(dataset_info.n_block_y):
+                for j in range(dataset_info.n_block_x):
                     # check if no valid pixels in the chip, then eliminate
                     qa_unique = np.unique(QA_blocks[i][j])
 
@@ -1114,9 +1211,18 @@ def single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, cle
                         continue
 
                     block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
-                    np.save(join(join(out_dir, block_folder), file_name),
-                            np.dstack([B1_blocks[i][j], B2_blocks[i][j], B3_blocks[i][j], B4_blocks[i][j],
-                                       B5_blocks[i][j], B6_blocks[i][j], B7_blocks[i][j], QA_blocks[i][j]]).astype(np.int16))
+                    np.save(
+                        join(join(out_dir, block_folder),
+                             file_name),
+                        np.dstack(
+                            [B1_blocks[i][j],
+                             B2_blocks[i][j],
+                             B3_blocks[i][j],
+                             B4_blocks[i][j],
+                             B5_blocks[i][j],
+                             B6_blocks[i][j],
+                             B7_blocks[i][j],
+                             QA_blocks[i][j]]).astype(np.int16))
 
         else:
             np.save(join(out_dir, file_name), np.dstack(
@@ -1226,24 +1332,31 @@ def bbox(f):
 
 
 @click.command()
-@click.option('--source_dir', type=str, default=None, help='the folder directory of Landsat tar files '
-                                                           'downloaded from USGS website')
+@click.option('--source_dir', type=str, default=None,
+              help='the folder directory of Landsat tar files '
+              'downloaded from USGS website')
 @click.option('--out_dir', type=str, default=None, help='the folder directory for storing stacks')
-@click.option('--clear_threshold', type=float, default=0, help='user-defined clear pixel proportion')
-@click.option('--single_path', type=bool, default=True, help='indicate if using single_path or sidelap')
+@click.option('--clear_threshold', type=float, default=0,
+              help='user-defined clear pixel proportion')
+@click.option('--single_path', type=bool, default=True,
+              help='indicate if using single_path or sidelap')
 @click.option('--rank', type=int, default=1, help='the rank id')
 @click.option('--n_cores', type=int, default=1, help='the total cores assigned')
 @click.option('--is_partition/--continuous', default=True, help='partition the output to blocks')
 @click.option('--yaml_path', type=str, help='yaml file path')
 @click.option('--hpc/--dhtc', default=True, help='if it is set for HPC or DHTC environment')
-@click.option('--low_date_bound', type=str, default=None, help='the lower bound of the date range of user interest')
-@click.option('--upp_date_bound', type=str, default=None, help='the upper bound of the date range of user interest')
-@click.option('--collection',  type=click.Choice(['ARD', 'C2', 'HLS', 'HLS14', 'ARD-C2']), default='ARD',
-              help='image source category')
+@click.option('--low_date_bound', type=str, default=None,
+              help='the lower bound of the date range of user interest')
+@click.option('--upp_date_bound', type=str, default=None,
+              help='the upper bound of the date range of user interest')
+@click.option(
+    '--collection', type=click.Choice(['ARD', 'C2', 'HLS', 'HLS14', 'ARD-C2']),
+    default='ARD', help='image source category')
 @click.option('--shapefile_path', type=str, default=None)
-@click.option('--id', type=int, default=0, help=' the id of shapefile to crop image, only for C2 image category')
-def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_partition, yaml_path, hpc, low_date_bound,
-         upp_date_bound, collection, shapefile_path, id):
+@click.option('--id', type=int, default=0,
+              help=' the id of shapefile to crop image, only for C2 image category')
+def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_partition, yaml_path,
+         hpc, low_date_bound, upp_date_bound, collection, shapefile_path, id):
     if not os.path.exists(source_dir):
         print('Source directory not exists!')
 
@@ -1265,13 +1378,16 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
 
     tz = timezone('US/Eastern')
     with open(yaml_path) as yaml_obj:
-        config = yaml.safe_load(yaml_obj)
+        config_general = yaml.safe_load(yaml_obj)
+
+    dataset_info = class_from_dict(DatasetInfo, config_general['DATASETINFO'])
 
     logger = None
     # create needed folders
     if rank == 1:
+        # mode = w enables the log file to be overwritten
         logging.basicConfig(filename=join(os.getcwd(), 'prepare_ard.log'),
-                            filemode='w', level=logging.INFO)  # mode = w enables the log file to be overwritten
+                            filemode='w', level=logging.INFO)
         logger = logging.getLogger(__name__)
 
         logger.info('AutoPrepareDataARD starts: {}'.format(
@@ -1281,8 +1397,8 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             os.mkdir(out_dir)
 
         if is_partition is True:
-            for i in range(config['n_block_y']):
-                for j in range(config['n_block_x']):
+            for i in range(dataset_info.n_block_y):
+                for j in range(dataset_info.n_block_x):
                     block_folder = 'block_x{}_y{}'.format(j + 1, i + 1)
                     if not os.path.exists(join(out_dir, block_folder)):
                         os.mkdir(join(out_dir, block_folder))
@@ -1330,19 +1446,27 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                     join(tmp_path, folder_list[0]), ignore_errors=True)
 
         if collection == 'ARD' or collection == 'ARD-C2':
-            ordinal_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder[15:19]), int(folder[19:21]),
-                                                                int(folder[21:23])))
-                             for folder in folder_list]
+            ordinal_dates = [pd.Timestamp.toordinal(
+                dt.datetime(
+                    int(folder[15: 19]),
+                    int(folder[19: 21]),
+                    int(folder[21: 23]))) for folder in folder_list]
         elif collection == 'C2':
-            ordinal_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder[17:21]), int(folder[21:23]),
-                                                                int(folder[23:25])))
-                             for folder in folder_list]
+            ordinal_dates = [pd.Timestamp.toordinal(
+                dt.datetime(
+                    int(folder[17: 21]),
+                    int(folder[21: 23]),
+                    int(folder[23: 25]))) for folder in folder_list]
         elif collection == 'HLS':
-            ordinal_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder[15:19]), 1, 1)) + int(folder[19:22]) - 1
-                             for folder in folder_list]
+            ordinal_dates = [
+                pd.Timestamp.toordinal(dt.datetime(int(folder[15: 19]),
+                                                   1, 1)) + int(folder[19: 22]) - 1
+                for folder in folder_list]
         elif collection == 'HLS14':
-            ordinal_dates = [pd.Timestamp.toordinal(dt.datetime(int(folder.split('/')[-1][15:19]), 1, 1))
-                             + int(folder.split('/')[-1][19:22]) - 1 for folder in folder_list]
+            ordinal_dates = [pd.Timestamp.toordinal(
+                dt.datetime(int(folder.split('/')[-1][15: 19]),
+                            1, 1)) + int(folder.split('/')[-1][19: 22]) - 1
+                for folder in folder_list]
         ordinal_dates.sort()
         file = open(join(out_dir, "starting_last_dates.txt"),
                     "w+")  # need to save out starting and
@@ -1359,8 +1483,9 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
         file.writelines("{}\n".format(str(np.min([ordinal_dates[-1], tmp]))))
         file.close()
     else:
+        # mode = w enables the log file to be overwritten
         logging.basicConfig(filename=join(os.getcwd(), 'prepare_ard.log'),
-                            filemode='a', level=logging.INFO)  # mode = w enables the log file to be overwritten
+                            filemode='a', level=logging.INFO)
         logger = logging.getLogger(__name__)
 
     # use starting_last_dates.txt to indicate all folder have been created. Very stupid way. Need improve it in future.
@@ -1382,14 +1507,14 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
                         'h') + 1: folder_name.find('h') + 4])
                     tile_v = int(folder_name[folder_name.find(
                         'v') + 1: folder_name.find('v') + 4])
-                    path_array = gdal_array.LoadFile(join(Path(os.path.realpath(__file__)).parent,
-                                                          'singlepath_landsat_tile_crop_compress.tif'),
-                                                     xoff=tile_h *
-                                                     config['n_cols'],
-                                                     yoff=tile_v *
-                                                     config['n_rows'],
-                                                     xsize=config['n_cols'],
-                                                     ysize=config['n_rows'])  # read a partial array
+                    path_array = gdal_array.LoadFile(
+                        join(
+                            Path(os.path.realpath(__file__)).parent,
+                            'singlepath_landsat_tile_crop_compress.tif'),
+                        xoff=tile_h * dataset_info.n_cols, yoff=tile_v
+                        * dataset_info.n_rows,
+                        xsize=dataset_info.n_cols,
+                        ysize=dataset_info.n_rows)  # read a partial array
                     # from a large file
                 except IOError as e:
                     logger.error(e)
@@ -1405,9 +1530,10 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             if new_rank > (len(folder_list) - 1):
                 break
             folder = folder_list[new_rank]
-            single_image_stacking_collection2(tmp_path, source_dir, out_dir, folder, clear_threshold, logger,
-                                              config, bounds, is_partition=is_partition,
-                                              low_date_bound=low_date_bound, upp_date_bound=upp_date_bound)
+            single_image_stacking_collection2(
+                tmp_path, source_dir, out_dir, folder, clear_threshold, logger, dataset_info,
+                bounds, is_partition=is_partition, low_date_bound=low_date_bound,
+                upp_date_bound=upp_date_bound)
     elif collection == 'ARD':
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
@@ -1416,9 +1542,10 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             if new_rank > (len(folder_list) - 1):
                 break
             folder = folder_list[new_rank]
-            single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger,
-                                  config, is_partition=is_partition, low_date_bound=low_date_bound,
-                                  upp_date_bound=upp_date_bound)
+            single_image_stacking(
+                tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger,
+                dataset_info, is_partition=is_partition, low_date_bound=low_date_bound,
+                upp_date_bound=upp_date_bound)
     elif collection == 'ARD-C2':
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
@@ -1427,9 +1554,10 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             if new_rank > (len(folder_list) - 1):
                 break
             folder = folder_list[new_rank]
-            single_image_stacking(tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger,
-                                  config, is_partition=is_partition, low_date_bound=low_date_bound,
-                                  upp_date_bound=upp_date_bound, b_c2=True)
+            single_image_stacking(
+                tmp_path, source_dir, out_dir, folder, clear_threshold, path_array, logger,
+                dataset_info, is_partition=is_partition, low_date_bound=low_date_bound,
+                upp_date_bound=upp_date_bound, b_c2=True)
     elif collection == 'HLS':
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
@@ -1438,9 +1566,10 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             if new_rank > (len(folder_list) - 1):
                 break
             folder = folder_list[new_rank]
-            single_image_stacking_hls(source_dir, out_dir, logger, config, folder, clear_threshold=clear_threshold,
-                                      is_partition=is_partition, low_date_bound=low_date_bound,
-                                      upp_date_bound=upp_date_bound)
+            single_image_stacking_hls(
+                source_dir, out_dir, logger, dataset_info, folder, clear_threshold=clear_threshold,
+                is_partition=is_partition, low_date_bound=low_date_bound,
+                upp_date_bound=upp_date_bound)
     elif collection == 'HLS14':
         # assign files to each core
         for i in range(int(np.ceil(len(folder_list) / n_cores))):
@@ -1449,9 +1578,10 @@ def main(source_dir, out_dir, clear_threshold, single_path, rank, n_cores, is_pa
             if new_rank > (len(folder_list) - 1):
                 break
             folder = folder_list[new_rank]
-            single_image_stacking_hls14(out_dir, logger, config, folder, clear_threshold=clear_threshold,
-                                        is_partition=is_partition, low_date_bound=low_date_bound,
-                                        upp_date_bound=upp_date_bound)
+            single_image_stacking_hls14(
+                out_dir, logger, dataset_info, folder, clear_threshold=clear_threshold,
+                is_partition=is_partition, low_date_bound=low_date_bound,
+                upp_date_bound=upp_date_bound)
     # create an empty file for signaling the core that has been finished
     with open(os.path.join(out_dir, 'rank{}_finished.txt'.format(rank)), 'w'):
         pass
