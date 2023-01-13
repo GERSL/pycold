@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
-from typing import Optional
+from typing import Optional, List, Any
 # import datetime
 from cv2 import floodFill
 import cv2 as cv2
@@ -1075,7 +1075,7 @@ class ObjectAnalystHPC:
                           img_stack: Optional[np.ndarray] = None,
                           img_dates_sorted: Optional[np.ndarray] = None,
                           logger: Optional[Logger] = None,
-                          conse: int = 6):
+                          conse: int = 6) -> List[Any]:
         """
         the third step of OBCOLD, it reconstructs the new temporal segment based on the new spatially adjusted break
         Args:
