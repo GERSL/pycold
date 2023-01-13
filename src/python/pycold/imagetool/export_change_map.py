@@ -74,11 +74,11 @@ def extract_features(
                 max_days = cold_plot[idx]['t_end']
             else:
                 max_days = cold_plot[idx + 1]['t_start']
-            if cold_curve['t_break'] > 0:
-                break_year = pd.Timestamp.fromordinal(cold_curve['t_break']).year
-                ordinal_day_break_july1st = pd.Timestamp.toordinal(datetime.date(break_year, 7, 1))
-            else:
-                ordinal_day_break_july1st = 0
+            break_year = pd.Timestamp.fromordinal(
+                cold_curve['t_break']).year if cold_curve['t_break'] > 0 else -9999
+            # ordinal_day_break_july1st = pd.Timestamp.toordinal(datetime.date(break_year, 7, 1))
+            # else:
+            # ordinal_day_break_july1st = 0
 
             if cold_curve['t_start'] <= ordinal_day < max_days:
                 for n, feature in enumerate(feature_outputs):
@@ -116,7 +116,7 @@ def extract_features(
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
                     elif feature == 'cv':
-                        if ordinal_day == ordinal_day_break_july1st:
+                        if pd.Timestamp.fromordinal(ordinal_day).year == break_year:
                             features[n][index] = cold_curve['magnitude'][band]
                         else:
                             features[n][index] = 0
@@ -254,13 +254,13 @@ def main(
         try:
             coefs = list(coefs.split(","))
             coefs = [str(coef) for coef in coefs]
-        except:
+        except ValueError:
             print("Illegal coefs inputs: example, --coefs='a0, c1, a1, b1, a2, b2, a3, b3, cv, rmse'")
 
         try:
             coefs_bands = list(coefs_bands.split(","))
             coefs_bands = [int(coefs_band) for coefs_band in coefs_bands]
-        except:
+        except ValueError:
             print("Illegal coefs_bands inputs: example, --coefs_bands='0, 1, 2, 3, 4, 5, 6'")
 
     # outname'obcold':
