@@ -1,7 +1,5 @@
-n_rows: 53
-n_cols: 53
-n_block_x: 1
-n_block_y: 1
-probability_threshold: 0.99
-conse: 6
-CM_OUTPUT_INTERVAL: 60
+DATASETINFO:
+  n_rows: 53
+  n_cols: 53
+  n_block_x: 1
+  n_block_y: 1

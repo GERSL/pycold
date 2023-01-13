@@ -2,6 +2,8 @@ import numpy as np
 from pycold.ob_analyst import segmentation_floodfill
 from pycold.ob_analyst import object_analysis
 from pycold.ob_analyst import ObjectAnalystHPC
+from pycold.utils import class_from_dict
+from pycold.common import DatasetInfo
 import yaml
 import shutil
 import pathlib
@@ -17,6 +19,7 @@ except NameError:
 
 with open(TEST_RESOURCE_DPATH / 'test_config_obanalyst.yaml', 'r') as yaml_obj:
     test_config = yaml.safe_load(yaml_obj)
+data_info = class_from_dict(DatasetInfo, test_config['DATASETINFO'])
 
 date = 730329
 
@@ -27,7 +30,7 @@ cm_array_l1_date = np.load(TEST_RESOURCE_DPATH / 'cm_maps/CM_date_maps_730297_20
 
 
 def test_workflow():
-    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date,
+    ob_analyst = ObjectAnalystHPC(data_info, starting_date=date,
                                   stack_path=TEST_RESOURCE_DPATH,
                                   result_path=TEST_RESOURCE_DPATH,
                                   thematic_path=TEST_RESOURCE_DPATH / 'feature_maps')
@@ -64,7 +67,7 @@ def test_object_analysis():
 
 
 def test_get_lastyear_cmap_fromdate():
-    ob_analyst = ObjectAnalystHPC(test_config, starting_date=date - 366,
+    ob_analyst = ObjectAnalystHPC(data_info, starting_date=date - 366,
                                   stack_path=TEST_RESOURCE_DPATH,
                                   result_path=TEST_RESOURCE_DPATH,
                                   thematic_path=TEST_RESOURCE_DPATH / 'feature_maps')

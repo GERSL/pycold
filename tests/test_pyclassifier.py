@@ -6,7 +6,8 @@ import joblib
 import pathlib
 from osgeo import gdal_array
 from pycold.pyclassifier import PyClassifierHPC
-from pycold.utils import assemble_array
+from pycold.utils import assemble_array, class_from_dict
+from pycold.common import DatasetInfo
 
 
 # Use this file to determine where the resources are.  If for some reason we
@@ -21,6 +22,7 @@ except NameError:
 
 with open(TEST_RESOURCE_DPATH / 'test_config_pyclassifier.yaml', 'r') as yaml_obj:
     test_config = yaml.safe_load(yaml_obj)
+data_info = class_from_dict(DatasetInfo, test_config['DATASETINFO'])
 
 ref_path = TEST_RESOURCE_DPATH / 'LCMAP_CU_2001_V01_LCPRI_027009_100_100.tif'
 year_lowbound = 2015
@@ -29,12 +31,11 @@ testing_folder = TEST_RESOURCE_DPATH / 'tmp'
 
 
 def test_step1_4():
-    pyclassifier = PyClassifierHPC(test_config,
-                                   record_path=TEST_RESOURCE_DPATH,
-                                   tmp_path=testing_folder,
-                                   output_path=testing_folder,
-                                   year_list_to_predict=list(range(year_lowbound, year_uppbound + 1)),
-                                   seedmap_path=ref_path)
+    pyclassifier = PyClassifierHPC(
+        data_info, record_path=TEST_RESOURCE_DPATH, tmp_path=testing_folder,
+        output_path=testing_folder,
+        year_list_to_predict=list(range(year_lowbound, year_uppbound + 1)),
+        seedmap_path=ref_path)
 
     # delete testing folder if it has
     if os.path.exists(pyclassifier.tmp_path):
@@ -42,7 +43,7 @@ def test_step1_4():
 
     pyclassifier.hpc_preparation()
 
-    for iblock in range(pyclassifier.config['n_blocks']):
+    for iblock in range(data_info.nblocks):
         pyclassifier.step1_feature_generation(iblock + 1)
         for year in range(year_lowbound, year_uppbound + 1):
             assert (pathlib.Path(pyclassifier.tmp_path) /
@@ -51,7 +52,7 @@ def test_step1_4():
     pyclassifier.step2_train_rf(2017)
     assert (pathlib.Path(pyclassifier.output_path) / 'rf.model').exists()
 
-    for iblock in range(pyclassifier.config['n_blocks']):
+    for iblock in range(data_info.nblocks):
         pyclassifier.step3_classification(iblock + 1)
         for year in range(year_lowbound, year_uppbound + 1):
             fname = 'tmp_yearlyclassification{}_block{}.npy'.format(year, iblock + 1)
@@ -67,33 +68,39 @@ def test_step1_4():
 
 
 def test_predict_features():
-    pyclassifier = PyClassifierHPC(test_config, record_path=TEST_RESOURCE_DPATH,
-                                   year_list_to_predict=list(range(year_lowbound, year_uppbound + 1)),
-                                   seedmap_path=ref_path)
+    pyclassifier = PyClassifierHPC(
+        data_info, record_path=TEST_RESOURCE_DPATH,
+        year_list_to_predict=list(range(year_lowbound, year_uppbound + 1)),
+        seedmap_path=ref_path)
     cold_block = np.load(TEST_RESOURCE_DPATH / 'record_change_x1_y1_cold.npy')
-    block_features = pyclassifier.predict_features(1, cold_block, list(range(year_lowbound, year_uppbound + 1)))
-    assert np.shape(block_features) == (6, pyclassifier.config['block_width'] * pyclassifier.config['block_height'],
+    block_features = pyclassifier.predict_features(
+        1, cold_block, list(range(year_lowbound, year_uppbound + 1)))
+    assert np.shape(block_features) == (6, data_info.block_height * data_info.block_width,
                                         21)   # 6 years, 2500 pixels (50, 50), 21 features
 
 
 def test_train_rf_model():
-    pyclassifier = PyClassifierHPC(test_config, record_path=TEST_RESOURCE_DPATH, tmp_path=TEST_RESOURCE_DPATH / 'feature_maps',
-                                   year_list_to_predict=list(range(year_lowbound, year_lowbound + 1)),
-                                   seedmap_path=ref_path)
+    pyclassifier = PyClassifierHPC(
+        data_info, record_path=TEST_RESOURCE_DPATH, tmp_path=TEST_RESOURCE_DPATH / 'feature_maps',
+        year_list_to_predict=list(range(year_lowbound, year_lowbound + 1)),
+        seedmap_path=ref_path)
 
     full_feature_2017 = assemble_array(pyclassifier.get_fullfeature_forcertainyear(2017),
-                                       pyclassifier.config['n_block_x'])
-    rf_model = pyclassifier.train_rfmodel(full_feature_2017, gdal_array.LoadFile(os.fspath(ref_path)))
+                                       data_info.n_block_x)
+    rf_model = pyclassifier.train_rfmodel(
+        full_feature_2017, gdal_array.LoadFile(os.fspath(ref_path)))
     # pyclassifier.save_rf_model(rf_model)
     assert rf_model is not None
 
 
 def test_classification_block():
-    pyclassifier = PyClassifierHPC(test_config, record_path=TEST_RESOURCE_DPATH, tmp_path=TEST_RESOURCE_DPATH / 'feature_maps',
-                                   rf_path=TEST_RESOURCE_DPATH / 'feature_maps/rf.model',
-                                   year_list_to_predict=list(range(year_lowbound, year_lowbound + 1)))
+    pyclassifier = PyClassifierHPC(
+        data_info, record_path=TEST_RESOURCE_DPATH, tmp_path=TEST_RESOURCE_DPATH / 'feature_maps',
+        rf_path=TEST_RESOURCE_DPATH / 'feature_maps/rf.model',
+        year_list_to_predict=list(range(year_lowbound, year_lowbound + 1)))
     rf_model = joblib.load(TEST_RESOURCE_DPATH / 'feature_maps/rf.model')
-    tmp_feature_block = np.load(TEST_RESOURCE_DPATH / 'feature_maps/tmp_feature_year2017_block1.npy')
+    tmp_feature_block = np.load(
+        TEST_RESOURCE_DPATH / 'feature_maps/tmp_feature_year2017_block1.npy')
     cmap = pyclassifier.classification_block(rf_model, tmp_feature_block)
     print(cmap.shape)
     assert cmap.shape == (50, 50)

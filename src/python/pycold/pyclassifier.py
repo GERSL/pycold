@@ -179,7 +179,7 @@ class PyClassifier:
         an array [len(year_list_to_predict), block_width*block_height, n_features]
         """
         block_features = np.full((len(year_list_to_predict),
-                                  self.dataset_info.nblocks,
+                                  self.dataset_info.block_width * self.dataset_info.block_height,
                                   self.n_features),
                                  defaults['COMMON']['NAN_VAL'], dtype=np.float32)
         ordinal_day_list = [dt.date(year, 7, 1).toordinal() for year

@@ -62,7 +62,8 @@ def test_obcold_reconstruct():
     data = read_data(in_path)
     breaks = read_data(break_path)
     dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, sensor = data.copy()  # exclude header
-    cold_result = obcold_reconstruct(dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas, breaks)
+    cold_result = obcold_reconstruct(dates, blues, greens, reds,
+                                     nirs, swir1s, swir2s, thermals, qas, breaks)
     assert cold_result[0]['t_break'] == 735040
     # assert cold_result[0]['num_obs'] == 139
     # assert cold_result[1]['t_end'] == 737352

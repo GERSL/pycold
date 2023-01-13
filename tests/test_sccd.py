@@ -63,6 +63,7 @@ def test_sccd_update():
     assert nrtmodel_dt.itemsize == sccd_pack.nrt_model.dtype.itemsize, (
         'The test data does not correspond to the current code')
 
-    sccd_plot_new = sccd_update(sccd_pack, dates, blues, greens, reds, nirs, swir1s, swir2s, thermals, qas)
+    sccd_plot_new = sccd_update(sccd_pack, dates, blues, greens, reds,
+                                nirs, swir1s, swir2s, thermals, qas)
     assert sccd_plot_new.nrt_model['num_obs'] == 64
     assert sccd_plot_new.nrt_model['obs_date_since1982'][0][3] == 9059
