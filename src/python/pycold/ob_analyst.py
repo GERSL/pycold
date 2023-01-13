@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 # import datetime
 from cv2 import floodFill
 import cv2 as cv2
@@ -1075,7 +1075,7 @@ class ObjectAnalystHPC:
                           img_stack: Optional[np.ndarray] = None,
                           img_dates_sorted: Optional[np.ndarray] = None,
                           logger: Optional[Logger] = None,
-                          conse: int = 6) -> List[Any]:
+                          conse: int = 6) -> Union[List[Any], None]:
         """
         the third step of OBCOLD, it reconstructs the new temporal segment based on the new spatially adjusted break
         Args:
@@ -1106,7 +1106,7 @@ class ObjectAnalystHPC:
         obia_breaks = self.get_allobiaresult_asarray(block_x, block_y)
         result_collect = []
         if img_stack is None or img_dates_sorted is None:
-            return result_collect
+            return None
         for pos in range(self.dataset_info.block_width * self.dataset_info.block_height):
             original_row, original_col = get_rowcol_intile(
                 pos, self.dataset_info.block_width, self.dataset_info.block_height, block_x, block_y
