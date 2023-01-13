@@ -793,7 +793,10 @@ def single_image_stacking(tmp_path: str, source_dir: str, out_dir: str, folder: 
             if b_c2 is False:
                 pathid = int(elements[0].attrib['path'])
             else:
-                pathid = int(elements[0][3].text)
+                if elements[0][3].text is not None:
+                    pathid = int(elements[0][3].text)
+                else:
+                    raise ValueError('path id could not be located.')
             # print(pathid)
 
             # assign filled value to the pixels has different path id so won't be processed

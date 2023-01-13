@@ -1105,6 +1105,8 @@ class ObjectAnalystHPC:
             )
         obia_breaks = self.get_allobiaresult_asarray(block_x, block_y)
         result_collect = []
+        if img_stack is None or img_dates_sorted is None:
+            return result_collect
         for pos in range(self.dataset_info.block_width * self.dataset_info.block_height):
             original_row, original_col = get_rowcol_intile(
                 pos, self.dataset_info.block_width, self.dataset_info.block_height, block_x, block_y
