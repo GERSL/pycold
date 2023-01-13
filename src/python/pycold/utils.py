@@ -2,10 +2,10 @@ import numpy as np
 from datetime import datetime
 import pandas as pd
 from os.path import join
-from dataclasses import dataclass, fields
+from dataclasses import fields
 import os
 import datetime as dt
-from typing import Protocol, Dict
+from typing import Callable, Any
 from osgeo import gdal
 from .app import defaults
 from .common import SccdOutput, nrtqueue_dt, sccd_dt, nrtmodel_dt, DatasetInfo
@@ -555,14 +555,7 @@ def calculate_sccd_cm(sccd_pack):
     return np.median(cm, axis=1)
 
 
-# source: https://stackoverflow.com/questions/54668000/type-hint-for-an-instance-of-a-non-specific-dataclass
-class IsDataclass(Protocol):
-    # as already noted in comments, checking for this attribute is currently
-    # the most reliable way to ascertain that something is a dataclass
-    __dataclass_fields__: Dict
-
-
-def class_from_dict(data_class: IsDataclass, dict_var: dict):
+def class_from_dict(data_class: Callable[..., Any], dict_var: dict):
     """convert dictionary to dataclas
 
     Args:
