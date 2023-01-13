@@ -5,7 +5,7 @@ from os.path import join
 from dataclasses import dataclass, fields
 import os
 import datetime as dt
-from typing import Protocol
+from typing import Protocol, Dict
 from osgeo import gdal
 from .app import defaults
 from .common import SccdOutput, nrtqueue_dt, sccd_dt, nrtmodel_dt, DatasetInfo
