@@ -71,17 +71,21 @@ def extract_features(
         # print(index)
         for idx, cold_curve in enumerate(cold_plot):
             if idx == len(cold_plot) - 1:
-                max_days = cold_plot[idx]['t_end']
+                last_year = pd.Timestamp.fromordinal(cold_plot[idx]['t_end']).year
+                max_days = datetime.date(last_year, 12, 31).toordinal()
             else:
                 max_days = cold_plot[idx + 1]['t_start']
-            break_year = pd.Timestamp.fromordinal(
-                cold_curve['t_break']).year if cold_curve['t_break'] > 0 else -9999
+            break_year = pd.Timestamp.fromordinal(cold_curve['t_break']).year if (
+                cold_curve['t_break'] > 0 and cold_curve['change_prob'] == 100) else -9999
             # ordinal_day_break_july1st = pd.Timestamp.toordinal(datetime.date(break_year, 7, 1))
             # else:
             # ordinal_day_break_july1st = 0
 
             if cold_curve['t_start'] <= ordinal_day < max_days:
                 for n, feature in enumerate(feature_outputs):
+                    if feature not in feature_outputs:
+                        raise Exception(
+                            'the outputted feature must be in [a0, c1, a1, b1,a2, b2, a3, b3, cv, rmse]')
                     if feature == 'a0':
                         features[n][index] = cold_curve['coefs'][band][0] + \
                             cold_curve['coefs'][band][1] * ordinal_day / SLOPE_SCALE
@@ -115,21 +119,26 @@ def extract_features(
                         features[n][index] = cold_curve['coefs'][band][7]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
-                    elif feature == 'cv':
-                        if pd.Timestamp.fromordinal(ordinal_day).year == break_year:
-                            features[n][index] = cold_curve['magnitude'][band]
-                        else:
-                            features[n][index] = 0
-                        if np.isnan(features[n][index]):
-                            features[n][index] = 0
                     elif feature == 'rmse':
                         features[n][index] = cold_curve['rmse'][band]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
-                    else:
-                        raise Exception(
-                            'the outputted feature must be in [a0, c1, a1, b1,a2, b2, a3, b3, cv, rmse]')
+                    # else:
+                    #     raise Exception(
+                    #         'the outputted feature must be in [a0, c1, a1, b1,a2, b2, a3, b3, cv, rmse]')
                 break
+
+    # we have to separately deal with cv
+    if 'cv' in feature_outputs:
+        ordinal_day_years = [pd.Timestamp.fromordinal(day).year for day in ordinal_day_list]
+        for cold_curve in cold_plot:
+            if (cold_curve['t_break'] == 0) or (cold_curve['change_prob'] != 100):
+                continue
+            break_year = pd.Timestamp.fromordinal(cold_curve['t_break']).year
+            if break_year in ordinal_day_years:
+                features[feature_outputs.index('cv')][ordinal_day_years.index(
+                    break_year)] = cold_curve['magnitude'][band]
+
     return features
 
 
