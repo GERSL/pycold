@@ -513,7 +513,7 @@ def process_one_coco_image(coco_image, config, out_dir):
     
     if mode == 'ASI':
         Scale = 10000
-        fill_value = -9999
+        fill_value = 0
         B1 = im_data[:, :, 0]
         B2 = im_data[:, :, 1]
         B3 = im_data[:, :, 2]
@@ -529,9 +529,9 @@ def process_one_coco_image(coco_image, config, out_dir):
                         )
         
         # Calculating ASI
-        ASI = artificial_surface_index(B1, B2, B3, B4, B5, B6, Scale, MaskValid_Obs, fill_value)
+        ASI = artificial_surface_index(B1.astype(np.float32), B2.astype(np.float32), B3.astype(np.float32), B4.astype(np.float32), B5.astype(np.float32), B6.astype(np.float32), Scale, MaskValid_Obs, fill_value)
         # Get land mask.        
-        MNDWI = (B2 - B5) / (B2 + B5) + 0.000001
+        MNDWI = (B2 - B5) / (B2 + B5)
         MNDWI, MaskValid_MNDWI = hist_cut(MNDWI, MaskValid_Obs, fill_value, 6, [-1, 1])
         Water_Th = 0; # Water threshold for MNDWI (may need to be adjusted for different study areas).
         MaskLand = (MNDWI<Water_Th)
@@ -544,7 +544,9 @@ def process_one_coco_image(coco_image, config, out_dir):
         # Exclude water pixels.
         ASI[~MaskLand] = fill_value
         ASI = ASI.reshape(ASI.shape[0], ASI.shape[1], 1)
-        data = np.concatenate([im_data[:,:,1:5], ASI, qa_unpacked], axis=2)
+        false_band = np.full((ASI.shape[0], ASI.shape[1], 1), 0)
+        # input for Hybrid-COLD (with ASI) = B2, B3, B4, B5, B6, ASI
+        data = np.concatenate([im_data[:,:,1:6], ASI, false_band, qa_unpacked], axis=2)
 
     else:
         data = np.concatenate([im_data, qa_unpacked], axis=2)
