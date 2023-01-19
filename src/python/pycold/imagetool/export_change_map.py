@@ -138,7 +138,7 @@ def extract_features(
                 break_year = pd.Timestamp.fromordinal(cold_curve['t_break']).year
                 if break_year == ordinal_year:
                     features[feature_outputs.index('cv')][index] = cold_curve['magnitude'][band]
-                    continue
+                    break
 
     return features
 
