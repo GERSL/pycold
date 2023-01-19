@@ -128,16 +128,17 @@ def extract_features(
                     #         'the outputted feature must be in [a0, c1, a1, b1,a2, b2, a3, b3, cv, rmse]')
                 break
 
-    # we have to separately deal with cv
+    # we have to separately deal with cv. dirty solution
     if 'cv' in feature_outputs:
         ordinal_day_years = [pd.Timestamp.fromordinal(day).year for day in ordinal_day_list]
-        for cold_curve in cold_plot:
-            if (cold_curve['t_break'] == 0) or (cold_curve['change_prob'] != 100):
-                continue
-            break_year = pd.Timestamp.fromordinal(cold_curve['t_break']).year
-            if break_year in ordinal_day_years:
-                features[feature_outputs.index('cv')][ordinal_day_years.index(
-                    break_year)] = cold_curve['magnitude'][band]
+        for index, ordinal_year in enumerate(ordinal_day_years):
+            for cold_curve in cold_plot:
+                if (cold_curve['t_break'] == 0) or (cold_curve['change_prob'] != 100):
+                    continue
+                break_year = pd.Timestamp.fromordinal(cold_curve['t_break']).year
+                if break_year == ordinal_year:
+                    features[feature_outputs.index('cv')][index] = cold_curve['magnitude'][band]
+                    continue
 
     return features
 
