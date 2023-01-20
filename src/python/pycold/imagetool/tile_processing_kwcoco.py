@@ -17,7 +17,7 @@ from scipy.stats import chi2
 import ubelt as ub
 import pycold
 from pycold import cold_detect, sccd_detect
-from pycold.utils import get_rowcol_intile, get_doy, assemble_cmmaps, unindex_sccdpack, class_from_dict
+from pycold.utils import get_rowcol_intile, get_doy, assemble_cmmaps, unindex_sccdpack
 from pycold.ob_analyst import ObjectAnalystHPC
 from pycold.pyclassifier import PyClassifierHPC
 from pycold.app import defaults
