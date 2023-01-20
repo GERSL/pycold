@@ -149,9 +149,7 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, timestamp, feat
                     elif feature == 'rmse':
                         features[n][index] = cold_curve['rmse'][band]
                         if np.isnan(features[n][index]):
-                            features[n][index] = 0
-                    else:
-                        raise Exception('the outputted feature must be in [a0, c1, a1, b1, a2, b2, a3, b3, CV, rmse]')
+                            features[n][index] = 0                    
                 break
 
         if 'cv' in feature_outputs:
@@ -389,72 +387,72 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
                     np.save(outfile, results_block[day])
                 continue
 
-            cold_block = np.array(np.load(os.path.join(reccg_path, filename)), dtype=dt)
+          cold_block = np.array(np.load(os.path.join(reccg_path, filename)), dtype=dt)
 
-            cold_block.sort(order='pos')
-            current_processing_pos = cold_block[0]['pos']
-            current_dist_type = 0
+          cold_block.sort(order='pos')
+          current_processing_pos = cold_block[0]['pos']
+          current_dist_type = 0
 
-            for count, curve in enumerate(cold_block):
-                if curve['pos'] != current_processing_pos:
-                    current_processing_pos = curve['pos']
-                    current_dist_type = 0
+          for count, curve in enumerate(cold_block):
+              if curve['pos'] != current_processing_pos:
+                  current_processing_pos = curve['pos']
+                  current_dist_type = 0
 
-                if curve['change_prob'] < 100 or curve['t_break'] == 0 or count == (len(cold_block) - 1):  # last segment
-                    continue
+              if curve['change_prob'] < 100 or curve['t_break'] == 0 or count == (len(cold_block) - 1):  # last segment
+                  continue
 
-                i_col = int((curve["pos"] - 1) % config['n_cols']) - \
-                        (current_block_x - 1) * config['block_width']
-                i_row = int((curve["pos"] - 1) / config['n_cols']) - \
-                        (current_block_y - 1) * config['block_height']
-                if i_col < 0:
-                    dat_pth = '?'
-                    print('Processing {} failed: i_row={}; i_col={} for {}'.format(filename, i_row, i_col, dat_pth))
-                    return
+              i_col = int((curve["pos"] - 1) % config['n_cols']) - \
+                      (current_block_x - 1) * config['block_width']
+              i_row = int((curve["pos"] - 1) / config['n_cols']) - \
+                      (current_block_y - 1) * config['block_height']
+              if i_col < 0:
+                  dat_pth = '?'
+                  print('Processing {} failed: i_row={}; i_col={} for {}'.format(filename, i_row, i_col, dat_pth))
+                  return
 
-                if method == 'OBCOLD':
-                    current_dist_type = getcategory_obcold(cold_block, count, current_dist_type)
-                else:
-                    current_dist_type = getcategory_cold(cold_block, count)
-                break_year = pd.Timestamp.fromordinal(curve['t_break']).year
-                if break_year < year_lowbound or break_year > year_highbound:
-                    continue
-                results_block[break_year - year_lowbound][i_row][i_col] = current_dist_type * 1000 + curve['t_break'] - \
-                    (pd.Timestamp.toordinal(datetime.date(break_year, 1, 1))) + 1
+              if method == 'OBCOLD':
+                  current_dist_type = getcategory_obcold(cold_block, count, current_dist_type)
+              else:
+                  current_dist_type = getcategory_cold(cold_block, count)
+              break_year = pd.Timestamp.fromordinal(curve['t_break']).year
+              if break_year < year_lowbound or break_year > year_highbound:
+                  continue
+              results_block[break_year - year_lowbound][i_row][i_col] = current_dist_type * 1000 + curve['t_break'] - \
+                  (pd.Timestamp.toordinal(datetime.date(break_year, 1, 1))) + 1
 
-            if coefs is not None:
-                cold_block_split = np.split(cold_block, np.argwhere(np.diff(cold_block['pos']) != 0)[:, 0] + 1)
-                for element in cold_block_split:
-                    # the relative column number in the block
-                    i_col = int((element[0]["pos"] - 1) % config['n_cols']) - \
-                            (current_block_x - 1) * config['block_width']
-                    i_row = int((element[0]["pos"] - 1) / config['n_cols']) - \
-                            (current_block_y - 1) * config['block_height']
+          if coefs is not None:
+              cold_block_split = np.split(cold_block, np.argwhere(np.diff(cold_block['pos']) != 0)[:, 0] + 1)
+              for element in cold_block_split:
+                  # the relative column number in the block
+                  i_col = int((element[0]["pos"] - 1) % config['n_cols']) - \
+                          (current_block_x - 1) * config['block_width']
+                  i_row = int((element[0]["pos"] - 1) / config['n_cols']) - \
+                          (current_block_y - 1) * config['block_height']
 
-                    for band_idx, band in enumerate(coefs_bands):
-                        feature_row = extract_features(element, band, ordinal_day_list, -9999, timestamp,
-                                                       feature_outputs=coefs)
-                        for index, coef in enumerate(coefs):
-                            results_block_coefs[i_row][i_col][index + band_idx * len(coefs)][:] = \
-                                feature_row[index]
-            # e.g., 1315 means that disturbance happens at doy of 315
-            # save the temp dataset out
-            if timestamp == False:
-                for year in range(year_lowbound, year_highbound + 1):
-                    outfile = os.path.join(out_path,
-                                           'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
-                    np.save(outfile, results_block[year - year_lowbound])
-                    if coefs is not None:
-                        outfile = os.path.join(out_path,
-                                               'tmp_coefmap_block{}_{}.npy'.format(iblock + 1, year))
-                        np.save(outfile, results_block_coefs[:, :, :, year - year_lowbound])
-            else:
-                for day in range(len(ordinal_day_list)):
-                    if coefs is not None:
-                        outfile = os.path.join(out_path,
-                                               'tmp_coefmap_block{}_{}.npy'.format(iblock + 1,
-                                                                                   ordinal_day_list[day]))
-                        np.save(outfile, results_block_coefs[:, :, :, day])
+                  for band_idx, band in enumerate(coefs_bands):
+                      feature_row = extract_features(element, band, ordinal_day_list, -9999, timestamp,
+                                                     feature_outputs=coefs)
+                      for index, coef in enumerate(coefs):
+                          results_block_coefs[i_row][i_col][index + band_idx * len(coefs)][:] = \
+                              feature_row[index]
+          # e.g., 1315 means that disturbance happens at doy of 315
+          # save the temp dataset out
+          if timestamp == False:
+              for year in range(year_lowbound, year_highbound + 1):
+                  outfile = os.path.join(out_path,
+                                         'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
+                  np.save(outfile, results_block[year - year_lowbound])
+                  if coefs is not None:
+                      outfile = os.path.join(out_path,
+                                             'tmp_coefmap_block{}_{}.npy'.format(iblock + 1, year))
+                      np.save(outfile, results_block_coefs[:, :, :, year - year_lowbound])
+          else:
+              for day in range(len(ordinal_day_list)):
+                  if coefs is not None:
+                      outfile = os.path.join(out_path,
+                                             'tmp_coefmap_block{}_{}.npy'.format(iblock + 1,
+                                                                                 ordinal_day_list[day]))
+                      np.save(outfile, results_block_coefs[:, :, :, day])
 
     # MPI mode (wait for all processes)
     # comm.Barrier()
@@ -591,7 +589,7 @@ if __name__ == '__main__':
     reference_path = "~/kwcoco/US_C000_ref.tif"
     yaml_path = "~/pycold-uconnhpc/config_watch.yaml"
     coefs = ['cv']
-    band_names = [0, 1, 2, 3, 4, 5, 6]
+    band_names = [0, 1, 2, 3, 4, 5]
     year_lowbound = 2017
     year_highbound = 2021
     coefs_bands = [5]
