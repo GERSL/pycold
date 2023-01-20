@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from osgeo import gdal
 from osgeo import gdal_array
-import click
+# import click
 import datetime as datetime
 from os.path import join
 import json
@@ -80,7 +80,7 @@ BAND_INFO = {0: 'blue',
 
 # copy from /pycold/src/python/pycold/pyclassifier.py because MPI has conflicts with the pycold package in UCONN HPC.
 # Dirty approach!
-def extract_features(cold_plot, band, ordinal_day_list, nan_val, feature_outputs=['a0', 'a1', 'b1'], timestamp):
+def extract_features(cold_plot, band, ordinal_day_list, nan_val, timestamp, feature_outputs=['a0', 'a1', 'b1']):
     """
     generate features for classification based on a plot-based rec_cg and a list of days to be predicted
     Parameters
@@ -103,17 +103,16 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, feature_outputs
     for index, ordinal_day in enumerate(ordinal_day_list):
         for idx, cold_curve in enumerate(cold_plot):
             if idx == len(cold_plot) - 1:
-                max_days = cold_plot[idx]['t_end']
+                last_year = pd.Timestamp.fromordinal(cold_plot[idx]['t_end']).year
+                max_days = datetime.date(last_year, 12, 31).toordinal()
             else:
                 max_days = cold_plot[idx + 1]['t_start']
-            if cold_curve['t_break'] > 0:
-                break_year = pd.Timestamp.fromordinal(cold_curve['t_break']).year
-                ordinal_day_break_july1st = pd.Timestamp.toordinal(datetime.date(break_year, 7, 1))
-            else:
-                ordinal_day_break_july1st = 0
+            break_year = pd.Timestamp.fromordinal(cold_curve['t_break']).year if(cold_curve['t_break'] > 0 and cold_curve['change_prob'] == 100) else -9999
 
             if cold_curve['t_start'] <= ordinal_day < max_days:
                 for n, feature in enumerate(feature_outputs):
+                    if feature not in feature_outputs:
+                        raise Exception('the outputted feature must be in [a0, c1, a1, b1,a2, b2, a3, b3, cv, rmse]')
                     if feature == 'a0':
                         features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][band][1] * \
                                              ordinal_day / SLOPE_SCALE
@@ -147,21 +146,6 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, feature_outputs
                         features[n][index] = cold_curve['coefs'][band][7]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
-                    elif feature == 'cv':
-                        if timestamp == True:
-                            if ordinal_day == ordinal_day_break_july1st:
-                                features[n][index] = cold_curve['magnitude'][band]
-                            else:
-                                features[n][index] = 0
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0                        
-                        else:                        
-                            if ordinal_day == cold_curve['t_break']:
-                                features[n][index] = cold_curve['magnitude'][band]
-                            else:
-                                features[n][index] = 0
-                            if np.isnan(features[n][index]):
-                                features[n][index] = 0
                     elif feature == 'rmse':
                         features[n][index] = cold_curve['rmse'][band]
                         if np.isnan(features[n][index]):
@@ -169,6 +153,18 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, feature_outputs
                     else:
                         raise Exception('the outputted feature must be in [a0, c1, a1, b1, a2, b2, a3, b3, CV, rmse]')
                 break
+
+        if 'cv' in feature_outputs:
+            ordinal_day_years = [pd.Timestamp.fromordinal(day).year for day in ordinal_day_list]
+            for index, ordinal_year in enumerate(ordinal_day_years):
+                for cold_curve in cold_plot:
+                    if (cold_curve['t_break'] == 0) or (cold_curve['change_prob'] != 100):
+                        continue
+                    break_year = pd.Timestamp.fromordinal(cold_curve['t_break']).year
+                    if break_year == ordinal_year:
+                        features[feature_outputs.index('cv')][index] = cold_curve['magnitude'][band]
+                        continue
+
     return features
 
 
@@ -185,6 +181,31 @@ def getcategory_cold(cold_plot, i_curve):
     else:
         return 1  # land disturbance
 
+def getcategory_obcold(cold_plot, i_curve, last_dist_type):
+    t_c = -250
+    if cold_plot[i_curve]['magnitude'][3] > t_c and cold_plot[i_curve]['magnitude'][2] < -t_c and \
+            cold_plot[i_curve]['magnitude'][4] < -t_c:
+        if cold_plot[i_curve + 1]['coefs'][3, 1] > np.abs(cold_plot[i_curve]['coefs'][3, 1]) and \
+                cold_plot[i_curve + 1]['coefs'][2, 1] < -np.abs(cold_plot[i_curve]['coefs'][2, 1]) and \
+                cold_plot[i_curve + 1]['coefs'][4, 1] < -np.abs(cold_plot[i_curve]['coefs'][4, 1]):
+            return 3  # aforestation
+        else:
+            return 2  # regrowth
+    else:
+        if i_curve > 0:
+            if (cold_plot[i_curve]['t_break'] - cold_plot[i_curve - 1]['t_break'] > 365.25 * 5) or (
+                    last_dist_type != 1):
+                return 1
+            flip_count = 0
+            for b in range(5):
+                if cold_plot[i_curve]['magnitude'][b + 1] * cold_plot[i_curve - 1]['magnitude'][b + 1] < 0:
+                    flip_count = flip_count + 1
+            if flip_count >= 4:
+                return 4
+            else:
+                return 1
+        else:
+            return 1  # land disturbance
 
 # @click.command()
 # @click.option('--reccg_path', type=str, help='rec_cg folder')
@@ -205,15 +226,22 @@ def getcategory_cold(cold_plot, i_curve):
 #                                                                                   'False: exporting cold result by year'
 #                                                                                   'Default is False')
 
-def main(stack_path, reccg_path, reference_path, out_path, method, region, probability, year_lowbound, year_highbound, yaml_path, coefs, coefs_bands, timestamp=False):
+def main(stack_path, reccg_path, reference_path, out_path, method, region, probability, conse, year_lowbound,
+         year_highbound, coefs, coefs_bands, timestamp):
 # def main():
 
     ## MPI mode
     # comm = MPI.COMM_WORLD
     # rank = comm.Get_rank()
     # n_process = comm.Get_size()
-    
-    if method == 'COLD':
+    if method == 'OBCOLD':
+        reccg_path = os.path.join(reccg_path, 'obcold')
+        if timestamp == True:
+            out_path = os.path.join(out_path, 'obcold_maps', 'by_timestamp')
+        else:
+            out_path = os.path.join(out_path, 'obcold_maps', 'by_year')
+
+    elif method == 'COLD' or method == 'HybridCOLD':
         if timestamp == True:
             out_path = os.path.join(out_path, 'cold_maps', 'by_timestamp')
         else:
@@ -231,17 +259,16 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
         except:
             print("Illegal coefs_bands inputs: example, --coefs_bands='0, 1, 2, 3, 4, 5, 6'")
 
-    if method == 'COLD':
-        dt = np.dtype([('t_start', np.int32),
-                       ('t_end', np.int32),
-                       ('t_break', np.int32),
-                       ('pos', np.int32),
-                       ('num_obs', np.int32),
-                       ('category', np.short),
-                       ('change_prob', np.short),
-                       ('coefs', np.float32, (7, 8)),   # note that the slope coefficient was scaled up by 10000
-                       ('rmse', np.float32, 7),
-                       ('magnitude', np.float32, 7)])
+    dt = np.dtype([('t_start', np.int32),
+                   ('t_end', np.int32),
+                   ('t_break', np.int32),
+                   ('pos', np.int32),
+                   ('num_obs', np.int32),
+                   ('category', np.short),
+                   ('change_prob', np.short),
+                   ('coefs', np.float32, (7, 8)),   # note that the slope coefficient was scaled up by 10000
+                   ('rmse', np.float32, 7),
+                   ('magnitude', np.float32, 7)])
 
     if coefs is not None:
         assert all(elem in coef_names for elem in coefs)
@@ -251,14 +278,14 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
         if not os.path.exists(out_path):
             os.makedirs(out_path)
 
-        with open(yaml_path, 'r') as yaml_obj:
-            config = yaml.safe_load(yaml_obj)
+        # with open(yaml_path, 'r') as yaml_obj:
+        #     config = yaml.safe_load(yaml_obj)
 
-        # config = {'n_block_x': 20,
-        #           'n_block_y': 20,
-        #           'padded_n_cols': 660,
-        #           'padded_n_rows': 780
-        # }
+        config = {'n_block_x': 20,
+                  'n_block_y': 20,
+                  'padded_n_cols': 660,
+                  'padded_n_rows': 780
+        }
 
         config['block_width'] = int(config['n_cols'] / config['n_block_x'])  # width of a block
         config['block_height'] = int(config['n_rows'] / config['n_block_y'])  # height of a block
@@ -291,12 +318,34 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
             break
         current_block_y = int(np.floor(iblock / config['n_block_x'])) + 1
         current_block_x = iblock % config['n_block_x'] + 1
+        if method == 'OBCOLD':
+            filename = 'record_change_x{}_y{}_obcold.npy'.format(current_block_x, current_block_y)
+        elif method == 'COLD':
+            filename = 'record_change_x{}_y{}_cold.npy'.format(current_block_x, current_block_y)
+        elif method == 'HybridCOLD':
+            filename = 'record_change_x{}_y{}_hybridcold.npy'.format(current_block_x, current_block_y)
 
         block_folder = os.path.join(stack_path, 'block_x{}_y{}'.format(current_block_x, current_block_y))
-        year_list_to_predict = list(range(year_lowbound, year_highbound + 1))
+
         if timestamp == False:
+            year_list_to_predict = list(range(year_lowbound, year_highbound + 1))
             ordinal_day_list = [pd.Timestamp.toordinal(datetime.date(year, 7, 1)) for year
                                 in year_list_to_predict]
+            results_block = [np.full((config['block_height'], config['block_width']), -9999, dtype=np.int16)
+                             for t in range(year_highbound - year_lowbound + 1)]
+            if coefs is not None:
+                results_block_coefs = np.full(
+                    (config['block_height'], config['block_width'], len(coefs) * len(coefs_bands),
+                     year_highbound - year_lowbound + 1), -9999, dtype=np.float32)
+
+            print('processing the rec_cg file {}'.format(os.path.join(reccg_path, filename)))
+            if not os.path.exists(os.path.join(reccg_path, filename)):
+                print('the rec_cg file {} is missing'.format(os.path.join(reccg_path, filename)))
+                for year in range(year_lowbound, year_highbound + 1):
+                    print(outfile)
+                    outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
+                    np.save(outfile, results_block[year - year_lowbound])
+                continue
         else:
             meta_files = [m for m in os.listdir(block_folder) if m.endswith('.json')]
 
@@ -321,43 +370,26 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
                 year_high_ordinal = pd.Timestamp.toordinal(datetime.datetime(int(year_highbound + 1), 1, 1))
                 img_dates, img_files = zip(*filter(lambda x: x[0] < year_high_ordinal,
                                                    zip(img_dates, img_files)))
-            
+            img_dates = sorted(img_dates)
             ordinal_day_list = img_dates
-        
-        if method == 'COLD':
-            filename = 'record_change_x{}_y{}_cold.npy'.format(current_block_x, current_block_y)
-
-        if timestamp == False:
-            results_block = [np.full((config['block_height'], config['block_width']), -9999, dtype=np.int16)
-                             for t in range(year_highbound - year_lowbound + 1)]
-        else:
             results_block = [np.full((config['block_height'], config['block_width']), -9999, dtype=np.int16)
                              for t in range(len(ordinal_day_list))]
-        if coefs is not None:
-            if timestamp == False:
-                results_block_coefs = np.full((config['block_height'], config['block_width'], len(coefs) * len(coefs_bands),
-                                               year_highbound - year_lowbound + 1), -9999, dtype=np.float32)
-            else:
-                results_block_coefs = np.full((config['block_height'], config['block_width'], len(coefs) * len(coefs_bands),
-                                               len(ordinal_day_list)), -9999, dtype=np.float32)
 
-        print('processing the rec_cg file {}'.format(os.path.join(reccg_path, filename)))
+            if coefs is not None:
+                results_block_coefs = np.full(
+                    (config['block_height'], config['block_width'], len(coefs) * len(coefs_bands),
+                     len(ordinal_day_list)), -9999, dtype=np.float32)
 
-        if not os.path.exists(os.path.join(reccg_path, filename)):
-            print('the rec_cg file {} is missing'.format(os.path.join(reccg_path, filename)))
+            print('processing the rec_cg file {}'.format(os.path.join(reccg_path, filename)))
+            if not os.path.exists(os.path.join(reccg_path, filename)):
+                print('the rec_cg file {} is missing'.format(os.path.join(reccg_path, filename)))
 
-            if timestamp == False:
-                for year in range(year_lowbound, year_highbound + 1):
-                    outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
-                    np.save(outfile, results_block[year - year_lowbound])
-
-            else:
                 for day in range(len(ordinal_day_list)):
                     outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, ordinal_day_list[day]))
+                    # if not os.path.exists(outfile):
                     np.save(outfile, results_block[day])
                 continue
 
-        if method == 'COLD':
             cold_block = np.array(np.load(os.path.join(reccg_path, filename)), dtype=dt)
 
             cold_block.sort(order='pos')
@@ -381,24 +413,15 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
                     print('Processing {} failed: i_row={}; i_col={} for {}'.format(filename, i_row, i_col, dat_pth))
                     return
 
-                if method == 'COLD':
+                if method == 'OBCOLD':
+                    current_dist_type = getcategory_obcold(cold_block, count, current_dist_type)
+                else:
                     current_dist_type = getcategory_cold(cold_block, count)
                 break_year = pd.Timestamp.fromordinal(curve['t_break']).year
                 if break_year < year_lowbound or break_year > year_highbound:
                     continue
                 results_block[break_year - year_lowbound][i_row][i_col] = current_dist_type * 1000 + curve['t_break'] - \
                     (pd.Timestamp.toordinal(datetime.date(break_year, 1, 1))) + 1
-                # e.g., 1315 means that disturbance happens at doy of 315
-                # save the temp dataset out
-                if timestamp == False:
-                    for year in range(year_lowbound, year_highbound + 1):
-                        outfile = os.path.join(out_path,
-                                               'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
-                        np.save(outfile, results_block[year - year_lowbound])
-                else:
-                    for day in range(len(ordinal_day_list)):
-                        outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, ordinal_day_list[day]))
-                        np.save(outfile, results_block[day])
 
             if coefs is not None:
                 cold_block_split = np.split(cold_block, np.argwhere(np.diff(cold_block['pos']) != 0)[:, 0] + 1)
@@ -410,27 +433,30 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
                             (current_block_y - 1) * config['block_height']
 
                     for band_idx, band in enumerate(coefs_bands):
-                        feature_row = extract_features(element, band, ordinal_day_list, -9999,
-                                                       feature_outputs=coefs, timestamp)
+                        feature_row = extract_features(element, band, ordinal_day_list, -9999, timestamp,
+                                                       feature_outputs=coefs)
                         for index, coef in enumerate(coefs):
                             results_block_coefs[i_row][i_col][index + band_idx * len(coefs)][:] = \
                                 feature_row[index]
-
+            # e.g., 1315 means that disturbance happens at doy of 315
             # save the temp dataset out
             if timestamp == False:
                 for year in range(year_lowbound, year_highbound + 1):
-                    outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
+                    outfile = os.path.join(out_path,
+                                           'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
                     np.save(outfile, results_block[year - year_lowbound])
                     if coefs is not None:
                         outfile = os.path.join(out_path,
                                                'tmp_coefmap_block{}_{}.npy'.format(iblock + 1, year))
-                        np.save(outfile, results_block_coefs[:, :, :, year])
+                        np.save(outfile, results_block_coefs[:, :, :, year - year_lowbound])
             else:
                 for day in range(len(ordinal_day_list)):
-                    outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, ordinal_day_list[day]))
-                    np.save(outfile, results_block[day])
+                    # outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, ordinal_day_list[day]))
+                    # np.save(outfile, results_block[day])
                     if coefs is not None:
-                        outfile = os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(iblock + 1, ordinal_day_list[day]))
+                        outfile = os.path.join(out_path,
+                                               'tmp_coefmap_block{}_{}.npy'.format(iblock + 1,
+                                                                                   ordinal_day_list[day]))
                         np.save(outfile, results_block_coefs[:, :, :, day])
 
     # MPI mode (wait for all processes)
@@ -438,37 +464,78 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
 
     if rank == 0:
         # assemble
-        print(len(ordinal_day_list))
-        for year in range(len(ordinal_day_list)):
-            tmp_map_blocks = [np.load(os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(x + 1, ordinal_day_list[year])))
-                              for x in range(config['n_blocks'])]
-            results = np.hstack(tmp_map_blocks)
-            results = np.vstack(np.hsplit(results, config['n_block_x']))
-            for x in range(config['n_blocks']):
-                os.remove(os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(x + 1, ordinal_day_list[year])))        
+        if timestamp is False:
+            for year in range(year_lowbound, year_highbound + 1):
+                tmp_map_blocks = [np.load(os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(x + 1, year)))
+                                  for x in range(config['n_blocks'])]
 
-        if coefs is not None:
-            if timestamp == False:
+                results = np.hstack(tmp_map_blocks)
+                results = np.vstack(np.hsplit(results, config['n_block_x']))
+
+                for x in range(config['n_blocks']):
+                    os.remove(os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(x + 1, year)))
+                outname = '%s_%s_prob_%s_conse_%s_%s_break_map.tif' % (region, method, probability, conse, year)
+                outfile = os.path.join(out_path, outname)
+                outdriver1 = gdal.GetDriverByName("GTiff")
+                outdata = outdriver1.Create(outfile, vid_w, vid_h, 1, gdal.GDT_Int16)
+                outdata.GetRasterBand(1).WriteArray(results[:vid_h, :vid_w])
+                outdata.FlushCache()
+                outdata.SetGeoTransform(new_gdal_transform)
+                outdata.FlushCache()
+                outdata.SetProjection(proj)
+                outdata.FlushCache()
+
+            # output recent disturbance year
+            recent_dist = np.full((vid_h, vid_w), 0, dtype=np.int16)
+            for year in range(year_lowbound, year_highbound + 1):
+                outname = '%s_%s_prob_%s_conse_%s_%s_break_map.tif' % (region, method, probability, conse, year)
+                breakmap = gdal_array.LoadFile(os.path.join(out_path, outname))  # 4 digit array (type + doy) lamda
+                # monthmap = breakmap % 1000 # need funtion converting doy to month
+                recent_dist[
+                    (breakmap / 1000).astype(np.byte) == 1] = year  # monthmap[(breakmap / 1000).astype(np.byte) == 1]
+            outname = "%s_%s_prob_%s_conse_%s_recent_disturbance_map.tif" % (region, method, probability, conse)
+            outfile = os.path.join(out_path, outname)
+            outdriver1 = gdal.GetDriverByName("GTiff")
+            outdata = outdriver1.Create(outfile, vid_w, vid_h, 1, gdal.GDT_Int16)
+            outdata.GetRasterBand(1).WriteArray(recent_dist[:vid_h, :vid_w])
+            outdata.FlushCache()
+            outdata.SetGeoTransform(new_gdal_transform)
+            outdata.FlushCache()
+            outdata.SetProjection(proj)
+            outdata.FlushCache()
+
+            first_dist = np.full((vid_h, vid_w), 0, dtype=np.int16)
+            for year in range(year_highbound, year_lowbound - 1, -1):
+                outname = '%s_%s_prob_%s_conse_%s_%s_break_map.tif' % (region, method, probability, conse, year)
+                breakmap = gdal_array.LoadFile(os.path.join(out_path, outname))
+                first_dist[(breakmap / 1000).astype(np.byte) == 1] = year
+            outname = "%s_%s_prob_%s_conse_%s_first_disturbance_map.tif" % (region, method, probability, conse)
+            outfile = os.path.join(out_path, outname)
+            outdriver1 = gdal.GetDriverByName("GTiff")
+            outdata = outdriver1.Create(outfile, vid_w, vid_h, 1, gdal.GDT_Int16)
+            outdata.GetRasterBand(1).WriteArray(first_dist[:vid_h, :vid_w])
+            outdata.FlushCache()
+            outdata.SetGeoTransform(new_gdal_transform)
+            outdata.FlushCache()
+            outdata.SetProjection(proj)
+            outdata.FlushCache()
+
+            if coefs is not None:
                 for year in range(year_lowbound, year_highbound + 1):
-                    tmp_map_blocks = [np.load(
-                        os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(x + 1, year)))
+                    tmp_map_blocks = [np.load(os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(x + 1, year)))
                                       for x in range(config['n_blocks'])]
-            else:
-                for year in range(len(ordinal_day_list)):
-                    tmp_map_blocks = [np.load(os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(x + 1, ordinal_day_list[year])))
-                                      for x in range(config['n_blocks'])]
-
                     results = np.hstack(tmp_map_blocks)
                     results = np.vstack(np.hsplit(results, config['n_block_x']))
                     ninput = 0
                     for band_idx, band_name in enumerate(coefs_bands):
                         for coef_index, coef in enumerate(coefs):
-
                             # FIXME: Best name for outputs...?
-                            date = str(datetime.date.fromordinal(ordinal_day_list[year]))
                             band = BAND_INFO[band_name]
-                            prob = method + '_prob_' + str(probability)
-                            outname = '%s_%s_%s_%s_%s.tif'%(region, prob, date, band, coef)#.format(mode_string, method, band_name, coef)
+                            if coef == 'cv':
+                                results[results == -9999.0] = 0
+                            outname = '%s_%s_prob_%s_conse_%s_%s_%s_%s.tif' % (
+                            region, method, probability, conse, year, band,
+                            coef)  # .format(mode_string, method, band_name, coef)
                             outfile = os.path.join(out_path, outname)
                             outdriver1 = gdal.GetDriverByName("GTiff")
                             outdata = outdriver1.Create(outfile, vid_w, vid_h, 1, gdal.GDT_Float32)
@@ -480,48 +547,40 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
                             outdata.FlushCache()
                             ninput = ninput + 1
                     for x in range(config['n_blocks']):
-                        os.remove(os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(x + 1, ordinal_day_list[year])))
+                        os.remove(
+                            os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(x + 1, year)))
 
-            else:                
-                # output recent disturbance year
-                # recent_dist = np.full((config['n_rows'], config['n_cols']), 0, dtype=np.int16)
-                # recent_dist = np.full((vid_h, vid_w), 0, dtype=np.int16)
-                # for year in range(year_lowbound, year_highbound + 1):
-                #     mode_string = str(year) + '_break_map'
-                #     outname = '{}_{}_{}.tif'.format(mode_string, region, probability)
-                #     breakmap = gdal_array.LoadFile(os.path.join(out_path, outname)) # 4 digit array (type + doy) lamda
-                #     #monthmap = breakmap % 1000 # need funtion converting doy to month
-                #     recent_dist[(breakmap / 1000).astype(np.byte) == 1] = year # monthmap[(breakmap / 1000).astype(np.byte) == 1]
-                # mode_string = 'recent_disturbance_map'
-                # outname = '{}_{}_{}.tif'.format(mode_string, region, probability)
-                # outfile = os.path.join(out_path, outname)
-                # outdriver1 = gdal.GetDriverByName("GTiff")
-                # outdata = outdriver1.Create(outfile, vid_w, vid_h, 1, gdal.GDT_Int16)
-                # outdata.GetRasterBand(1).WriteArray(recent_dist[:vid_h, :vid_w])
-                # outdata.FlushCache()
-                # outdata.SetGeoTransform(new_gdal_transform)
-                # outdata.FlushCache()
-                # outdata.SetProjection(proj)
-                # outdata.FlushCache()
+        else:
+            if coefs is not None:
+                for day in range(len(ordinal_day_list)):
+                    tmp_map_blocks = [np.load(
+                        os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(x + 1, ordinal_day_list[day])))
+                        for x in range(config['n_blocks'])]
 
-                # first_dist = np.full((config['n_rows'], config['n_cols']), 0, dtype=np.int16)
-                # for year in range(year_highbound, year_lowbound - 1, -1):
-                #     mode_string = str(year) + '_break_map'
-                #     outname = '{}_{}.tif'.format(mode_string, method)
-                #     breakmap = gdal_array.LoadFile(os.path.join(out_path, outname))
-                #     first_dist[(breakmap / 1000).astype(np.byte) == 1] = year
-                # mode_string = 'first_disturbance_map'
-                # outname = '{}_{}.tif'.format(mode_string, method)
-                # outfile = os.path.join(out_path, outname)
-                # outdriver1 = gdal.GetDriverByName("GTiff")
-                # outdata = outdriver1.Create(outfile, cols, rows, 1, gdal.GDT_Int16) 
-                # outdata.GetRasterBand(1).WriteArray(first_dist)
-                # outdata.FlushCache()
-                # outdata.SetGeoTransform(trans)
-                # outdata.FlushCache()
-                # outdata.SetProjection(proj)
-                # outdata.FlushCache()
+                    results = np.hstack(tmp_map_blocks)
+                    results = np.vstack(np.hsplit(results, config['n_block_x']))
+                    ninput = 0
+                    for band_idx, band_name in enumerate(coefs_bands):
+                        for coef_index, coef in enumerate(coefs):
+                            # FIXME: Best name for outputs...?
+                            date = str(datetime.date.fromordinal(ordinal_day_list[day]))
+                            band = BAND_INFO[band_name]
+                            outname = '%s_%s_prob_%s_conse_%s_%s_%s_%s.tif' % (
+                            region, method, probability, conse, date, band, coef)
+                            outfile = os.path.join(out_path, outname)
+                            outdriver1 = gdal.GetDriverByName("GTiff")
+                            outdata = outdriver1.Create(outfile, vid_w, vid_h, 1, gdal.GDT_Float32)
+                            outdata.GetRasterBand(1).WriteArray(results[:vid_h, :vid_w, ninput])
+                            outdata.FlushCache()
+                            outdata.SetGeoTransform(new_gdal_transform)
+                            outdata.FlushCache()
+                            outdata.SetProjection(proj)
+                            outdata.FlushCache()
+                            ninput = ninput + 1
 
+                    for x in range(config['n_blocks']):
+                        os.remove(
+                            os.path.join(out_path, 'tmp_coefmap_block{}_{}.npy'.format(x + 1, ordinal_day_list[day])))
 
 if __name__ == '__main__':
     # main()
