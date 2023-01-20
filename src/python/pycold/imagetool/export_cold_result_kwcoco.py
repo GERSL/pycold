@@ -342,7 +342,6 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
             if not os.path.exists(os.path.join(reccg_path, filename)):
                 print('the rec_cg file {} is missing'.format(os.path.join(reccg_path, filename)))
                 for year in range(year_lowbound, year_highbound + 1):
-                    print(outfile)
                     outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, year))
                     np.save(outfile, results_block[year - year_lowbound])
                 continue
@@ -451,8 +450,6 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
                         np.save(outfile, results_block_coefs[:, :, :, year - year_lowbound])
             else:
                 for day in range(len(ordinal_day_list)):
-                    # outfile = os.path.join(out_path, 'tmp_map_block{}_{}.npy'.format(iblock + 1, ordinal_day_list[day]))
-                    # np.save(outfile, results_block[day])
                     if coefs is not None:
                         outfile = os.path.join(out_path,
                                                'tmp_coefmap_block{}_{}.npy'.format(iblock + 1,
@@ -489,10 +486,9 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
             recent_dist = np.full((vid_h, vid_w), 0, dtype=np.int16)
             for year in range(year_lowbound, year_highbound + 1):
                 outname = '%s_%s_prob_%s_conse_%s_%s_break_map.tif' % (region, method, probability, conse, year)
-                breakmap = gdal_array.LoadFile(os.path.join(out_path, outname))  # 4 digit array (type + doy) lamda
-                # monthmap = breakmap % 1000 # need funtion converting doy to month
+                breakmap = gdal_array.LoadFile(os.path.join(out_path, outname))
                 recent_dist[
-                    (breakmap / 1000).astype(np.byte) == 1] = year  # monthmap[(breakmap / 1000).astype(np.byte) == 1]
+                    (breakmap / 1000).astype(np.byte) == 1] = year
             outname = "%s_%s_prob_%s_conse_%s_recent_disturbance_map.tif" % (region, method, probability, conse)
             outfile = os.path.join(out_path, outname)
             outdriver1 = gdal.GetDriverByName("GTiff")
@@ -535,7 +531,7 @@ def main(stack_path, reccg_path, reference_path, out_path, method, region, proba
                                 results[results == -9999.0] = 0
                             outname = '%s_%s_prob_%s_conse_%s_%s_%s_%s.tif' % (
                             region, method, probability, conse, year, band,
-                            coef)  # .format(mode_string, method, band_name, coef)
+                            coef)
                             outfile = os.path.join(out_path, outname)
                             outdriver1 = gdal.GetDriverByName("GTiff")
                             outdata = outdriver1.Create(outfile, vid_w, vid_h, 1, gdal.GDT_Float32)
