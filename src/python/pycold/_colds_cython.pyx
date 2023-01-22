@@ -11,7 +11,7 @@ from collections import namedtuple
 from copy import deepcopy
 cimport cython
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
-from common import reccg_dt, sccd_dt, nrtqueue_dt, nrtmodel_dt, pinpoint_dt
+from .common import reccg_dt, sccd_dt, nrtqueue_dt, nrtmodel_dt, pinpoint_dt
 np.import_array()
 
 try:
