@@ -162,9 +162,7 @@ def extract_features(cold_plot, band, ordinal_day_list, nan_val, timestamp, feat
                     break_year = pd.Timestamp.fromordinal(cold_curve['t_break']).year
                     if timestamp == True:
                         if ordinal_day == cold_curve['t_break']:
-                            synthetic_value = predict_ref(cold_curve['coefs'][band], ordinal_day, 8)
-                            cv_value = synthetic_value - cold_curve['magnitude'][band]
-                            features[feature_outputs.index('cv')][index] = cv_value
+                            features[feature_outputs.index('cv')][index] = cold_curve['magnitude'][band]
                             continue
                     else:
                         if break_year == ordinal_year:
