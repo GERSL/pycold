@@ -1964,12 +1964,14 @@ int step2_KF_ChangeDetection(
 
     if (change_flag == TRUE)
     {
-        *mean_angle_scale100 = (mean_angle * 100);
-        if (*mean_angle_scale100 > MAX_SHORT)
-            *mean_angle_scale100 = MAX_SHORT;
-        *norm_cm_scale100 = break_mag * 100;
-        if (*norm_cm_scale100 > MAX_SHORT)
-            *norm_cm_scale100 = MAX_SHORT;
+        tmp = (mean_angle * 100);
+        if (tmp > MAX_SHORT)
+            tmp = MAX_SHORT;
+	*mean_angle_scale100 = tmp;
+        tmp = break_mag * 100;
+        if (tmp > MAX_SHORT)
+            tmp = MAX_SHORT;
+	*norm_cm_scale100 = tmp;
 
         for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
