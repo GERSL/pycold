@@ -632,6 +632,9 @@ class PyClassifierHPC(PyClassifier):
         tmp_feature_block = get_features(
             join(self.tmp_path, "tmp_feature_now_block{}.npy".format(block_id))
         )
+        if exists(join(self.tmp_path, "tmp_step3_classification_{}_finished.txt".format(block_id))):
+            return
+
         cmap = self.classification_block(rf_model, tmp_feature_block)
         self._save_yearlyclassification_maps(block_id, "now", cmap)
         with open(

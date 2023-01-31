@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 from typing import Optional, List, Any, Union
+
 # import datetime
 from cv2 import floodFill
 import cv2 as cv2
@@ -280,7 +281,7 @@ def segmentation_floodfill(
     parameters: Optional[dict] = None,
     b_dist_prob_map: Optional[bool] = False,
     date_interval: int = 60,
-    peak_threshold: Optional[float] = None
+    peak_threshold: Optional[float] = None,
 ):
     """
     hierachical segmentation based on floodfill
@@ -292,7 +293,7 @@ def segmentation_floodfill(
     cm_array_l1_date: 2-d numpy array
     floodfill_ratio: float
         the change magnitude ratio of the considered pixel over the seed pixel to be included into the cluster
-    parameters: parameter dictionary 
+    parameters: parameter dictionary
     b_dist_prob_map: boolean
         if true, cm_array is probability
     date_interval: the date interval for cm_date_array to connect adjacent pixels within the floodfill process
@@ -409,7 +410,7 @@ def segmentation_floodfill(
             mask_s1[(mask_label_s1 == 0) & (mask_s1 > 0)].astype(int) + no * 255
         )
 
-    object_map_s1 = mask_label_s1[1: n_rows + 1, 1: n_cols + 1].astype(np.int32)
+    object_map_s1 = mask_label_s1[1 : n_rows + 1, 1 : n_cols + 1].astype(np.int32)
 
     # free memory
     del cm_stack
@@ -808,18 +809,25 @@ class ObjectAnalystHPC:
         self.band_num = band_num
 
     @staticmethod
-    def _check_inputs(dataset_info, stack_path, result_path, cmmap_path, obia_path,
-                      obcold_recg_path, thematic_path):
+    def _check_inputs(
+        dataset_info,
+        stack_path,
+        result_path,
+        cmmap_path,
+        obia_path,
+        obcold_recg_path,
+        thematic_path,
+    ):
         if (isinstance(dataset_info.n_rows, int) is False) or (dataset_info.n_rows < 0):
-            raise ValueError('n_rows must be positive integer')
+            raise ValueError("n_rows must be positive integer")
         if (isinstance(dataset_info.n_cols, int) is False) or (dataset_info.n_cols < 0):
-            raise ValueError('n_cols must be positive integer')
+            raise ValueError("n_cols must be positive integer")
         if (isinstance(dataset_info.n_block_x, int) is False) or (dataset_info.n_block_x < 0):
-            raise ValueError('n_block_x must be positive integer')
+            raise ValueError("n_block_x must be positive integer")
         if (isinstance(dataset_info.n_block_y, int) is False) or (dataset_info.n_block_y < 0):
-            raise ValueError('n_block_y must be positive integer')
+            raise ValueError("n_block_y must be positive integer")
         if (isinstance(dataset_info.n_block_y, int) is False) or (dataset_info.n_block_y < 0):
-            raise ValueError('n_block_y must be positive integer')
+            raise ValueError("n_block_y must be positive integer")
 
         if os.path.isdir(stack_path) is False:
             raise FileExistsError("No such directory: {}".format(stack_path))
@@ -871,8 +879,7 @@ class ObjectAnalystHPC:
         uniform_threshold: Optional[float] = None,
         uniform_sizeslope: Optional[float] = None,
         method: str = "floodfill",
-        cm_output_interval: int = 60
-
+        cm_output_interval: int = 60,
     ):
         """
         a function for executing OBIA pipeline
@@ -892,8 +899,8 @@ class ObjectAnalystHPC:
         """
         if date - cm_output_interval < self.starting_date:
             change_map = np.full(
-                (self.dataset_info.n_rows, self.dataset_info.n_cols),
-                0, dtype=np.byte)
+                (self.dataset_info.n_rows, self.dataset_info.n_cols), 0, dtype=np.byte
+            )
             cm_date_array_updated = np.full(
                 (self.dataset_info.n_rows, self.dataset_info.n_cols), 0, dtype=np.int32
             )
@@ -1054,7 +1061,7 @@ class ObjectAnalystHPC:
             int(
                 f[
                     f.find("obiaresult_")
-                    + len("obiaresult_"): f.find("obiaresult_")
+                    + len("obiaresult_") : f.find("obiaresult_")
                     + len("obiaresult_")
                     + 6
                 ]
@@ -1071,11 +1078,14 @@ class ObjectAnalystHPC:
         ]
         return np.vstack(obia_tstack)
 
-    def reconstruct_reccg(self, block_id: int,
-                          img_stack: Optional[np.ndarray] = None,
-                          img_dates_sorted: Optional[np.ndarray] = None,
-                          logger: Optional[Logger] = None,
-                          conse: int = 6) -> Union[List[Any], None]:
+    def reconstruct_reccg(
+        self,
+        block_id: int,
+        img_stack: Optional[np.ndarray] = None,
+        img_dates_sorted: Optional[np.ndarray] = None,
+        logger: Optional[Logger] = None,
+        conse: int = 6,
+    ) -> Union[List[Any], None]:
         """
         the third step of OBCOLD, it reconstructs the new temporal segment based on the new spatially adjusted break
         Args:

@@ -328,7 +328,6 @@ def main(
     #     low_datebound = None
     #     upper_datebound = None
     #     b_c2 =True
-
     start_time = datetime.now(TZ)
 
     if low_datebound is None:
@@ -576,7 +575,6 @@ def main(
                 block_x, block_y, datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S")
             )
         )
-
     # wait for all cores to be finished
     if method == "OBCOLD":
         while not is_finished_cold_blockfinished(
@@ -617,7 +615,6 @@ def main(
             if seedmap_path is not None:
                 pyclassifier.hpc_preparation()
             ob_analyst.hpc_preparation()
-
         #########################################################################
         #                        reorganize cm snapshots                        #
         #########################################################################
