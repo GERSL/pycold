@@ -17,7 +17,8 @@ from pycold.common import DatasetInfo
 
 
 def extract_features(
-        cold_plot, band, ordinal_day_list, nan_val, feature_outputs=['a0', 'a1', 'b1']):
+    cold_plot, band, ordinal_day_list, nan_val, feature_outputs=["a0", "a1", "b1"]
+):
     """
     generate features for classification based on a plot-based rec_cg and a list of days to be predicted
     Parameters
@@ -36,58 +37,67 @@ def extract_features(
     -------
         feature: a list (length = n_feature) of 1-array [len(ordinal_day_list)]
     """
-    features = [np.full(len(ordinal_day_list), nan_val, dtype=np.double)
-                for x in range(len(feature_outputs))]
+    features = [
+        np.full(len(ordinal_day_list), nan_val, dtype=np.double)
+        for x in range(len(feature_outputs))
+    ]
     for index, ordinal_day in enumerate(ordinal_day_list):
         # print(index)
         for idx, cold_curve in enumerate(cold_plot):
             if idx == len(cold_plot) - 1:
-                max_days = cold_plot[idx]['t_end']
+                max_days = cold_plot[idx]["t_end"]
             else:
-                max_days = cold_plot[idx + 1]['t_start']
+                max_days = cold_plot[idx + 1]["t_start"]
 
-            if cold_curve['t_start'] <= ordinal_day < max_days:
+            if cold_curve["t_start"] <= ordinal_day < max_days:
                 for n, feature in enumerate(feature_outputs):
-                    if feature == 'a0':
-                        features[n][index] = cold_curve['coefs'][band][0] + cold_curve['coefs'][
-                            band][1] * ordinal_day / defaults['COMMON']['SLOPE_SCALE']
+                    if feature == "a0":
+                        features[n][index] = (
+                            cold_curve["coefs"][band][0]
+                            + cold_curve["coefs"][band][1]
+                            * ordinal_day
+                            / defaults["COMMON"]["SLOPE_SCALE"]
+                        )
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
-                    elif feature == 'c1':
-                        features[n][index] = cold_curve['coefs'][band][1] / defaults['COMMON']['SLOPE_SCALE']
+                    elif feature == "c1":
+                        features[n][index] = (
+                            cold_curve["coefs"][band][1] / defaults["COMMON"]["SLOPE_SCALE"]
+                        )
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
-                    elif feature == 'a1':
-                        features[n][index] = cold_curve['coefs'][band][2]
+                    elif feature == "a1":
+                        features[n][index] = cold_curve["coefs"][band][2]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
-                    elif feature == 'b1':
-                        features[n][index] = cold_curve['coefs'][band][3]
+                    elif feature == "b1":
+                        features[n][index] = cold_curve["coefs"][band][3]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
-                    elif feature == 'a2':
-                        features[n][index] = cold_curve['coefs'][band][4]
+                    elif feature == "a2":
+                        features[n][index] = cold_curve["coefs"][band][4]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
-                    elif feature == 'b2':
-                        features[n][index] = cold_curve['coefs'][band][5]
+                    elif feature == "b2":
+                        features[n][index] = cold_curve["coefs"][band][5]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
-                    elif feature == 'a3':
-                        features[n][index] = cold_curve['coefs'][band][6]
+                    elif feature == "a3":
+                        features[n][index] = cold_curve["coefs"][band][6]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
-                    elif feature == 'b3':
-                        features[n][index] = cold_curve['coefs'][band][7]
+                    elif feature == "b3":
+                        features[n][index] = cold_curve["coefs"][band][7]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
-                    elif feature == 'rmse':
-                        features[n][index] = cold_curve['rmse'][band]
+                    elif feature == "rmse":
+                        features[n][index] = cold_curve["rmse"][band]
                         if np.isnan(features[n][index]):
                             features[n][index] = 0
                     else:
                         raise Exception(
-                            'the outputted feature must be in [a0, c1, a1, b1,a2, b2, a3, b3, rmse]')
+                            "the outputted feature must be in [a0, c1, a1, b1,a2, b2, a3, b3, rmse]"
+                        )
                 break
     return features
 
@@ -103,17 +113,23 @@ def generate_sample_num(label, sample_parameters):
 
     """
     unique_category, unique_counts_category = np.unique(
-        label[label <= sample_parameters['total_landcover_category']], return_counts=True)
-    counts_category = np.array([0] * sample_parameters['total_landcover_category'])
+        label[label <= sample_parameters["total_landcover_category"]], return_counts=True
+    )
+    counts_category = np.array([0] * sample_parameters["total_landcover_category"])
     for x in range(len(unique_counts_category)):
         counts_category[int(unique_category[x] - 1)] = unique_counts_category[x]
     percate_samples = np.array(
-        [round(x * sample_parameters['total_samples'] / sum(counts_category))
-         for x in counts_category])
-    percate_samples[percate_samples > sample_parameters['max_category_samples']] = \
-        sample_parameters['max_category_samples']
-    percate_samples[percate_samples < sample_parameters['min_category_samples']] = \
-        sample_parameters['min_category_samples']
+        [
+            round(x * sample_parameters["total_samples"] / sum(counts_category))
+            for x in counts_category
+        ]
+    )
+    percate_samples[
+        percate_samples > sample_parameters["max_category_samples"]
+    ] = sample_parameters["max_category_samples"]
+    percate_samples[
+        percate_samples < sample_parameters["min_category_samples"]
+    ] = sample_parameters["min_category_samples"]
     # needs to check not exceed the total category pixels
     percate_samples = np.minimum(percate_samples, counts_category)
     return percate_samples
@@ -132,8 +148,13 @@ def get_features(path):
 
 
 class PyClassifier:
-    def __init__(self, dataset_info: DatasetInfo, feature_outputs: list = ['a0', 'a1', 'b1'],
-                 logger: Optional[Logger] = None, band_num: int = 7):
+    def __init__(
+        self,
+        dataset_info: DatasetInfo,
+        feature_outputs: list = ["a0", "a1", "b1"],
+        logger: Optional[Logger] = None,
+        band_num: int = 7,
+    ):
         """
         Parameters
         ----------
@@ -146,13 +167,15 @@ class PyClassifier:
         # self.dataset_info.block_height = int(self.dataset_info.n_rows / self.dataset_info.n_block_y)
         # self.dataset_info.nblocks = self.dataset_info.n_block_x * self.dataset_info.n_block_y
         for feature in feature_outputs:
-            assert feature in ['a0', 'c1', 'a1', 'b1', 'a2', 'b2', 'a3', 'b3', 'rmse']
+            assert feature in ["a0", "c1", "a1", "b1", "a2", "b2", "a3", "b3", "rmse"]
         self.n_features = band_num * len(feature_outputs)
         self.feature_outputs = feature_outputs
         if logger is None:
-            logging.basicConfig(level=logging.DEBUG,
-                                format='%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s',
-                                stream=sys.stdout)
+            logging.basicConfig(
+                level=logging.DEBUG,
+                format="%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s",
+                stream=sys.stdout,
+            )
             self.logger = logging.getLogger(__name__)
         else:
             self.logger = logger
@@ -178,35 +201,52 @@ class PyClassifier:
         -------
         an array [len(year_list_to_predict), block_width*block_height, n_features]
         """
-        block_features = np.full((len(year_list_to_predict),
-                                  self.dataset_info.block_width * self.dataset_info.block_height,
-                                  self.n_features),
-                                 defaults['COMMON']['NAN_VAL'], dtype=np.float32)
-        ordinal_day_list = [dt.date(year, 7, 1).toordinal() for year
-                            in year_list_to_predict]
+        block_features = np.full(
+            (
+                len(year_list_to_predict),
+                self.dataset_info.block_width * self.dataset_info.block_height,
+                self.n_features,
+            ),
+            defaults["COMMON"]["NAN_VAL"],
+            dtype=np.float32,
+        )
+        ordinal_day_list = [dt.date(year, 7, 1).toordinal() for year in year_list_to_predict]
         if len(cold_block) == 0:
-            self.logger.warning('the rec_cg file for block_id={} has no records'.format(block_id))
+            self.logger.warning("the rec_cg file for block_id={} has no records".format(block_id))
             return block_features
 
-        cold_block_split = np.split(cold_block, np.argwhere(
-            np.diff(cold_block['pos']) != 0)[:, 0] + 1)
+        cold_block_split = np.split(
+            cold_block, np.argwhere(np.diff(cold_block["pos"]) != 0)[:, 0] + 1
+        )
         for element in cold_block_split:
             # the relative column number in the block
-            i_col = get_col_index(element[0]["pos"], self.dataset_info.n_cols,
-                                  get_block_x(block_id, self.dataset_info.n_block_x),
-                                  self.dataset_info.block_width)
-            i_row = get_row_index(element[0]["pos"], self.dataset_info.n_cols,
-                                  get_block_y(block_id, self.dataset_info.n_block_x),
-                                  self.dataset_info.block_height)
+            i_col = get_col_index(
+                element[0]["pos"],
+                self.dataset_info.n_cols,
+                get_block_x(block_id, self.dataset_info.n_block_x),
+                self.dataset_info.block_width,
+            )
+            i_row = get_row_index(
+                element[0]["pos"],
+                self.dataset_info.n_cols,
+                get_block_y(block_id, self.dataset_info.n_block_x),
+                self.dataset_info.block_height,
+            )
 
             for band in range(self.band_num):
                 feature_row = extract_features(
-                    element, band, ordinal_day_list, defaults['COMMON']['NAN_VAL'],
-                    feature_outputs=self.feature_outputs)
+                    element,
+                    band,
+                    ordinal_day_list,
+                    defaults["COMMON"]["NAN_VAL"],
+                    feature_outputs=self.feature_outputs,
+                )
                 for index in range(int(self.n_features / self.band_num)):
-                    block_features[:, i_row * self.dataset_info.block_width + i_col,
-                                   int(band * self.n_features / self.band_num) + index] \
-                        = feature_row[index]
+                    block_features[
+                        :,
+                        i_row * self.dataset_info.block_width + i_col,
+                        int(band * self.n_features / self.band_num) + index,
+                    ] = feature_row[index]
 
         return block_features
 
@@ -223,10 +263,10 @@ class PyClassifier:
             a sklearn random forest model
         """
         assert label.shape == (self.dataset_info.n_rows, self.dataset_info.n_cols)
-        samplecount = generate_sample_num(label, defaults['CLASSIFIER'])
+        samplecount = generate_sample_num(label, defaults["CLASSIFIER"])
         index_list = []
         label_list = []
-        for i in range(defaults['CLASSIFIER']['total_landcover_category']):
+        for i in range(defaults["CLASSIFIER"]["total_landcover_category"]):
             index = np.argwhere(label == i + 1)
             np.random.seed(42)  # set random seed to reproduce the same result
             index_sample = index[np.random.choice(len(index), int(samplecount[i]), replace=False)]
@@ -234,8 +274,9 @@ class PyClassifier:
             label_list.append(np.array([i + 1] * len(index_sample)))
         index_list = np.vstack(index_list)
         label_list = np.hstack(label_list)
-        feature_extraction = np.array([full_feature_array[tuple(x)]
-                                      for x in index_list]).astype(np.float32)
+        feature_extraction = np.array([full_feature_array[tuple(x)] for x in index_list]).astype(
+            np.float32
+        )
         rf_model = RandomForestClassifier(random_state=42, max_depth=20)
         rf_model.fit(feature_extraction, label_list)
         return rf_model
@@ -252,13 +293,11 @@ class PyClassifier:
             cmap, the feature temp array file for block_id and year
         """
         cmap = rf_model.predict(tmp_feature).reshape(
-            self.dataset_info.block_height,
-            self.dataset_info.block_width)
-        mask = np.all(
-            tmp_feature == defaults['COMMON']['NAN_VAL'],
-            axis=1).reshape(
-            self.dataset_info.block_height,
-            self.dataset_info.block_width)
+            self.dataset_info.block_height, self.dataset_info.block_width
+        )
+        mask = np.all(tmp_feature == defaults["COMMON"]["NAN_VAL"], axis=1).reshape(
+            self.dataset_info.block_height, self.dataset_info.block_width
+        )
         cmap[mask] = 255
         return cmap
 
@@ -275,13 +314,19 @@ class PyClassifierHPC(PyClassifier):
     this class adds IO functions based on the HPC environment for the base class
     """
 
-    def __init__(self, dataset_info: DatasetInfo, record_path: str, band_num: int = 7,
-                 year_list_to_predict=list(range(1982, 2022)),
-                 tmp_path: Optional[str] = None,
-                 output_path: Optional[str] = None,
-                 feature_outputs: list = ['a0', 'a1', 'b1'],
-                 seedmap_path: Optional[str] = None, rf_path: Optional[str] = None,
-                 logger: Optional[Logger] = None):
+    def __init__(
+        self,
+        dataset_info: DatasetInfo,
+        record_path: str,
+        band_num: int = 7,
+        year_list_to_predict=list(range(1982, 2022)),
+        tmp_path: Optional[str] = None,
+        output_path: Optional[str] = None,
+        feature_outputs: list = ["a0", "a1", "b1"],
+        seedmap_path: Optional[str] = None,
+        rf_path: Optional[str] = None,
+        logger: Optional[Logger] = None,
+    ):
         """
         Parameters
         ----------
@@ -308,16 +353,16 @@ class PyClassifierHPC(PyClassifier):
         self.dataset_info = dataset_info
         self.record_path = record_path
         for feature in feature_outputs:
-            assert feature in ['a0', 'c1', 'a1', 'b1', 'a2', 'b2', 'a3', 'b3', 'rmse']
+            assert feature in ["a0", "c1", "a1", "b1", "a2", "b2", "a3", "b3", "rmse"]
         self.feature_outputs = feature_outputs
 
         if tmp_path is None:
-            self.tmp_path = join(record_path, 'feature_maps')  # default path
+            self.tmp_path = join(record_path, "feature_maps")  # default path
         else:
             self.tmp_path = tmp_path
 
         if output_path is None:
-            self.output_path = join(record_path, 'feature_maps')  # default path
+            self.output_path = join(record_path, "feature_maps")  # default path
         else:
             self.output_path = self.tmp_path
 
@@ -326,14 +371,16 @@ class PyClassifierHPC(PyClassifier):
         self.year_list_to_predict = year_list_to_predict
         self.seedmap_path = seedmap_path
         if rf_path is None:
-            self.rf_path = join(self.output_path, 'rf.model')  # default path
+            self.rf_path = join(self.output_path, "rf.model")  # default path
         else:
             self.rf_path = rf_path
 
         if logger is None:
-            logging.basicConfig(level=logging.DEBUG,
-                                format='%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s',
-                                stream=sys.stdout)
+            logging.basicConfig(
+                level=logging.DEBUG,
+                format="%(asctime)s |%(levelname)s| %(funcName)-15s| %(message)s",
+                stream=sys.stdout,
+            )
             self.logger = logging.getLogger(__name__)
         else:
             self.logger = logger
@@ -341,32 +388,31 @@ class PyClassifierHPC(PyClassifier):
         self.band_num = band_num
 
     @staticmethod
-    def _check_inputs_thematic(dataset_info, record_path, tmp_path,  seedmap_path,
-                               rf_path):
+    def _check_inputs_thematic(dataset_info, record_path, tmp_path, seedmap_path, rf_path):
         if (isinstance(dataset_info.n_rows, int) is False) or (dataset_info.n_rows < 0):
-            raise ValueError('n_rows must be positive integer')
+            raise ValueError("n_rows must be positive integer")
         if (isinstance(dataset_info.n_cols, int) is False) or (dataset_info.n_cols < 0):
-            raise ValueError('n_cols must be positive integer')
+            raise ValueError("n_cols must be positive integer")
         if (isinstance(dataset_info.n_block_x, int) is False) or (dataset_info.n_block_x < 0):
-            raise ValueError('n_block_x must be positive integer')
+            raise ValueError("n_block_x must be positive integer")
         if (isinstance(dataset_info.n_block_y, int) is False) or (dataset_info.n_block_y < 0):
-            raise ValueError('n_block_y must be positive integer')
+            raise ValueError("n_block_y must be positive integer")
         if (isinstance(dataset_info.n_block_y, int) is False) or (dataset_info.n_block_y < 0):
-            raise ValueError('n_block_y must be positive integer')
+            raise ValueError("n_block_y must be positive integer")
 
         if os.path.isdir(record_path) is False:
-            raise FileExistsError('No such directory: {}'.format(record_path))
+            raise FileExistsError("No such directory: {}".format(record_path))
 
         if seedmap_path is not None:
             if os.path.isfile(seedmap_path) is False:
-                raise FileExistsError('No such file: {}'.format(seedmap_path))
+                raise FileExistsError("No such file: {}".format(seedmap_path))
 
         if rf_path is not None:
             if os.path.isfile(rf_path) is False:
-                raise FileExistsError('No such file: {}'.format(rf_path))
+                raise FileExistsError("No such file: {}".format(rf_path))
 
     def _save_features(self, block_id, block_features):
-        '''
+        """
         Parameters
         ----------
         block_id: integer
@@ -374,23 +420,24 @@ class PyClassifierHPC(PyClassifier):
         Returns
         -------
 
-        '''
+        """
         for id, year in enumerate(self.year_list_to_predict):
             np.save(
-                os.path.join(self.tmp_path, 'tmp_feature_year{}_block{}.npy').format(
-                    year, block_id),
-                block_features[id, :, :])
+                os.path.join(self.tmp_path, "tmp_feature_year{}_block{}.npy").format(
+                    year, block_id
+                ),
+                block_features[id, :, :],
+            )
 
-    def _is_finished_step1_predict_features(self):
+    def is_finished_step1_predict_features(self):
         for iblock in range(self.dataset_info.nblocks):
             if not exists(
-                join(
-                    self.tmp_path, 'tmp_step1_predict_{}_finished.txt'.format(
-                        iblock + 1))):
+                join(self.tmp_path, "tmp_step1_predict_{}_finished.txt".format(iblock + 1))
+            ):
                 return False
         return True
 
-    @ staticmethod
+    @staticmethod
     def _save_rf_model(rf_model, rf_path):
         joblib.dump(rf_model, rf_path, compress=3)
 
@@ -401,8 +448,9 @@ class PyClassifierHPC(PyClassifier):
         return joblib.load(self.rf_path)
 
     def _save_yearlyclassification_maps(self, block_id, year, cmap):
-        outfile = join(self.tmp_path, 'tmp_yearlyclassification{}_block{}.npy'.format(
-            year, block_id))
+        outfile = join(
+            self.tmp_path, "tmp_yearlyclassification{}_block{}.npy".format(year, block_id)
+        )
         np.save(outfile, cmap)
 
     def _is_finished_step3_classification(self):
@@ -411,45 +459,63 @@ class PyClassifierHPC(PyClassifier):
         """
         for iblock in range(self.dataset_info.nblocks):
             if not exists(
-                join(
-                    self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(
-                        iblock + 1))):
+                join(self.tmp_path, "tmp_step3_classification_{}_finished.txt".format(iblock + 1))
+            ):
                 return False
         return True
 
     def _save_covermaps(self, full_yearlyclass_array, year):
         np.save(
-            join(self.output_path, 'yearlyclassification_{}.npy'.format(year)),
-            full_yearlyclass_array)
+            join(self.output_path, "yearlyclassification_{}.npy".format(year)),
+            full_yearlyclass_array,
+        )
 
     def _clean(self):
-        tmp_yearlyclass_filenames = [file for file in os.listdir(self.tmp_path)
-                                     if file.startswith('tmp_')]
+        tmp_yearlyclass_filenames = [
+            file for file in os.listdir(self.tmp_path) if file.startswith("tmp_")
+        ]
         for file in tmp_yearlyclass_filenames:
             os.remove(join(self.tmp_path, file))
 
     def _get_fullclassification_forcertainyear(self, year):
-        tmp_yearlyclass_filenames = [file for file in os.listdir(self.tmp_path)
-                                     if file.startswith('tmp_yearlyclassification{}'.format(year))]
+        tmp_yearlyclass_filenames = [
+            file
+            for file in os.listdir(self.tmp_path)
+            if file.startswith("tmp_yearlyclassification{}".format(year))
+        ]
 
         # sort to guarantee order follows low to high rows
-        tmp_yearlyclass_filenames.sort(key=lambda t: int(t[t.find('block') + 5: t.find('.npy')]))
-        return [np.load(join(self.tmp_path, file)).reshape(self.dataset_info.block_height,
-                                                           self.dataset_info.block_width, 1)
-                for file in tmp_yearlyclass_filenames]
+        tmp_yearlyclass_filenames.sort(key=lambda t: int(t[t.find("block") + 5 : t.find(".npy")]))
+        return [
+            np.load(join(self.tmp_path, file)).reshape(
+                self.dataset_info.block_height, self.dataset_info.block_width, 1
+            )
+            for file in tmp_yearlyclass_filenames
+        ]
 
     def get_fullfeature_forcertainyear(self, year):
-        tmp_feature_filenames = [file for file in os.listdir(self.tmp_path)
-                                 if file.startswith('tmp_feature_year{}'.format(year))]
+        tmp_feature_filenames = [
+            file
+            for file in os.listdir(self.tmp_path)
+            if file.startswith("tmp_feature_year{}".format(year))
+        ]
         if len(tmp_feature_filenames) < self.dataset_info.nblocks:
-            self.logger.warning('tmp features are incomplete! should have {}; but actually have {} feature images'.
-                                format(self.dataset_info.nblocks, len(tmp_feature_filenames)))
+            self.logger.warning(
+                "tmp features are incomplete! should have {}; but actually have {} feature images".format(
+                    self.dataset_info.nblocks, len(tmp_feature_filenames)
+                )
+            )
 
         tmp_feature_filenames.sort(
-            key=lambda t: int(t[t.find('block') + 5: t.find('.npy')]))  # sorted by row number
+            key=lambda t: int(t[t.find("block") + 5 : t.find(".npy")])
+        )  # sorted by row number
 
-        return [np.load(join(self.tmp_path, file)).reshape(self.dataset_info.block_height, self.dataset_info.block_width,
-                self.n_features) for file in tmp_feature_filenames]
+        return [
+            np.load(join(self.tmp_path, file)).reshape(
+                self.dataset_info.block_height, self.dataset_info.block_width, self.n_features
+            )
+            for file in tmp_feature_filenames
+        ]
 
         # full_feature_array = assemble_array(, self.dataset_info.n_block_x)
         # if (full_feature_array.shape[1] != self.dataset_info.n_cols) or (full_feature_array.shape[0] !=
@@ -471,37 +537,48 @@ class PyClassifierHPC(PyClassifier):
                 raise e
 
     def step1_feature_generation(self, block_id):
-        if os.path.exists(join(self.record_path, 'record_change_x{}_y{}_cold.npy').format(
+        if os.path.exists(
+            join(self.record_path, "record_change_x{}_y{}_cold.npy").format(
                 get_block_x(block_id, self.dataset_info.n_block_x),
-                get_block_y(block_id, self.dataset_info.n_block_x))):
-            cold_block = np.load(join(self.record_path, 'record_change_x{}_y{}_cold.npy').format(
-                get_block_x(block_id, self.dataset_info.n_block_x),
-                get_block_y(block_id, self.dataset_info.n_block_x)))
+                get_block_y(block_id, self.dataset_info.n_block_x),
+            )
+        ):
+            cold_block = np.load(
+                join(self.record_path, "record_change_x{}_y{}_cold.npy").format(
+                    get_block_x(block_id, self.dataset_info.n_block_x),
+                    get_block_y(block_id, self.dataset_info.n_block_x),
+                )
+            )
             block_features = self.predict_features(block_id, cold_block, self.year_list_to_predict)
         else:
             block_features = np.full(
-                (len(self.year_list_to_predict),
-                 self.dataset_info.block_width * self.dataset_info.block_height, self.n_features),
-                defaults['COMMON']['NAN_VAL'],
-                dtype=np.float32)
+                (
+                    len(self.year_list_to_predict),
+                    self.dataset_info.block_width * self.dataset_info.block_height,
+                    self.n_features,
+                ),
+                defaults["COMMON"]["NAN_VAL"],
+                dtype=np.float32,
+            )
         self._save_features(block_id, block_features)
-        with open(join(self.tmp_path, 'tmp_step1_predict_{}_finished.txt'.format(block_id)), 'w'):
+        with open(join(self.tmp_path, "tmp_step1_predict_{}_finished.txt".format(block_id)), "w"):
             pass
 
     def step2_train_rf(self, ref_year=None, rf_path=None):
-        while not self._is_finished_step1_predict_features():
+        while not self.is_finished_step1_predict_features():
             time.sleep(5)
 
         if ref_year is None:
-            ref_year = defaults['CLASSIFIER']['training_year']
+            ref_year = defaults["CLASSIFIER"]["training_year"]
 
         # if ref_year not in self.year_list_to_predict:
         #     raise Exception("Ref_year {} is not in year_list_to_predict {}. "
         #                     "PLease included it and re-run step1_feature_generation".format(ref_year,
         #                                                                                     self.year_list_to_predict))
 
-        full_feature_array = assemble_array(self.get_fullfeature_forcertainyear(ref_year),
-                                            self.dataset_info.n_block_x)
+        full_feature_array = assemble_array(
+            self.get_fullfeature_forcertainyear(ref_year), self.dataset_info.n_block_x
+        )
         if self.seedmap_path is None:
             raise ValueError("seedmap_path is not assigned")
 
@@ -515,19 +592,25 @@ class PyClassifierHPC(PyClassifier):
     def step3_classification(self, block_id):
         while not self._is_finished_step2_train_rfmodel():
             time.sleep(5)
-        time.sleep(5)  # wait for 5 more seconds to guarantee all data of rf.model was down to the disk
+        time.sleep(
+            5
+        )  # wait for 5 more seconds to guarantee all data of rf.model was down to the disk
         try:
             rf_model = self._get_rf_model()
         except IOError as e:
             raise IOError(
-                "Please double check your rf model file directory or generate random forest model first") from e
+                "Please double check your rf model file directory or generate random forest model first"
+            ) from e
 
         for year in self.year_list_to_predict:
             tmp_feature_block = get_features(
-                join(self.tmp_path, 'tmp_feature_year{}_block{}.npy'.format(year, block_id)))
+                join(self.tmp_path, "tmp_feature_year{}_block{}.npy".format(year, block_id))
+            )
             cmap = self.classification_block(rf_model, tmp_feature_block)
             self._save_yearlyclassification_maps(block_id, year, cmap)
-        with open(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(block_id)), 'w'):
+        with open(
+            join(self.tmp_path, "tmp_step3_classification_{}_finished.txt".format(block_id)), "w"
+        ):
             pass
 
     def step3_classification_sccd(self, block_id):
@@ -537,7 +620,8 @@ class PyClassifierHPC(PyClassifier):
             rf_model = self._get_rf_model()
         except IOError as e:
             raise IOError(
-                "Please double check your rf model file directory or generate random forest model first") from e
+                "Please double check your rf model file directory or generate random forest model first"
+            ) from e
 
         # for year in self.year_list_to_predict:
         #     tmp_feature_block = get_features(join(self.tmp_path, 'tmp_feature_year{}_block{}.npy'.format(year,
@@ -546,10 +630,13 @@ class PyClassifierHPC(PyClassifier):
         #     self._save_yearlyclassification_maps(block_id, year, cmap)
 
         tmp_feature_block = get_features(
-            join(self.tmp_path, 'tmp_feature_now_block{}.npy'.format(block_id)))
+            join(self.tmp_path, "tmp_feature_now_block{}.npy".format(block_id))
+        )
         cmap = self.classification_block(rf_model, tmp_feature_block)
-        self._save_yearlyclassification_maps(block_id, 'now', cmap)
-        with open(join(self.tmp_path, 'tmp_step3_classification_{}_finished.txt'.format(block_id)), 'w'):
+        self._save_yearlyclassification_maps(block_id, "now", cmap)
+        with open(
+            join(self.tmp_path, "tmp_step3_classification_{}_finished.txt".format(block_id)), "w"
+        ):
             pass
 
     def step4_assemble(self, clean=True):
@@ -557,9 +644,8 @@ class PyClassifierHPC(PyClassifier):
             time.sleep(5)
         for year in self.year_list_to_predict:
             full_yearlyclass_array = assemble_array(
-                self._get_fullclassification_forcertainyear(year),
-                self.dataset_info.n_block_x)[
-                :, :, 0]
+                self._get_fullclassification_forcertainyear(year), self.dataset_info.n_block_x
+            )[:, :, 0]
             self._save_covermaps(full_yearlyclass_array, year)
         if clean:
             self._clean()  # _clean all temp files
@@ -568,9 +654,10 @@ class PyClassifierHPC(PyClassifier):
         while not self._is_finished_step3_classification():
             time.sleep(5)
 
-        full_yearlyclass_array = assemble_array(self._get_fullclassification_forcertainyear('now'),
-                                                self.dataset_info.n_block_x)[:, :, 0]
-        self._save_covermaps(full_yearlyclass_array.astype(np.uint8), 'now')
+        full_yearlyclass_array = assemble_array(
+            self._get_fullclassification_forcertainyear("now"), self.dataset_info.n_block_x
+        )[:, :, 0]
+        self._save_covermaps(full_yearlyclass_array.astype(np.uint8), "now")
 
         # for year in self.year_list_to_predict:
         #     full_yearlyclass_array = assemble_array(self._get_fullclassification_forcertainyear(year),
@@ -582,7 +669,8 @@ class PyClassifierHPC(PyClassifier):
     def is_finished_step4_assemble(self):
         for year in self.year_list_to_predict:
             if not os.path.exists(
-                    join(self.output_path, 'yearlyclassification_{}.npy'.format(year))):
+                join(self.output_path, "yearlyclassification_{}.npy".format(year))
+            ):
                 return False
         else:
             return True
