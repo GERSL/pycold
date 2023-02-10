@@ -16,7 +16,6 @@
 
 int lasso_blist_sccd[NUM_LASSO_BANDS] = {1, 2, 3, 4, 5};
 
-
 /******************************************************************************
 MODULE:  sccd_offline
 
@@ -1967,11 +1966,11 @@ int step2_KF_ChangeDetection(
         tmp = (mean_angle * 100);
         if (tmp > MAX_SHORT)
             tmp = MAX_SHORT;
-	*mean_angle_scale100 = tmp;
+        *mean_angle_scale100 = tmp;
         tmp = break_mag * 100;
         if (tmp > MAX_SHORT)
             tmp = MAX_SHORT;
-	*norm_cm_scale100 = tmp;
+        *norm_cm_scale100 = tmp;
 
         for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
@@ -2373,10 +2372,14 @@ int step3_processing_end(
                         }
                     }
 
-                    // if pass the predictability test, change the first digit to zero
-                    if ((float)stable_count / valid_conse_last > CORRECT_RATIO_PREDICTABILITY)
+                    // won't tested predictability for nrt_mode == 2. temporal!
+                    if (*nrt_mode % 10 == 1)
                     {
-                        *nrt_mode = *nrt_mode - 10;
+                        // if pass the predictability test, change the first digit to zero
+                        if ((float)stable_count / valid_conse_last > CORRECT_RATIO_PREDICTABILITY)
+                        {
+                            *nrt_mode = *nrt_mode - 10;
+                        }
                     }
                 }
             }
@@ -2988,10 +2991,6 @@ int sccd_standard(
             }
         }
     }
-
-    //    time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
-    //    printf("step2_KF_ChangeDetection took %f seconds to execute\n", time_taken);
-    //    t_time = clock();
 
     /**************************************************************/
     /*                                                            */
