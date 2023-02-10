@@ -1,8 +1,14 @@
 from ._colds_cython import _sccd_update, _sccd_detect, _obcold_reconstruct, _cold_detect
 import numpy as np
 from .common import SccdOutput
-from ._param_validation import validate_parameter_constraints, Interval, Integral, Real, check_consistent_length, \
-    check_1d
+from ._param_validation import (
+    validate_parameter_constraints,
+    Interval,
+    Integral,
+    Real,
+    check_consistent_length,
+    check_1d,
+)
 from .utils import calculate_sccd_cm
 from .app import defaults
 
@@ -21,7 +27,7 @@ _parameter_constraints: dict = {
     "t_cg_scale100": [Interval(Real, 0.0, None, closed="neither")],
     "t_cg_singleband_scale1000": [Interval(Real, None, None, closed="neither")],
     "t_angle_scale100": [Interval(Integral, 0, 18000, closed="neither")],
-    "transform_mode": ["boolean"]
+    "transform_mode": ["boolean"],
 }
 
 NUM_FC = 40  # define the maximum number of outputted curves
@@ -66,16 +72,16 @@ def _validate_data(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break
     ----------
     """
     check_consistent_length(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas)
-    check_1d(dates, 'dates')
-    check_1d(ts_b, 'ts_b')
-    check_1d(ts_g, 'ts_g')
-    check_1d(ts_r, 'ts_r')
-    check_1d(ts_n, 'ts_n')
-    check_1d(ts_s1, 'ts_s1')
-    check_1d(ts_s2, 'ts_s2')
-    check_1d(qas, 'qas')
+    check_1d(dates, "dates")
+    check_1d(ts_b, "ts_b")
+    check_1d(ts_g, "ts_g")
+    check_1d(ts_r, "ts_r")
+    check_1d(ts_n, "ts_n")
+    check_1d(ts_s1, "ts_s1")
+    check_1d(ts_s2, "ts_s2")
+    check_1d(qas, "qas")
     if break_dates is not None:
-        check_1d(break_dates, 'break_dates')
+        check_1d(break_dates, "break_dates")
 
     dates = dates.astype(dtype=np.int64, order="C")
     ts_b = ts_b.astype(dtype=np.int64, order="C")
@@ -159,9 +165,25 @@ def _validate_data(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break
 
 
 def cold_detect(
-        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.0863, pos=1, conse=6,
-        b_output_cm=False, starting_date=0, n_cm=0, cm_output_interval=0, b_c2=False,
-        gap_days=365.25):
+    dates,
+    ts_b,
+    ts_g,
+    ts_r,
+    ts_n,
+    ts_s1,
+    ts_s2,
+    ts_t,
+    qas,
+    t_cg=15.0863,
+    pos=1,
+    conse=6,
+    b_output_cm=False,
+    starting_date=0,
+    n_cm=0,
+    cm_output_interval=0,
+    b_c2=False,
+    gap_days=365.25,
+):
     """
     pixel-based COLD algorithm.
     Zhu, Z., Zhang, J., Yang, Z., Aljaddani, A. H., Cohen, W. B., Qiu, S., &
@@ -198,22 +220,49 @@ def cold_detect(
     [change records, cm_outputs, cm_outputs_date] if b_output_cm==True
     """
 
-    _validate_params(func_name='cold_detect', t_cg=t_cg, pos=pos, conse=conse,
-                     b_output_cm=b_output_cm, starting_date=starting_date, n_cm=n_cm,
-                     cm_output_interval=cm_output_interval, b_c2=b_c2, gap_days=gap_days)
+    _validate_params(
+        func_name="cold_detect",
+        t_cg=t_cg,
+        pos=pos,
+        conse=conse,
+        b_output_cm=b_output_cm,
+        starting_date=starting_date,
+        n_cm=n_cm,
+        cm_output_interval=cm_output_interval,
+        b_c2=b_c2,
+        gap_days=gap_days,
+    )
 
     # make sure it is c contiguous array and 64 bit
     dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas = _validate_data(
-        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas)
+        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas
+    )
 
     return _cold_detect(
-        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg, pos, conse, b_output_cm,
-        starting_date, n_cm, cm_output_interval, b_c2, gap_days)
+        dates,
+        ts_b,
+        ts_g,
+        ts_r,
+        ts_n,
+        ts_s1,
+        ts_s2,
+        ts_t,
+        qas,
+        t_cg,
+        pos,
+        conse,
+        b_output_cm,
+        starting_date,
+        n_cm,
+        cm_output_interval,
+        b_c2,
+        gap_days,
+    )
 
 
 def obcold_reconstruct(
-        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates, pos=1, conse=6,
-        b_c2=False):
+    dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates, pos=1, conse=6, b_c2=False
+):
     """
     re-contructructing change records using break dates.
     Parameters
@@ -236,16 +285,34 @@ def obcold_reconstruct(
     ----------
     change records: the COLD outputs that characterizes each temporal segment
     """
-    _validate_params(func_name='sccd_detect', pos=pos, conse=conse, b_c2=b_c2)
+    _validate_params(func_name="sccd_detect", pos=pos, conse=conse, b_c2=b_c2)
     dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates = _validate_data(
-        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates)
+        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates
+    )
 
     return _obcold_reconstruct(
-        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates, pos, conse, b_c2)
+        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, break_dates, pos, conse, b_c2
+    )
 
 
-def sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.0863, pos=1,
-                conse=6, b_c2=False, b_pinpoint=False, gate_tcg=9.236, b_monitor_init=False):
+def sccd_detect(
+    dates,
+    ts_b,
+    ts_g,
+    ts_r,
+    ts_n,
+    ts_s1,
+    ts_s2,
+    ts_t,
+    qas,
+    t_cg=15.0863,
+    pos=1,
+    conse=6,
+    b_c2=False,
+    b_pinpoint=False,
+    gate_tcg=9.236,
+    b_monitor_init=False,
+):
     """
     pixel-based offline SCCD algorithm.
     Ye, S., Rogan, J., Zhu, Z., & Eastman, J. R. (2021). A near-real-time approach for monitoring forest
@@ -279,24 +346,63 @@ def sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.
     Or
     [SccdOutput, SccdReccgPinpoint]: b_pinpoint==True
     """
-    _validate_params(func_name='sccd_detect', t_cg=t_cg, pos=pos, conse=conse, b_c2=b_c2,
-                     b_pinpoint=b_pinpoint, gate_tcg=gate_tcg, b_monitor_init=b_monitor_init)
+    _validate_params(
+        func_name="sccd_detect",
+        t_cg=t_cg,
+        pos=pos,
+        conse=conse,
+        b_c2=b_c2,
+        b_pinpoint=b_pinpoint,
+        gate_tcg=gate_tcg,
+        b_monitor_init=b_monitor_init,
+    )
     # make sure it is c contiguous array and 64 bit
     dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas = _validate_data(
-        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas)
+        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas
+    )
 
     # sccd_wrapper = SccdDetectWrapper()
     # tmp = copy.deepcopy(sccd_wrapper.sccd_detect(dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg,
     #                                 pos, conse, b_c2, b_pinpoint, gate_tcg, b_monitor_init))
     # return tmp
     return _sccd_detect(
-        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg, pos, conse, b_c2, b_pinpoint,
-        gate_tcg, b_monitor_init)
+        dates,
+        ts_b,
+        ts_g,
+        ts_r,
+        ts_n,
+        ts_s1,
+        ts_s2,
+        ts_t,
+        qas,
+        t_cg,
+        pos,
+        conse,
+        b_c2,
+        b_pinpoint,
+        gate_tcg,
+        b_monitor_init,
+    )
 
 
 def sccd_update(
-        sccd_pack, dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg=15.0863, pos=1,
-        conse=6, b_c2=False, gate_tcg=9.236, predictability_tcg=15.086):
+    sccd_pack,
+    dates,
+    ts_b,
+    ts_g,
+    ts_r,
+    ts_n,
+    ts_s1,
+    ts_s2,
+    ts_t,
+    qas,
+    t_cg=15.0863,
+    pos=1,
+    conse=6,
+    b_c2=False,
+    gate_tcg=9.236,
+    predictability_tcg=9.236,
+):
     """
     SCCD online update for new observations
     Ye, S., Rogan, J., Zhu, Z., & Eastman, J. R. (2021). A near-real-time approach for monitoring forest
@@ -330,20 +436,49 @@ def sccd_update(
     # if not isinstance(sccd_pack, SccdOutput):
     #     raise ValueError("The type of sccd_pack has to be namedtuple 'SccdOutput'!")
 
-    _validate_params(func_name='sccd_update', t_cg=t_cg, pos=pos, conse=conse, b_c2=b_c2,
-                     b_pinpoint=False, gate_tcg=gate_tcg, predictability_tcg=predictability_tcg)
+    _validate_params(
+        func_name="sccd_update",
+        t_cg=t_cg,
+        pos=pos,
+        conse=conse,
+        b_c2=b_c2,
+        b_pinpoint=False,
+        gate_tcg=gate_tcg,
+        predictability_tcg=predictability_tcg,
+    )
 
     dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas = _validate_data(
-        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas)
+        dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas
+    )
 
     return _sccd_update(
-        sccd_pack, dates, ts_b, ts_g, ts_r, ts_n, ts_s1, ts_s2, ts_t, qas, t_cg, pos, conse, b_c2,
-        gate_tcg, predictability_tcg)
+        sccd_pack,
+        dates,
+        ts_b,
+        ts_g,
+        ts_r,
+        ts_n,
+        ts_s1,
+        ts_s2,
+        ts_t,
+        qas,
+        t_cg,
+        pos,
+        conse,
+        b_c2,
+        gate_tcg,
+        predictability_tcg,
+    )
 
 
 def sccd_identify(
-        sccd_pack, dist_conse=6, t_cg_scale100=1508.6, t_cg_singleband_scale1000=-200,
-        t_angle_scale100=4500, transform_mode=True):
+    sccd_pack,
+    dist_conse=6,
+    t_cg_scale100=1508.6,
+    t_cg_singleband_scale1000=-200,
+    t_angle_scale100=4500,
+    transform_mode=True,
+):
     """
     identify disturbance date from sccd_pack
     Parameters
@@ -361,29 +496,49 @@ def sccd_identify(
     0 (no disturbance) or the ordinal date of disturbance occurrence
     """
     _validate_params(
-        func_name='sccd_identify', dist_conse=dist_conse, t_cg_scale100=t_cg_scale100,
-        t_cg_singleband_scale1000=t_cg_singleband_scale1000, t_angle_scale100=t_angle_scale100,
-        transform_mode=transform_mode)
-    if sccd_pack.nrt_mode == defaults['SCCD']['NRT_MONITOR_SNOW'] or \
-            sccd_pack.nrt_mode == defaults['SCCD']['NRT_QUEUE_SNOW'] or int(sccd_pack.nrt_mode / 10) == 1:
+        func_name="sccd_identify",
+        dist_conse=dist_conse,
+        t_cg_scale100=t_cg_scale100,
+        t_cg_singleband_scale1000=t_cg_singleband_scale1000,
+        t_angle_scale100=t_angle_scale100,
+        transform_mode=transform_mode,
+    )
+    if (
+        sccd_pack.nrt_mode == defaults["SCCD"]["NRT_MONITOR_SNOW"]
+        or sccd_pack.nrt_mode == defaults["SCCD"]["NRT_QUEUE_SNOW"]
+        or int(sccd_pack.nrt_mode / 10) == 1
+    ):
         return sccd_pack, 0
 
-    if sccd_pack.nrt_model[0]['conse_last'] >= dist_conse and sccd_pack.nrt_model[0]['norm_cm'] > t_cg_scale100 and \
-            sccd_pack.nrt_model[0]['cm_angle'] < t_angle_scale100:
+    if (
+        sccd_pack.nrt_model[0]["conse_last"] >= dist_conse
+        and sccd_pack.nrt_model[0]["norm_cm"] > t_cg_scale100
+        and sccd_pack.nrt_model[0]["cm_angle"] < t_angle_scale100
+    ):
         cm_median = calculate_sccd_cm(sccd_pack)
-        if cm_median[2] < -t_cg_singleband_scale1000 and cm_median[3] > t_cg_singleband_scale1000 \
-                and cm_median[4] < -t_cg_singleband_scale1000:  # greening
+        if (
+            cm_median[2] < -t_cg_singleband_scale1000
+            and cm_median[3] > t_cg_singleband_scale1000
+            and cm_median[4] < -t_cg_singleband_scale1000
+        ):  # greening
             return sccd_pack, 0
         else:
             if transform_mode:
-                if int(sccd_pack.nrt_mode / 10) == 0 and sccd_pack.nrt_mode != defaults['SCCD'][
-                        'NRT_MONITOR2QUEUE']:
+                if (
+                    int(sccd_pack.nrt_mode / 10) == 0
+                    and sccd_pack.nrt_mode != defaults["SCCD"]["NRT_MONITOR2QUEUE"]
+                ):
                     sccd_pack = sccd_pack._replace(nrt_mode=sccd_pack.nrt_mode + 10)
-                elif sccd_pack.nrt_mode == defaults['SCCD']['NRT_MONITOR2QUEUE']:
+                elif sccd_pack.nrt_mode == defaults["SCCD"]["NRT_MONITOR2QUEUE"]:
                     sccd_pack = sccd_pack._replace(
-                        nrt_mode=defaults['SCCD']['NRT_QUEUE_STANDARD'] + 10)
-            return sccd_pack, sccd_pack.nrt_model[0]['obs_date_since1982'][defaults['SCCD']['DEFAULT_CONSE'] -
-                                                                           sccd_pack.nrt_model[0]['conse_last']] + \
-                defaults['COMMON']['JULIAN_LANDSAT4_LAUNCH']
+                        nrt_mode=defaults["SCCD"]["NRT_QUEUE_STANDARD"] + 10
+                    )
+            return (
+                sccd_pack,
+                sccd_pack.nrt_model[0]["obs_date_since1982"][
+                    defaults["SCCD"]["DEFAULT_CONSE"] - sccd_pack.nrt_model[0]["conse_last"]
+                ]
+                + defaults["COMMON"]["JULIAN_LANDSAT4_LAUNCH"],
+            )
     else:
         return sccd_pack, 0
