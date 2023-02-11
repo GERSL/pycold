@@ -97,7 +97,7 @@ int sccd(
 
     // mode update condition 1: replace NRT_MONITOR2QUEUE with NRT_QUEUE_STANDARD as input
     if (*nrt_mode % 10 == NRT_MONITOR2QUEUE)
-        *nrt_mode = (int)(*nrt_mode / 10) * 10 + NRT_QUEUE_STANDARD;
+        *nrt_mode = 10 + NRT_QUEUE_STANDARD;
 
     if ((*nrt_mode == NRT_QUEUE_SNOW) | (*nrt_mode % 10 == NRT_QUEUE_STANDARD))
         len_clrx = valid_num_scenes + *num_obs_queue;
