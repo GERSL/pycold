@@ -380,7 +380,9 @@ cpdef _sccd_detect(np.ndarray[np.int64_t, ndim=1, mode='c'] dates,
         if b_pinpoint == False:
             if nrt_mode % 10 == 1 or nrt_mode == 3:  # monitor mode
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode, nrt_model, np.array([]))
-            elif nrt_mode % 10 == 2 or nrt_mode == 4 or nrt_mode == 5:  # queue mode
+            if nrt_mode % 10 == 2 or nrt_mode == 4:  # queue mode
+                return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode, np.array([]), nrt_queue[:num_nrt_queue])
+            elif nrt_mode == 5:  # queue mode
                 return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode, nrt_model, nrt_queue[:num_nrt_queue])
             elif nrt_mode == 0:  # void mode
                 return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]),
@@ -397,7 +399,10 @@ cpdef _sccd_detect(np.ndarray[np.int64_t, ndim=1, mode='c'] dates,
                 return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                                    nrt_model, np.array([])),
                                    SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
-            elif nrt_mode % 10 == 2 or nrt_mode == 4 or nrt_mode == 5:  # queue mode
+            elif nrt_mode % 10 == 2 or nrt_mode == 4:
+                return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode, np.array([]), nrt_queue[:num_nrt_queue]),
+                                    SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
+            elif nrt_mode == 5:  # queue mode
                 return [SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode, nrt_model, nrt_queue[:num_nrt_queue]),
                                    SccdReccgPinpoint(pos, output_rec_cg_pinpoint)]
             elif nrt_mode == 0:  # void mode
@@ -474,7 +479,7 @@ cpdef _sccd_update(sccd_pack,
     if num_nrt_queue > 0:
         nrt_queue_new[0:num_nrt_queue] = sccd_pack.nrt_queue[0:num_nrt_queue]
 
-    if nrt_mode % 10 == 1 or nrt_mode == 3:
+    if nrt_mode % 10 == 1 or nrt_mode == 3 or nrt_mode % 10 == 5:
         nrt_model_new = sccd_pack.nrt_model.copy()
     else:
         nrt_model_new = np.empty(1, dtype=nrtmodel_dt)
@@ -514,7 +519,9 @@ cpdef _sccd_update(sccd_pack,
         if nrt_mode % 10 == 1 or nrt_mode == 3:  # monitor mode
             return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode,
                               nrt_model_new, np.array([]))
-        elif nrt_mode % 10 == 2 or nrt_mode == 4 or nrt_mode == 5:  # queue or m2q mode
+        elif nrt_mode % 10 == 2 or nrt_mode == 4: # queue mode:
+            return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode, np.array([]), nrt_queue_new[0:num_nrt_queue])
+        elif nrt_mode == 5:  # queue or m2q mode
             return SccdOutput(pos, output_rec_cg, min_rmse, nrt_mode, nrt_model_new, nrt_queue_new[0:num_nrt_queue])
         elif nrt_mode == 0:  # void mode
             return SccdOutput(pos, np.array([]), min_rmse, nrt_mode, np.array([]), np.array([]))

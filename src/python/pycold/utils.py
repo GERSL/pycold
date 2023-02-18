@@ -71,9 +71,16 @@ def get_row_index(pos, n_cols, current_block_y, block_height):
     return int((pos - 1) / n_cols) - (current_block_y - 1) * block_height
 
 
-def assemble_cmmaps(dataset_info: DatasetInfo, result_path: str, cmmap_path: str,
-                    starting_date: int, n_cm_maps: int, prefix: str, cm_output_interval: int,
-                    clean: bool = True):
+def assemble_cmmaps(
+    dataset_info: DatasetInfo,
+    result_path: str,
+    cmmap_path: str,
+    starting_date: int,
+    n_cm_maps: int,
+    prefix: str,
+    cm_output_interval: int,
+    clean: bool = True,
+):
     """
     this function reorganized block-based fix-interval CM intermediate files into map-based output (one map per interval)
     Parameters
@@ -110,7 +117,9 @@ def assemble_cmmaps(dataset_info: DatasetInfo, result_path: str, cmmap_path: str
 
     cm_map_list = [
         np.full(
-            (dataset_info.n_rows, dataset_info.n_cols), defaults["COMMON"]["NAN_VAL"], dtype=output_type
+            (dataset_info.n_rows, dataset_info.n_cols),
+            defaults["COMMON"]["NAN_VAL"],
+            dtype=output_type,
         )
         for x in range(n_cm_maps)
     ]
@@ -138,10 +147,10 @@ def assemble_cmmaps(dataset_info: DatasetInfo, result_path: str, cmmap_path: str
         for count, maps in enumerate(cm_map_list):
             maps[
                 (current_block_y - 1)
-                * dataset_info.block_height: current_block_y
+                * dataset_info.block_height : current_block_y
                 * dataset_info.block_height,
                 (current_block_x - 1)
-                * dataset_info.block_width: current_block_x
+                * dataset_info.block_width : current_block_x
                 * dataset_info.block_width,
             ] = hori_profile[count].reshape(dataset_info.block_height, dataset_info.block_width)
 
@@ -436,7 +445,7 @@ def save_1band_fromrefimage(array, out_path, ref_image_path=None, gtype=gdal.GDT
 
     if ref_image_path is None:
         outdriver1 = gdal.GetDriverByName("GTiff")
-        outdata = outdriver1.Create(out_path, rows, cols, 1, gtype)
+        outdata = outdriver1.Create(out_path, cols, rows, 1, gtype)
         outdata.GetRasterBand(1).WriteArray(array)
         outdata.FlushCache()
     else:
@@ -444,7 +453,7 @@ def save_1band_fromrefimage(array, out_path, ref_image_path=None, gtype=gdal.GDT
         trans = ref_image.GetGeoTransform()
         proj = ref_image.GetProjection()
         outdriver1 = gdal.GetDriverByName("GTiff")
-        outdata = outdriver1.Create(out_path, rows, cols, 1, gtype)
+        outdata = outdriver1.Create(out_path, cols, rows, 1, gtype)
         outdata.GetRasterBand(1).WriteArray(array)
         outdata.FlushCache()
         outdata.SetGeoTransform(trans)
@@ -550,7 +559,7 @@ def calculate_sccd_cm(sccd_pack):
         ]
     )
     cm = (
-        sccd_pack.nrt_model[0]["obs"][:, start_index: defaults["SCCD"]["DEFAULT_CONSE"]] - pred_ref
+        sccd_pack.nrt_model[0]["obs"][:, start_index : defaults["SCCD"]["DEFAULT_CONSE"]] - pred_ref
     )
     return np.median(cm, axis=1)
 

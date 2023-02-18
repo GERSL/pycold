@@ -96,10 +96,10 @@ int sccd(
     }
 
     // mode update condition 1: replace NRT_MONITOR2QUEUE with NRT_QUEUE_STANDARD as input
-    if (*nrt_mode % 10 == NRT_MONITOR2QUEUE)
-        *nrt_mode = 10 + NRT_QUEUE_STANDARD;
+    // if (*nrt_mode % 10 == NRT_MONITOR2QUEUE)
+    //     *nrt_mode = 10 + NRT_QUEUE_STANDARD;
 
-    if ((*nrt_mode == NRT_QUEUE_SNOW) | (*nrt_mode % 10 == NRT_QUEUE_STANDARD))
+    if ((*nrt_mode == NRT_QUEUE_SNOW) | (*nrt_mode % 10 == NRT_QUEUE_STANDARD) | (*nrt_mode % 10 == NRT_MONITOR2QUEUE))
         len_clrx = valid_num_scenes + *num_obs_queue;
     else if ((*nrt_mode == NRT_MONITOR_SNOW) | (*nrt_mode % 10 == NRT_MONITOR_STANDARD))
         len_clrx = valid_num_scenes + DEFAULT_CONSE;
@@ -151,7 +151,7 @@ int sccd(
     /*     initializing clrx and clry using existing obs in queue        */
     /*                                                                   */
     /*********************************************************************/
-    if ((*nrt_mode == NRT_QUEUE_SNOW) | (*nrt_mode % 10 == NRT_QUEUE_STANDARD))
+    if ((*nrt_mode == NRT_QUEUE_SNOW) | (*nrt_mode % 10 == NRT_QUEUE_STANDARD) | (*nrt_mode % 10 == NRT_MONITOR2QUEUE))
     {
         // if queue mode, will append old observation first
         for (i = 0; i < *num_obs_queue; i++)
@@ -223,7 +223,7 @@ int sccd(
             }
         }
 
-        if ((n_clr > n_clr_record) | (*nrt_mode % 10 == NRT_QUEUE_STANDARD))
+        if (n_clr > n_clr_record)
         {
 
             /* need to calculate min_rmse at the beginning of the monitoring */
@@ -2216,7 +2216,7 @@ int step3_processing_end(
     //    time_taken = (clock() - (double)t_time)/CLOCKS_PER_SEC; // calculate the elapsed time
     //    printf("step3 timepoint 1 took %f seconds to execute\n", time_taken);
     //    t_time = clock();
-    if (*nrt_mode != NRT_MONITOR2QUEUE)
+    if (*nrt_mode % 10 == NRT_MONITOR_STANDARD)
     {
         /****************************************************/
         /*   need to save nrt records for monitor mode      */
@@ -2501,7 +2501,7 @@ int step3_processing_end(
         }
     }
 
-    if ((*nrt_mode % 10 == NRT_QUEUE_STANDARD) | (*nrt_mode % 10 == NRT_MONITOR2QUEUE)) // meaning will update mode to queue
+    if ((*nrt_mode % 10 == NRT_QUEUE_STANDARD) | (*nrt_mode % 10 == NRT_MONITOR2QUEUE))
     {
         *num_obs_queue = *n_clr - prev_i_break;
         if (*num_obs_queue > MAX_OBS_QUEUE)
@@ -2704,7 +2704,7 @@ int sccd_standard(
             initialize_ssmconstants(DEFAULT_N_STATE, nrt_model->H[i_b], &instance[i_b]);
         }
     }
-    else if (*nrt_mode % 10 == NRT_QUEUE_STANDARD)
+    else if ((*nrt_mode % 10 == NRT_QUEUE_STANDARD) | (*nrt_mode % 10 == NRT_MONITOR2QUEUE))
     {
         for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
@@ -2956,68 +2956,87 @@ int sccd_standard(
     //    }
 
     // calculate fit_cft for queue mode; num_obs_processed and sum_square_vt are also updated if the status is queue
-    if (bl_train == 0)
-    {
-        t_start = clrx[prev_i_break];
-        if (n_clr - prev_i_break < conse)
-        {
-            num_obs_processed = 0;
-            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-            {
-                for (k2 = 0; k2 < SCCD_NUM_C; k2++)
-                    fit_cft[i_b][k2] = NA_VALUE;
-                sum_square_vt[i_b] = 0;
-            }
-        }
-        //    RETURN_ERROR("The observation in the queue cannot be smaller than conse \n", FUNC_NAME, FAILURE);
-        else
-        {
-            num_obs_processed = n_clr - prev_i_break - conse;
-            if (num_obs_processed < conse)
-                num_obs_processed = conse;
+    // if (bl_train == 0)
+    // {
+    //     t_start = clrx[prev_i_break];
+    //     if (n_clr - prev_i_break < conse)
+    //     {
+    //         num_obs_processed = 0;
+    //         for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+    //         {
+    //             for (k2 = 0; k2 < SCCD_NUM_C; k2++)
+    //                 fit_cft[i_b][k2] = NA_VALUE;
+    //             sum_square_vt[i_b] = 0;
+    //         }
+    //     }
+    //     //    RETURN_ERROR("The observation in the queue cannot be smaller than conse \n", FUNC_NAME, FAILURE);
+    //     else
+    //     {
+    //         num_obs_processed = n_clr - prev_i_break - conse;
+    //         if (num_obs_processed < conse)
+    //             num_obs_processed = conse;
 
-            update_cft(num_obs_processed, N_TIMES, MIN_NUM_C, MID_NUM_C, MID_NUM_C,
-                       SCCD_NUM_C, &update_num_c);
-            for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
-            {
-                status = auto_ts_fit_sccd(clrx, clry, i_b, i_b, prev_i_break, prev_i_break + num_obs_processed - 1,
-                                          update_num_c, fit_cft, &rmse_ini[i_b], rec_v_dif);
-                if (status != SUCCESS)
-                {
-                    RETURN_ERROR("Calling auto_ts_fit_sccd at the end of time series\n",
-                                 FUNC_NAME, FAILURE);
-                }
-                sum_square_vt[i_b] = rmse_ini[i_b] * rmse_ini[i_b] * (num_obs_processed - update_num_c);
-            }
-        }
-    }
+    //         update_cft(num_obs_processed, N_TIMES, MIN_NUM_C, MID_NUM_C, MID_NUM_C,
+    //                    SCCD_NUM_C, &update_num_c);
+    //         for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
+    //         {
+    //             status = auto_ts_fit_sccd(clrx, clry, i_b, i_b, prev_i_break, prev_i_break + num_obs_processed - 1,
+    //                                       update_num_c, fit_cft, &rmse_ini[i_b], rec_v_dif);
+    //             if (status != SUCCESS)
+    //             {
+    //                 RETURN_ERROR("Calling auto_ts_fit_sccd at the end of time series\n",
+    //                              FUNC_NAME, FAILURE);
+    //             }
+    //             sum_square_vt[i_b] = rmse_ini[i_b] * rmse_ini[i_b] * (num_obs_processed - update_num_c);
+    //         }
+    //     }
+    // }
 
     /**************************************************************/
     /*                                                            */
     /*    change status before entering step 3                    */
     /*                                                            */
     /**************************************************************/
+    int new_mode = *nrt_mode;
     if (*nrt_mode == NRT_VOID)
     {
         if (bl_train == 1)
-            *nrt_mode = NRT_MONITOR_STANDARD;
+            new_mode = NRT_MONITOR_STANDARD;
         else
-            *nrt_mode = NRT_QUEUE_STANDARD + 10;
+            new_mode = NRT_QUEUE_STANDARD + 10;
     }
-    else if (change_detected == TRUE)
+    else
     {
-        if (*nrt_mode / 10 == 1)
-        { // the change has been detected previously, so predictability is not been confirmed
-            *nrt_mode = NRT_QUEUE_STANDARD + 10;
+        if (change_detected == TRUE)
+        {
+            if (*nrt_mode / 10 == 1)
+            { // the change has been detected previously, so predictability is not been confirmed
+                new_mode = NRT_QUEUE_STANDARD + 10;
+            }
+            else
+                new_mode = NRT_MONITOR2QUEUE; // NRT_MONITOR2QUEU always has firm predictability
         }
         else
-            *nrt_mode = NRT_MONITOR2QUEUE; // NRT_MONITOR2QUEU always has firm predictability
+        {
+            if (*nrt_mode % 10 == NRT_QUEUE_STANDARD)
+            {
+                if (bl_train == 1)
+                    new_mode = NRT_MONITOR_STANDARD;
+            }
+            else if (*nrt_mode % 10 == NRT_MONITOR2QUEUE)
+            {
+                if (clrx[n_clr - conse] - nrt_model->obs_date_since1982[0] - ORDINAL_LANDSAT4_LAUNCH < STATUS_DELEY_DAYS)
+                {
+                    prev_i_break = 0;
+                }
+                else
+                {
+                    new_mode = NRT_QUEUE_STANDARD + 10;
+                }
+            }
+        }
     }
-    else if (*nrt_mode % 10 == NRT_QUEUE_STANDARD)
-    {
-        if (bl_train == 1)
-            *nrt_mode = NRT_MONITOR_STANDARD;
-    }
+    *nrt_mode = new_mode;
 
     status = step3_processing_end(instance, cov_p, fit_cft, clrx, clry, i, &n_clr, nrt_mode,
                                   i_start, prev_i_break, nrt_model, num_obs_queue,

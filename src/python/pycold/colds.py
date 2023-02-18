@@ -524,15 +524,12 @@ def sccd_identify(
             return sccd_pack, 0
         else:
             if transform_mode:
-                if (
-                    int(sccd_pack.nrt_mode / 10) == 0
-                    and sccd_pack.nrt_mode != defaults["SCCD"]["NRT_MONITOR2QUEUE"]
-                ):
+                if sccd_pack.nrt_mode == defaults["SCCD"]["NRT_MONITOR_STANDARD"]:
                     sccd_pack = sccd_pack._replace(nrt_mode=sccd_pack.nrt_mode + 10)
-                elif sccd_pack.nrt_mode == defaults["SCCD"]["NRT_MONITOR2QUEUE"]:
-                    sccd_pack = sccd_pack._replace(
-                        nrt_mode=defaults["SCCD"]["NRT_QUEUE_STANDARD"] + 10
-                    )
+                # elif sccd_pack.nrt_mode == defaults["SCCD"]["NRT_MONITOR2QUEUE"]:
+                #     sccd_pack = sccd_pack._replace(
+                #         nrt_mode=defaults["SCCD"]["NRT_QUEUE_STANDARD"] + 10
+                #     )
             return (
                 sccd_pack,
                 sccd_pack.nrt_model[0]["obs_date_since1982"][
