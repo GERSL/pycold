@@ -46,10 +46,10 @@ jobs:
     - name: Upgrade pip
       run: |-
         python -m pip install --upgrade pip
-        python -m pip install -r requirements/tests.txt
-        python -m pip install -r requirements/runtime.txt
-        python -m pip install -r requirements/headless.txt
-        python -m pip install -r requirements/gdal.txt
+        python -m pip install --prefer-binary -r requirements/tests.txt
+        python -m pip install --prefer-binary -r requirements/runtime.txt
+        python -m pip install --prefer-binary -r requirements/headless.txt
+        python -m pip install --prefer-binary -r requirements/gdal.txt
     - name: Build sdist
       shell: bash
       run: |-
@@ -59,7 +59,7 @@ jobs:
     - name: Install sdist
       run: |-
         ls -al ./wheelhouse
-        pip install wheelhouse/pycold*.tar.gz -v
+        pip install --prefer-binary wheelhouse/pycold*.tar.gz -v
     - name: Test minimal loose sdist
       run: |-
         pwd

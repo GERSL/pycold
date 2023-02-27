@@ -1,5 +1,10 @@
 #!/bin/bash
 __doc__="""
+Runs cibuildwheel to create linux binary wheels.
+
+Requirements:
+    pip install cibuildwheel
+
 SeeAlso:
     pyproject.toml
 """
