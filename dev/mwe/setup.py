@@ -14,7 +14,7 @@ Usage:
 
     python setup.py mwe analyize
 
-    python ~/code/pycold/dev/setup.py mwe analyize --mod_name=pycold --repo_dpath=$HOME/code/pycold
+    python ~/code/pycold/dev/mwe/setup.py mwe analyize --mod_name=pycold --repo_dpath=$HOME/code/pycold
 """
 import sys
 
