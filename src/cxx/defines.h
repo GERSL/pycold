@@ -125,8 +125,8 @@
 
 #define N_FEATURE 7
 #define DEFAULT_PROBABILITY 0.99
-#define DEFAULT_CONSE 6
-
+// #define DEFAULT_CONSE 6
+#define DEFAULT_CONSE_SCCD 8
 #define JULY1ST_DOY 183
 #define SLOPE_SCALE 10000 // the parameter to guarantee the precision for converting scale double slope to float slope
 

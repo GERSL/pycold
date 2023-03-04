@@ -23,7 +23,7 @@ except ImportError:
 cdef int NUM_FC = 40  # define the maximum number of outputted curves
 cdef int NUM_FC_SCCD = 40
 cdef int NUM_NRT_QUEUE = 240
-DEF DEFAULT_CONSE = 6
+DEF DEFAULT_CONSE = 8
 DEF NRT_BAND = 6
 DEF SCCD_NUM_C = 6
 
@@ -310,7 +310,7 @@ cpdef _sccd_detect(np.ndarray[np.int64_t, ndim=1, mode='c'] dates,
        ts_t: 1d array of shape(observation numbers), time series of thermal band
        qas: 1d array, the QA cfmask bands. '0' - clear; '1' - water; '2' - shadow; '3' - snow; '4' - cloud
        t_cg: threshold of change magnitude, default is chi2.ppf(0.99,5)
-        pos: position id of the pixel
+       pos: position id of the pixel
        conse: consecutive observation number
        b_c2: bool, a temporal parameter to indicate if collection 2. C2 needs ignoring thermal band for valid pixel test due to its current low quality
        b_pinpoint: bool, output pinpoint break

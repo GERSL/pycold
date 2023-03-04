@@ -102,7 +102,7 @@ int sccd(
     if ((*nrt_mode == NRT_QUEUE_SNOW) | (*nrt_mode % 10 == NRT_QUEUE_STANDARD) | (*nrt_mode % 10 == NRT_MONITOR2QUEUE))
         len_clrx = valid_num_scenes + *num_obs_queue;
     else if ((*nrt_mode == NRT_MONITOR_SNOW) | (*nrt_mode % 10 == NRT_MONITOR_STANDARD))
-        len_clrx = valid_num_scenes + DEFAULT_CONSE;
+        len_clrx = valid_num_scenes + DEFAULT_CONSE_SCCD;
     else
         len_clrx = valid_num_scenes;
 
@@ -165,7 +165,7 @@ int sccd(
     else if ((*nrt_mode == NRT_MONITOR_SNOW) | (*nrt_mode % 10 == NRT_MONITOR_STANDARD))
     {
         //  if monitor mode, will append output_nrtmodel default conse-1 obs
-        for (k = 0; k < DEFAULT_CONSE; k++)
+        for (k = 0; k < DEFAULT_CONSE_SCCD; k++)
         {
             for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
             {
@@ -1745,7 +1745,7 @@ int step2_KF_ChangeDetection(
     }
     for (k = 0; k < conse; k++)
     {
-        v_dif_mag_norm[k] = 0;
+        v_dif_mag_norm[k] = 0.0;
     }
 
     medium_v_dif = (float *)malloc(TOTAL_IMAGE_BANDS_SCCD * sizeof(float));
@@ -1783,9 +1783,14 @@ int step2_KF_ChangeDetection(
             }
         }
 
+        if (v_dif_mag_norm[i_conse] < break_mag)
+        {
+            break_mag = v_dif_mag_norm[i_conse];
+        }
+
         if (b_pinpoint == TRUE)
         {
-            if ((v_dif_mag_norm[i_conse] < gate_tcg) & (i_conse < PINPOINT_CONSE))
+            if ((break_mag < gate_tcg) & (i_conse < PINPOINT_CONSE))
             {
                 change_flag = FALSE;
                 break;
@@ -1793,7 +1798,7 @@ int step2_KF_ChangeDetection(
         }
         else
         {
-            if (v_dif_mag_norm[i_conse] < tcg)
+            if (break_mag < tcg)
             {
                 change_flag = FALSE;
                 break;
@@ -1817,11 +1822,6 @@ int step2_KF_ChangeDetection(
         //                break;
         //            }
         //        }
-
-        if (v_dif_mag_norm[i_conse] < break_mag)
-        {
-            break_mag = v_dif_mag_norm[i_conse];
-        }
     }
 
     if (b_pinpoint == TRUE)
@@ -1875,7 +1875,7 @@ int step2_KF_ChangeDetection(
                         mean_angle_pinpoint = MAX_SHORT;
                     rec_cg_pinpoint[current_pinpoint].cm_angle[conse_last - 1] = (short int)mean_angle_pinpoint;
                     rec_cg_pinpoint[current_pinpoint].norm_cm[conse_last - 1] = (short int)min_cm;
-                    for (k = 0; k < DEFAULT_CONSE; k++)
+                    for (k = 0; k < DEFAULT_CONSE_SCCD; k++)
                     {
                         for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
                         {
@@ -2248,7 +2248,7 @@ int step3_processing_end(
         nrt_model->num_obs = (short int)(num_obs_processed);
 
         /*     5. observations in tail       */
-        for (k = 0; k < DEFAULT_CONSE; k++)
+        for (k = 0; k < DEFAULT_CONSE_SCCD; k++)
         {
             if (num_obs_processed > 0)
             {
@@ -2898,7 +2898,7 @@ int sccd_standard(
                 nrt_model->num_obs = (short int)(num_obs_processed);
 
                 /*     5. observations in tail       */
-                for (k = 0; k < DEFAULT_CONSE; k++)
+                for (k = 0; k < DEFAULT_CONSE_SCCD; k++)
                 {
                     if (k < conse)
                     {
@@ -3302,11 +3302,11 @@ int sccd_snow(
             initialize_ssmconstants(DEFAULT_N_STATE, nrt_model[0].H[i_b], &instance[i_b]);
         }
 
-        nrt_model[0].num_obs = nrt_model[0].num_obs + n_clr - DEFAULT_CONSE;
+        nrt_model[0].num_obs = nrt_model[0].num_obs + n_clr - DEFAULT_CONSE_SCCD;
 
         for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
-            for (i = 0; i < n_clr - DEFAULT_CONSE; i++)
+            for (i = 0; i < n_clr - DEFAULT_CONSE_SCCD; i++)
             {
                 KF_ts_filter_regular(&instance[i_b], clrx, clry[i_b], cov_p[i_b], fit_cft, i, i_b, &vt, FALSE);
                 sum_square_vt[i_b] = sum_square_vt[i_b] + (unsigned int)(vt * vt);
@@ -3314,13 +3314,13 @@ int sccd_snow(
         }
     }
 
-    for (k = 0; k < DEFAULT_CONSE; k++)
+    for (k = 0; k < DEFAULT_CONSE_SCCD; k++)
     {
         for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
         {
-            nrt_model[0].obs[i_b][k] = (short int)clry[i_b][n_clr - DEFAULT_CONSE + k];
+            nrt_model[0].obs[i_b][k] = (short int)clry[i_b][n_clr - DEFAULT_CONSE_SCCD + k];
         }
-        nrt_model[0].obs_date_since1982[k] = (short int)(clrx[n_clr - DEFAULT_CONSE + k] - ORDINAL_LANDSAT4_LAUNCH);
+        nrt_model[0].obs_date_since1982[k] = (short int)(clrx[n_clr - DEFAULT_CONSE_SCCD + k] - ORDINAL_LANDSAT4_LAUNCH);
     }
 
     for (i_b = 0; i_b < TOTAL_IMAGE_BANDS_SCCD; i_b++)
