@@ -2766,7 +2766,7 @@ int stand_procedure
                     else if (k == 5)
                         clry[k][n_clr] = (float)buf_s2[i];
                     else if (k == 6){
-                        if (b_c2 == TRUE)
+                        if ((b_c2 == TRUE) && (buf_t[i] == 0))
                             clry[k][n_clr] = 0;
                         else
                             clry[k][n_clr] = (float)(buf_t[i] * 10 - 27320);
