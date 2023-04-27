@@ -105,7 +105,7 @@ def assemble_cmmaps(
     if prefix == "CM":
         output_type = np.int16
     elif prefix == "CM_date":
-        output_type = np.int32
+        output_type = np.int16
         # cuz the date is produced as byte to squeeze the storage size, need to expand
         # anchor_dates_list_single = np.arange(start=starting_date,
         #                                      stop=starting_date + config['CM_OUTPUT_INTERVAL'] * n_cm_maps,
@@ -134,11 +134,11 @@ def assemble_cmmaps(
             print("Reading CM files fails: {}".format(e))
         #    continue
 
-        if prefix == "CM_date":
-            cm_block_copy = cm_block.copy()
-            cm_block = cm_block + defaults["COMMON"]["JULIAN_LANDSAT4_LAUNCH"]
+        # if prefix == "CM_date":
+        #    cm_block_copy = cm_block.copy()
+        #    cm_block = cm_block + defaults["COMMON"]["JULIAN_LANDSAT4_LAUNCH"]
             # we assign an extremely large value to original NA value (255)
-            cm_block[cm_block_copy == -9999] = -9999
+        #    cm_block[cm_block_copy == -9999] = -9999
 
         cm_block_reshape = np.reshape(
             cm_block, (dataset_info.block_width * dataset_info.block_height, n_cm_maps)

@@ -905,6 +905,16 @@ class ObjectAnalystHPC:
                 (self.dataset_info.n_rows, self.dataset_info.n_cols), 0, dtype=np.int32
             )
         else:
+            date_array = np.load(join(self.cmmap_path, cmdatename_fromdate(date) + ".npy")).astype(np.int32)
+            date_array_copy = date_array
+            date_array = date_array + defaults["COMMON"]["JULIAN_LANDSAT4_LAUNCH"]
+            date_array[date_array_copy == -9999] = -9999
+            del date_array_copy
+            date_array_last = np.load(join(self.cmmap_path, cmdatename_fromdate(date - cm_output_interval) + ".npy")).astype(np.int32)
+            date_array_copy = date_array_last
+            date_array_last = date_array_last + defaults["COMMON"]["JULIAN_LANDSAT4_LAUNCH"]
+            date_array_last[date_array_copy == -9999] = -9999
+            del date_array_copy
             if method == "floodfill":
                 [
                     object_map_s1,
@@ -913,36 +923,26 @@ class ObjectAnalystHPC:
                     s1_info,
                 ] = segmentation_floodfill(
                     np.load(join(self.cmmap_path, cmname_fromdate(date) + ".npy")),
-                    np.load(join(self.cmmap_path, cmdatename_fromdate(date) + ".npy")),
+                    date_array,
                     np.load(
                         join(
                             self.cmmap_path,
                             cmname_fromdate(date - cm_output_interval) + ".npy",
                         )
                     ),
-                    np.load(
-                        join(
-                            self.cmmap_path,
-                            cmdatename_fromdate(date - cm_output_interval) + ".npy",
-                        )
-                    ),
+                    date_array_last
                 )
             elif method == "slic":
                 [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation_slic(
                     np.load(join(self.cmmap_path, cmname_fromdate(date) + ".npy")),
-                    np.load(join(self.cmmap_path, cmdatename_fromdate(date) + ".npy")),
+                    date_array,
                     np.load(
                         join(
                             self.cmmap_path,
                             cmname_fromdate(date - cm_output_interval) + ".npy",
                         )
                     ),
-                    np.load(
-                        join(
-                            self.cmmap_path,
-                            cmdatename_fromdate(date - cm_output_interval) + ".npy",
-                        )
-                    ),
+                    date_array_last
                 )
             elif method == "watershed":
                 [
@@ -952,19 +952,14 @@ class ObjectAnalystHPC:
                     s1_info,
                 ] = segmentation_watershed(
                     np.load(join(self.cmmap_path, cmname_fromdate(date) + ".npy")),
-                    np.load(join(self.cmmap_path, cmdatename_fromdate(date) + ".npy")),
+                    date_array,
                     np.load(
                         join(
                             self.cmmap_path,
                             cmname_fromdate(date - cm_output_interval) + ".npy",
                         )
                     ),
-                    np.load(
-                        join(
-                            self.cmmap_path,
-                            cmdatename_fromdate(date - cm_output_interval) + ".npy",
-                        )
-                    ),
+                    date_array_last
                 )
 
             if self.thematic_path is not None:

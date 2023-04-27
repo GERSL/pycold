@@ -633,7 +633,7 @@ def main(
                     cm_output_interval,
                     clean=False,
                 )
-            elif rank == 2:
+            if rank == 16:
                 assemble_cmmaps(
                     dataset_info,
                     result_path,
