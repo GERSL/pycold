@@ -17,7 +17,8 @@ rm -rf tests/htmlcov
 rm -rf tests/coverage.xml
 
 # Also clean up any shared libraries
-rm src/python/pycold/_colds_cython.*.so
+rm -f src/python/pycold/_colds_cython.*.so
+rm -f src/python/pycold/*.so
 # Clean up old egg links and such
 rm -rf src/python/pycold.egg-info
 rm -rf pycold.egg-info
