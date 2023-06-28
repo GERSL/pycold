@@ -303,7 +303,7 @@ jobs:
   test_deploy:
     name: Uploading Test to PyPi
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && ! startsWith(github.event.ref, 'refs/tags') && ! startsWith(github.event.ref, 'refs/heads/release') 
+    if: github.event_name == 'push' && ! startsWith(github.event.ref, 'refs/tags') && ! startsWith(github.event.ref, 'refs/heads/release')
     needs:
     - build_and_test_sdist
     - build_binpy_wheels
@@ -323,10 +323,10 @@ jobs:
       env:
         TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
         TWINE_USERNAME: __user__
-        TWINE_PASSWORD: ${{ secrets.PYPI_TEST }}
+        TWINE_PASSWORD: ${{ secrets.PYPY_TEST }}
       run: |-
         pip install urllib3 requests[security] twine -U
-        twine upload --username=__token__ --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
+        twine upload --username __token__ --password "$TWINE_PASSWORD" --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
   live_deploy:
     name: Uploading Live to PyPi
     runs-on: ubuntu-latest
@@ -353,6 +353,6 @@ jobs:
         TWINE_PASSWORD: ${{ secrets.PYPI }}
       run: |-
         pip install urllib3 requests[security] twine -U
-        twine upload --username=__token__ --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
+        twine upload --username __token__ --password "$TWINE_PASSWORD" --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
 
 

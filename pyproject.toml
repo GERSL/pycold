@@ -35,7 +35,7 @@ description = "python implementation of COntinuous monitoring of Land disturbanc
 dev_status = "beta"
 license = "Apache 2"
 ci_pypi_live_password_varname = 'PYPI'
-ci_pypi_test_password_varname = 'PYPI_TEST'
+ci_pypi_test_password_varname = 'PYPY_TEST'
 
 
 [tool.cibuildwheel]
