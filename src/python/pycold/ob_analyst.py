@@ -242,7 +242,14 @@ def modeby(input_array, index_array):
 
     # Split input array with those start, stop ones
     split = [a_sorted[i:j] for i, j in zip(cut_idx[:-1], cut_idx[1:])]
-    mode_list = [stats.mode(x)[0][0] for x in split]
+    try:
+        mode_list = [stats.mode(x)[0][0] for x in split]
+    except Exception as ex:
+        print('ERROR in modeby')
+        print(f'ex={ex}')
+        print(f'split={split}')
+        print(f'stats={stats}')
+        raise
     return mode_list
 
 
