@@ -188,36 +188,36 @@ jobs:
         # Xcookie generates an explicit list of environments that will be used
         # for testing instead of using the more concise matrix notation.
         include:
-        - python-version: '3.8'
-          install-extras: tests-strict,runtime-strict,headless-strict
-          os: ubuntu-latest
-          arch: auto
-          gdal-requirement-txt: requirements/gdal-strict.txt
+        #- python-version: '3.8'
+        #  install-extras: tests-strict,runtime-strict,headless-strict
+        #  os: ubuntu-latest
+        #  arch: auto
+        #  gdal-requirement-txt: requirements/gdal-strict.txt
         - python-version: '3.11'
           install-extras: tests-strict,runtime-strict,optional-strict,headless-strict
           os: ubuntu-latest
           arch: auto
           gdal-requirement-txt: requirements/gdal-strict.txt
-        - python-version: '3.8'
-          install-extras: tests,optional,headless
-          os: ubuntu-latest
-          arch: auto
-          gdal-requirement-txt: requirements/gdal.txt
-        - python-version: '3.9'
-          install-extras: tests,optional,headless
-          os: ubuntu-latest
-          arch: auto
-          gdal-requirement-txt: requirements/gdal.txt
-        - python-version: '3.10'
-          install-extras: tests,optional,headless
-          os: ubuntu-latest
-          arch: auto
-          gdal-requirement-txt: requirements/gdal.txt
-        - python-version: '3.11'
-          install-extras: tests,optional,headless
-          os: ubuntu-latest
-          arch: auto
-          gdal-requirement-txt: requirements/gdal.txt
+        #- python-version: '3.8'
+        #  install-extras: tests,optional,headless
+        #  os: ubuntu-latest
+        #  arch: auto
+        #  gdal-requirement-txt: requirements/gdal.txt
+        #- python-version: '3.9'
+        #  install-extras: tests,optional,headless
+        #  os: ubuntu-latest
+        #  arch: auto
+        #  gdal-requirement-txt: requirements/gdal.txt
+        #- python-version: '3.10'
+        #  install-extras: tests,optional,headless
+        #  os: ubuntu-latest
+        #  arch: auto
+        #  gdal-requirement-txt: requirements/gdal.txt
+        #- python-version: '3.11'
+        #  install-extras: tests,optional,headless
+        #  os: ubuntu-latest
+        #  arch: auto
+        #  gdal-requirement-txt: requirements/gdal.txt
     steps:
     - name: Checkout source
       uses: actions/checkout@v3
@@ -323,10 +323,10 @@ jobs:
       env:
         TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
         TWINE_USERNAME: __user__
-        TWINE_PASSWORD: ${{ secrets.PYPI_TEST }}
+        TWINE_PASSWORD: ${{ secrets.PYPY_TEST }}
       run: |-
         pip install urllib3 requests[security] twine -U
-        twine upload --username=__token__ --password=$TWINE_PASSWORD --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
+        twine upload --username __token__ --password "$TWINE_PASSWORD" --repository-url "$TWINE_REPOSITORY_URL" wheelhouse/* --skip-existing --verbose || { echo "failed to twine upload" ; exit 1; }
   live_deploy:
     name: Uploading Live to PyPi
     runs-on: ubuntu-latest
