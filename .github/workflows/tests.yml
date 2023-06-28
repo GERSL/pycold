@@ -303,7 +303,7 @@ jobs:
   test_deploy:
     name: Uploading Test to PyPi
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && ! startsWith(github.event.ref, 'refs/tags') && ! startsWith(github.event.ref, 'refs/heads/release') && github.event.pull_request.head.repo.full_name == 'GERSL/pycold'
+    if: github.event_name == 'push' && ! startsWith(github.event.ref, 'refs/tags') && ! startsWith(github.event.ref, 'refs/heads/release') 
     needs:
     - build_and_test_sdist
     - build_binpy_wheels
@@ -330,7 +330,7 @@ jobs:
   live_deploy:
     name: Uploading Live to PyPi
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (startsWith(github.event.ref, 'refs/tags') || startsWith(github.event.ref, 'refs/heads/release')) && github.event.pull_request.head.repo.full_name == 'GERSL/pycold'
+    if: github.event_name == 'push' && (startsWith(github.event.ref, 'refs/tags') || startsWith(github.event.ref, 'refs/heads/release'))
     needs:
     - build_and_test_sdist
     - build_binpy_wheels
