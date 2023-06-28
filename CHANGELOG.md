@@ -6,6 +6,9 @@ that conforms to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Version 0.1.1] - Unreleased
 
+### Changed
+* Fixed requirements (added astropy)
+* Added support for Python 3.11
 
 ## [Version 0.1.0] - Released 2022-09-09
 

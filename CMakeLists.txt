@@ -2,10 +2,6 @@ cmake_minimum_required(VERSION 3.13.0)
 project(pycold LANGUAGES C Fortran)
 
 
-find_package(PythonInterp REQUIRED)
-find_package(PythonLibs REQUIRED)
-
-
 ###
 # Private helper function to execute `python -c "<cmd>"`
 #
@@ -31,6 +27,8 @@ endfunction()
 # Find scikit-build and include its cmake resource scripts
 #
 if (NOT SKBUILD)
+  find_package(PythonInterp REQUIRED)
+  find_package(PythonLibs REQUIRED)
   pycmd(skbuild_location "import os, skbuild; print(os.path.dirname(skbuild.__file__))")
   set(skbuild_cmake_dir "${skbuild_location}/resources/cmake")
   # If skbuild is not the driver, then we need to include its utilities in our CMAKE_MODULE_PATH
@@ -44,6 +42,7 @@ find_package(NumPy REQUIRED)
 
 # Backend C library
 add_subdirectory("src/cxx")
+
 
 # Cython library
 add_subdirectory("src/python/pycold")
