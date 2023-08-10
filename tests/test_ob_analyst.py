@@ -52,7 +52,13 @@ def test_object_analysis():
     [object_map_s1, cm_date_array_updated, object_map_s2, s1_info] = segmentation_floodfill(
         cm_array, cm_date_array, cm_array_l1, cm_array_l1_date)
     classification_map = np.load(TEST_RESOURCE_DPATH / 'feature_maps/yearlyclassification_1999.npy')
-    change_map = object_analysis(object_map_s1, object_map_s2, s1_info, classification_map)
+    uniform_threshold = None
+    uniform_sizeslope = None
+    parameters = None
+    change_map = object_analysis(
+        object_map_s1, object_map_s2, s1_info, classification_map,
+        uniform_threshold, uniform_sizeslope, parameters
+    )
     # import matplotlib.pyplot as plt
     # plt.imshow(change_map)
     # test_config = yaml.safe_load(yaml_obj)

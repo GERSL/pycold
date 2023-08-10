@@ -242,7 +242,7 @@ def modeby(input_array, index_array):
 
     # Split input array with those start, stop ones
     split = [a_sorted[i:j] for i, j in zip(cut_idx[:-1], cut_idx[1:])]
-    mode_list = [stats.mode(x)[0][0] for x in split]
+    mode_list = [stats.mode(x, keepdims=True)[0][0] for x in split]
     return mode_list
 
 
@@ -367,7 +367,7 @@ def segmentation_floodfill(
     seed_index = np.where(cm_array_gaussian_s1 > peak_threshold)
     cm_seed = cm_array_gaussian_s1[seed_index]
     zip_list = sorted(zip(cm_seed, np.transpose(seed_index)), key=lambda t: t[0], reverse=True)
-    seed_index = [x[1] for x in zip_list]
+    seed_index = [x[1] for x in zip_list]  # type: ignore
     # seed_index = np.flip(seed_index, axis=0)
 
     mask_s1 = np.zeros((n_rows + 2, n_cols + 2)).astype(np.uint8)

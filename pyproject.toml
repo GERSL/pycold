@@ -1,5 +1,18 @@
 [build-system]
-requires = ["setuptools>=41.0.1", "scikit-build>=0.11.1", "numpy", "ninja>=1.10.2", "cmake>=3.21.2", "cython>=0.29.24",]
+requires = [
+    "setuptools>=41.0.1",
+    "scikit-build>=0.11.1",
+    # Note: it is important that numpy is pinned to the minimum version at
+    # build time, because while the numpy ABI is forward compatible, it is 
+    # not backwards compatible.
+    "numpy==1.23.2  ; python_version < '4.0'  and python_version >= '3.11'",
+    "numpy==1.21.6  ; python_version < '3.11' and python_version >= '3.10'",
+    "numpy==1.21.6  ; python_version < '3.10' and python_version >= '3.9'",
+    "numpy==1.21.6  ; python_version < '3.9'  and python_version >= '3.8'",
+    "ninja>=1.10.2",
+    "cmake>=3.21.2",
+    "cython>=0.29.24",
+]
 
 [tool.xcookie]
 url = 'https://github.com/GERSL/pycold'
@@ -7,23 +20,32 @@ tags = [ "github", "binpy", "cv2", "gdal"]
 mod_name = "pycold"
 repo_name = "pycold"
 rel_mod_parent_dpath = "src/python"
-os = [ "osx", "linux", "win", "all"]
+os = [ 
+    #"osx",
+    "linux", 
+    #"win", 
+    #"all"
+]
 min_python = 3.8
 author = "Su Ye"
 enable_gpg = false
 defaultbranch = "devel"
 author_email = "remotesensingsuy@gmail.com"
 description = "python implementation of COntinuous monitoring of Land disturbances algorithm"
-dev_status = "alpha"
+dev_status = "beta"
 license = "Apache 2"
+ci_pypi_live_password_varname = 'PYPI'
+ci_pypi_test_password_varname = 'PYPY_TEST'
 
 
 [tool.cibuildwheel]
-build = "cp38-* cp39-* cp310-*"
+# Options for this section are documented here
+# https://cibuildwheel.readthedocs.io/en/stable/options/
+build = "cp38-* cp39-* cp310-* cp311-*"
 #build = "cp310-manylinux_x86_64"
 build-frontend = "build"
-skip = "pp* *-musllinux_*"
-#archs = ["x86_64"]
+skip = "*-win32 *-musllinux_* *i686 pp*"
+archs = ["x86_64"]
 #archs = ["i686"]
 build-verbosity = 1
 test-requires = ["-r requirements/tests.txt", "-r requirements/headless.txt", "-r requirements/gdal.txt"]

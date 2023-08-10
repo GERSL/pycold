@@ -294,7 +294,7 @@ cpdef _sccd_detect(np.ndarray[np.int64_t, ndim=1, mode='c'] dates,
                    np.ndarray[np.int64_t, ndim=1, mode='c'] ts_t,
                    np.ndarray[np.int64_t, ndim=1, mode='c'] qas,
                    double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False, b_pinpoint=False,
-                   double gate_tcg=9.236, double predictability_tcg=15.086):
+                   double gate_tcg=9.236, double predictability_tcg=9.236):
     """
     S-CCD processing. It is required to be done before near real time monitoring
 

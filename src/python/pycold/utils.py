@@ -5,7 +5,6 @@ from os.path import join
 from dataclasses import fields
 import os
 import datetime as dt
-from typing import Callable, Any
 from osgeo import gdal
 from .app import defaults
 from .common import SccdOutput, nrtqueue_dt, sccd_dt, nrtmodel_dt, DatasetInfo
@@ -103,9 +102,9 @@ def assemble_cmmaps(
     """
     # anchor_dates_list = None
     if prefix == "CM":
-        output_type = np.int16
+        output_type = np.int16  # type: ignore
     elif prefix == "CM_date":
-        output_type = np.int16
+        output_type = np.int32  # type: ignore
         # cuz the date is produced as byte to squeeze the storage size, need to expand
         # anchor_dates_list_single = np.arange(start=starting_date,
         #                                      stop=starting_date + config['CM_OUTPUT_INTERVAL'] * n_cm_maps,
@@ -113,7 +112,7 @@ def assemble_cmmaps(
         # anchor_dates_list = np.tile(anchor_dates_list_single, config['block_width'] * config['block_height'])
 
     elif prefix == "CM_direction":
-        output_type = np.uint8
+        output_type = np.uint8  # type: ignore
 
     cm_map_list = [
         np.full(
@@ -564,11 +563,15 @@ def calculate_sccd_cm(sccd_pack):
     return np.median(cm, axis=1)
 
 
-def class_from_dict(data_class: Callable[..., Any], dict_var: dict):
+# from typing import Callable, Any
+# data_class_type = DataclassInstance | type[DataclassInstance]
+#Callable[..., Any],
+
+def class_from_dict(data_class, dict_var: dict):
     """convert dictionary to dataclas
 
     Args:
-        dataclass (data_class): _description_
+        dataclass (DataclassInstance | type[DataclassInstance]): _description_
         dict_var (dict): _description_
 
     Returns:
