@@ -346,7 +346,7 @@ def main(
     dataset_info = class_from_dict(DatasetInfo, config_general["DATASETINFO"])
     conse = int(config_general["ALGORITHMINFO"]["conse"])
     cm_output_interval = int(config_general["ALGORITHMINFO"]["CM_OUTPUT_INTERVAL"])
-    probability_threshold = int(config_general["ALGORITHMINFO"]["probability_threshold"])
+    probability_threshold = config_general["ALGORITHMINFO"]["probability_threshold"]
 
     if (dataset_info.n_cols % dataset_info.block_width != 0) or (
         dataset_info.n_rows % dataset_info.block_height != 0

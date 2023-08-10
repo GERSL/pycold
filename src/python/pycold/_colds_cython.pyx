@@ -136,7 +136,7 @@ cpdef _cold_detect(np.ndarray[np.int64_t, ndim=1, mode='c'] dates, np.ndarray[np
                    np.ndarray[np.int64_t, ndim=1, mode='c'] ts_n, np.ndarray[np.int64_t, ndim=1, mode='c'] ts_s1,
                    np.ndarray[np.int64_t, ndim=1, mode='c'] ts_s2, np.ndarray[np.int64_t, ndim=1, mode='c'] ts_t,
                    np.ndarray[np.int64_t, ndim=1, mode='c'] qas, double t_cg = 15.0863, int pos=1, int conse=6,
-                   bint b_output_cm=False, int starting_date=0, int n_cm=0, int cm_output_interval=0, bint b_c2=False,
+                   bint b_output_cm=False, int starting_date=0, int n_cm=0, int cm_output_interval=0, bint b_c2=True,
                    double gap_days=365.25):
     """
     Helper function to do COLD algorithm.
@@ -229,7 +229,7 @@ cpdef _obcold_reconstruct(np.ndarray[np.int64_t, ndim=1, mode='c'] dates,
                           np.ndarray[np.int64_t, ndim=1, mode='c'] ts_t,
                           np.ndarray[np.int64_t, ndim=1, mode='c'] qas,
                           np.ndarray[np.int64_t, ndim=1, mode='c'] break_dates, int pos=1,
-                          int conse=6, bint b_c2=False):
+                          int conse=6, bint b_c2=True):
     """
     re-contructructing change records using break dates.
         Parameters
@@ -293,7 +293,7 @@ cpdef _sccd_detect(np.ndarray[np.int64_t, ndim=1, mode='c'] dates,
                    np.ndarray[np.int64_t, ndim=1, mode='c'] ts_s2,
                    np.ndarray[np.int64_t, ndim=1, mode='c'] ts_t,
                    np.ndarray[np.int64_t, ndim=1, mode='c'] qas,
-                   double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False, b_pinpoint=False,
+                   double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=True, b_pinpoint=False,
                    double gate_tcg=9.236, double predictability_tcg=9.236):
     """
     S-CCD processing. It is required to be done before near real time monitoring
@@ -422,7 +422,7 @@ cpdef _sccd_update(sccd_pack,
                    np.ndarray[np.int64_t, ndim=1, mode='c'] ts_s2,
                    np.ndarray[np.int64_t, ndim=1, mode='c'] ts_t,
                    np.ndarray[np.int64_t, ndim=1, mode='c'] qas,
-                   double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=False,
+                   double t_cg = 15.0863, int pos=1, int conse=6, bint b_c2=True,
                    double gate_tcg=9.236, double predictability_tcg=15.086):
     """
     SCCD online update for new observations
