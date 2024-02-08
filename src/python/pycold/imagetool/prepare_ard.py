@@ -223,9 +223,9 @@ def single_image_stacking_hls(
         QA_band = gdal_array.LoadFile(join(folder, "{}.Fmask.tif".format(folder.split('/')[-1])))
     except ValueError as e:
         # logger.error('Cannot open QA band for {}: {}'.format(folder, e))
-        logger.error("Cannot open QA band for {}: {}".format(folder, e))
+        logger.error("Cannot open QA band for {}: {}".format(folder.split('/')[-1], e))
         return False
-
+    
     # convertQA = np.vectorize(qabitval)
     QA_band_unpacked = qabitval_array_HLS(QA_band).astype(np.short)
     if clear_threshold > 0:
@@ -250,22 +250,22 @@ def single_image_stacking_hls(
         if sensor == "L30":
             try:
                 B1 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B02.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B02.tif".format(folder.split('/')[-1]))
                 )
                 B2 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B03.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B03.tif".format(folder.split('/')[-1]))
                 )
                 B3 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B04.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B04.tif".format(folder.split('/')[-1]))
                 )
                 B4 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B05.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B05.tif".format(folder.split('/')[-1]))
                 )
                 B5 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B06.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B06.tif".format(folder.split('/')[-1]))
                 )
                 B6 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B07.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B07.tif".format(folder.split('/')[-1]))
                 )
                 B7 = np.full(B6.shape, 0)  # assign zero
 
@@ -276,22 +276,22 @@ def single_image_stacking_hls(
         elif sensor == "S30":
             try:
                 B1 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B02.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B02.tif".format(folder.split('/')[-1]))
                 )
                 B2 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B03.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B03.tif".format(folder.split('/')[-1]))
                 )
                 B3 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B04.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B04.tif".format(folder.split('/')[-1]))
                 )
                 B4 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B8A.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B8A.tif".format(folder.split('/')[-1]))
                 )
                 B5 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B11.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B11.tif".format(folder.split('/')[-1]))
                 )
                 B6 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B12.tif".format(folder.split('/')[-1]))
+                    join(folder, "{}.B12.tif".format(folder.split('/')[-1]))
                 )
                 B7 = np.full(B6.shape, 0)
 
@@ -2077,7 +2077,6 @@ def main(
             if new_rank > (len(folder_list) - 1):
                 break
             folder = folder_list[new_rank]
-            print(folder)
             single_image_stacking_hls(
                 source_dir,
                 out_dir,
