@@ -365,8 +365,7 @@ def main(
         assert all(elem in band_names for elem in coefs_bands)
 
     if rank == 0:
-        if not os.path.exists(out_path):
-            os.makedirs(out_path)
+        os.makedirs(out_path, exist_ok=True)
 
         ref_image = gdal.Open(reference_path, gdal.GA_ReadOnly)
         trans = ref_image.GetGeoTransform()
