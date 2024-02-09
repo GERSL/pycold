@@ -40,7 +40,7 @@ from osgeo import gdal
 import fiona
 from pycold.common import DatasetInfo
 from pycold.utils import class_from_dict
-
+from pathlib import Path
 
 # define constant here
 QA_CLEAR = 0
@@ -1841,7 +1841,7 @@ def main(
     elif collection == "HLS":
         folder_list = [f for f in listdir(source_dir) if f.startswith("HLS")]
         if folder_list == []:
-            folder_list = [folder for folder, dir, file in os.walk(source_dir) if folder.split('/')[-1].startswith('HLS.')]
+            folder_list = [folder for folder, dir, file in os.walk(source_dir) if Path(folder).name.startswith('HLS.')]
     elif collection == "HLS14":
         folder_list = [y for x in os.walk(source_dir) for y in glob(os.path.join(x[0], "*.hdf"))]
 
@@ -1866,8 +1866,7 @@ def main(
             "AutoPrepareDataARD starts: {}".format(datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S"))
         )
 
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
+        os.makedirs(out_dir, exist_ok=True)
 
         if is_partition is True:
             for i in range(dataset_info.n_block_y):
@@ -1876,8 +1875,7 @@ def main(
                     if not os.path.exists(join(out_dir, block_folder)):
                         os.makedirs(join(out_dir, block_folder))
 
-        if not os.path.exists(tmp_path):
-            os.makedirs(tmp_path)
+        os.makedirs(tmp_path, exist_ok=True)
 
         if hpc is True:
             if collection == "ARD" or collection == "ARD-C2":
