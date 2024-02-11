@@ -40,7 +40,7 @@ from osgeo import gdal
 import fiona
 from pycold.common import DatasetInfo
 from pycold.utils import class_from_dict
-
+from pathlib import Path
 
 # define constant here
 QA_CLEAR = 0
@@ -220,12 +220,12 @@ def single_image_stacking_hls(
     :return:
     """
     try:
-        QA_band = gdal_array.LoadFile(join(join(source_dir, folder), "{}.Fmask.tif".format(folder)))
+        QA_band = gdal_array.LoadFile(join(folder, "{}.Fmask.tif".format(folder.split('/')[-1])))
     except ValueError as e:
         # logger.error('Cannot open QA band for {}: {}'.format(folder, e))
-        logger.error("Cannot open QA band for {}: {}".format(folder, e))
+        logger.error("Cannot open QA band for {}: {}".format(folder.split('/')[-1], e))
         return False
-
+    
     # convertQA = np.vectorize(qabitval)
     QA_band_unpacked = qabitval_array_HLS(QA_band).astype(np.short)
     if clear_threshold > 0:
@@ -236,7 +236,7 @@ def single_image_stacking_hls(
         clear_ratio = 1
 
     if clear_ratio > clear_threshold:
-        [collection, sensor, tile_id, imagetime, version1, version2] = folder.rsplit(".")
+        [collection, sensor, tile_id, imagetime, version1, version2] = folder.split('/')[-1].rsplit(".")
         year = imagetime[0:4]
         doy = imagetime[4:7]
         file_name = sensor + tile_id + year + doy + collection + version1
@@ -250,54 +250,54 @@ def single_image_stacking_hls(
         if sensor == "L30":
             try:
                 B1 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B02.tif".format(folder))
+                    join(folder, "{}.B02.tif".format(folder.split('/')[-1]))
                 )
                 B2 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B03.tif".format(folder))
+                    join(folder, "{}.B03.tif".format(folder.split('/')[-1]))
                 )
                 B3 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B04.tif".format(folder))
+                    join(folder, "{}.B04.tif".format(folder.split('/')[-1]))
                 )
                 B4 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B05.tif".format(folder))
+                    join(folder, "{}.B05.tif".format(folder.split('/')[-1]))
                 )
                 B5 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B06.tif".format(folder))
+                    join(folder, "{}.B06.tif".format(folder.split('/')[-1]))
                 )
                 B6 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B07.tif".format(folder))
+                    join(folder, "{}.B07.tif".format(folder.split('/')[-1]))
                 )
                 B7 = np.full(B6.shape, 0)  # assign zero
 
             except Exception as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                logger.error("Cannot open Landsat bands for {}: {}".format(folder, e))
+                logger.error("Cannot open Landsat bands for {}: {}".format(folder.split('/')[-1], e))
                 return False
         elif sensor == "S30":
             try:
                 B1 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B02.tif".format(folder))
+                    join(folder, "{}.B02.tif".format(folder.split('/')[-1]))
                 )
                 B2 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B03.tif".format(folder))
+                    join(folder, "{}.B03.tif".format(folder.split('/')[-1]))
                 )
                 B3 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B04.tif".format(folder))
+                    join(folder, "{}.B04.tif".format(folder.split('/')[-1]))
                 )
                 B4 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B8A.tif".format(folder))
+                    join(folder, "{}.B8A.tif".format(folder.split('/')[-1]))
                 )
                 B5 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B11.tif".format(folder))
+                    join(folder, "{}.B11.tif".format(folder.split('/')[-1]))
                 )
                 B6 = gdal_array.LoadFile(
-                    join(join(source_dir, folder), "{}.B12.tif".format(folder))
+                    join(folder, "{}.B12.tif".format(folder.split('/')[-1]))
                 )
                 B7 = np.full(B6.shape, 0)
 
             except Exception as e:
                 # logger.error('Cannot open spectral bands for {}: {}'.format(folder, e))
-                logger.error("Cannot open Landsat bands for {}: {}".format(folder, e))
+                logger.error("Cannot open Landsat bands for {}: {}".format(folder.split('/')[-1], e))
                 return False
 
         if (
@@ -1840,6 +1840,8 @@ def main(
         ]
     elif collection == "HLS":
         folder_list = [f for f in listdir(source_dir) if f.startswith("HLS")]
+        if folder_list == []:
+            folder_list = [folder for folder, dir, file in os.walk(source_dir) if Path(folder).name.startswith('HLS.')]
     elif collection == "HLS14":
         folder_list = [y for x in os.walk(source_dir) for y in glob(os.path.join(x[0], "*.hdf"))]
 
@@ -1864,18 +1866,16 @@ def main(
             "AutoPrepareDataARD starts: {}".format(datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S"))
         )
 
-        if not os.path.exists(out_dir):
-            os.mkdir(out_dir)
+        os.makedirs(out_dir, exist_ok=True)
 
         if is_partition is True:
             for i in range(dataset_info.n_block_y):
                 for j in range(dataset_info.n_block_x):
                     block_folder = "block_x{}_y{}".format(j + 1, i + 1)
                     if not os.path.exists(join(out_dir, block_folder)):
-                        os.mkdir(join(out_dir, block_folder))
+                        os.makedirs(join(out_dir, block_folder))
 
-        if not os.path.exists(tmp_path):
-            os.mkdir(tmp_path)
+        os.makedirs(tmp_path, exist_ok=True)
 
         if hpc is True:
             if collection == "ARD" or collection == "ARD-C2":
@@ -1937,8 +1937,8 @@ def main(
             ]
         elif collection == "HLS":
             ordinal_dates = [
-                pd.Timestamp.toordinal(dt.datetime(int(folder[15:19]), 1, 1))
-                + int(folder[19:22])
+                pd.Timestamp.toordinal(dt.datetime(int(folder.split('/')[-1][15:19]), 1, 1))
+                + int(folder.split('/')[-1][19:22])
                 - 1
                 for folder in folder_list
             ]

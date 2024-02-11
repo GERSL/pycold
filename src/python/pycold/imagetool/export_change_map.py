@@ -365,8 +365,7 @@ def main(
         assert all(elem in band_names for elem in coefs_bands)
 
     if rank == 0:
-        if not os.path.exists(out_path):
-            os.makedirs(out_path)
+        os.makedirs(out_path, exist_ok=True)
 
         ref_image = gdal.Open(reference_path, gdal.GA_ReadOnly)
         trans = ref_image.GetGeoTransform()
@@ -486,7 +485,7 @@ def main(
             current_dist_type = 0
             year_list_to_predict = list(range(year_lowbound, year_uppbound + 1))
             ordinal_day_list = [
-                pd.Timestamp.toordinal(datetime.date(year, 7, 1)) for year in year_list_to_predict
+                pd.Timestamp.toordinal(datetime.datetime(year, 7, 1)) for year in year_list_to_predict
             ]
             for count, curve in enumerate(cold_block):
                 if curve["pos"] != current_processing_pos:
@@ -527,7 +526,7 @@ def main(
                 results_block[break_year - year_lowbound][i_row][i_col] = (
                     current_dist_type * 1000
                     + curve["t_break"]
-                    - (pd.Timestamp.toordinal(datetime.date(break_year, 1, 1)))
+                    - (pd.Timestamp.toordinal(datetime.datetime(break_year, 1, 1)))
                     + 1
                 )
                 # e.g., 1315 means that disturbance happens at doy of 315
