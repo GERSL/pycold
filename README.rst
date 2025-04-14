@@ -1,7 +1,10 @@
-Pycold has been moved to the new place
-======
+⚠️ **Warning**
 
-For administrative reasons, pycold has been merged into the new package `pyxccd <https://github.com/Remote-Sensing-of-Land-Resource-Lab/pyxccd>`_ for better management. We have simplified the installation procedure, now you could install pyxccd directly through pip:
+For administrative reasons, `pycold` is **no longer maintained**.
+
+You should switch to `pyxccd <https://github.com/Remote-Sensing-of-Land-Resource-Lab/pyxccd>`_.
+
+To use the new package, you could simply install it in pip:
 
 .. code:: console
 
